@@ -1,0 +1,14 @@
+{
+    "name": "akp/dashboard-asset",
+    "description": "Dashboard Asset Management",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Andhikasepta",
+            "email": "andhikasepta9@gmail.com"
+        }
+    ],
+    "require": {
+        "phpoffice/phpspreadsheet": "^5.10"
+    }
+}
