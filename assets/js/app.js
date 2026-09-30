@@ -1,931 +1,605 @@
 /**
- * Dashboard Asset Management — Main Application
- * 
- * Handles navigation, CSRF tokens, DataTables initialization,
- * Excel import, period management, and migration controls.
+ * Asset Management - Core Application JS
+ * Stock Opname Master Data with Pagination, Column Filters & Delete
  */
 
-'use strict';
-
 const App = (() => {
-    /** @type {string} CSRF token for state-changing requests */
+    let allMasterRows = [];
+    let filteredMasterRows = [];
+    let currentPage = 1;
+    let pageSize = 10;
+    let searchQuery = '';
+
+    let selectedFile = null;
     let csrfToken = '';
 
-    /** @type {DataTable|null} DataTables instance */
-    let assetsTable = null;
-
-    /** @type {Chart|null} Chart.js instances */
-    let categoryChart = null;
-    let periodChart = null;
+    // Column keys matching the filter dropdowns
+    const filterColumns = [
+        'profile', 'period_start', 'period_end',
+        'match_physic_qty', 'match_physic_pct', 'match_nbv_value', 'match_nbv_pct',
+        'physic_physic_qty', 'physic_physic_pct', 'physic_nbv_value', 'physic_nbv_pct',
+        'db_physic_qty', 'db_physic_pct', 'db_nbv_value', 'db_nbv_pct',
+        'total_physic_actual', 'total_physic_target', 'total_physic_pct',
+        'total_nbv_actual', 'total_nbv_target', 'total_nbv_pct'
+    ];
 
     // ── Initialization ─────────────────────────────────────────
 
-    async function init() {
-        await fetchCsrfToken();
-        setupNavigation();
-        setupModals();
-        setupImportForm();
-        navigateTo('dashboard');
-    }
-
-    // ── CSRF Token ─────────────────────────────────────────────
-
-    async function fetchCsrfToken() {
-        try {
-            const res = await fetch('api/csrf.php');
-            const data = await res.json();
-            if (data.success) {
-                csrfToken = data.token;
-            }
-        } catch (err) {
-            showToast('error', 'Connection Error', 'Could not connect to the server.');
-        }
-    }
-
-    // ── Navigation ─────────────────────────────────────────────
-
-    function setupNavigation() {
-        const navItems = document.querySelectorAll('.nav-item[data-page]');
-        navItems.forEach(item => {
-            item.addEventListener('click', () => {
-                const page = item.getAttribute('data-page');
-                navigateTo(page);
-            });
-        });
-
-        // Mobile menu
-        const menuBtn = document.getElementById('mobile-menu-btn');
-        const sidebar = document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-
-        if (menuBtn) {
-            menuBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-            });
+    function init() {
+        const metaCsrf = document.querySelector('meta[name="csrf-token"]');
+        if (metaCsrf) {
+            csrfToken = metaCsrf.getAttribute('content');
         }
 
-        if (overlay) {
-            overlay.addEventListener('click', () => {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('active');
-            });
-        }
+        setupDragAndDrop();
+
+        // Default landing page is Master Data
+        navigateTo('master-data');
     }
+
+    // ── Navigation (Master Data vs Summary) ─────────────────────
 
     function navigateTo(page) {
-        // Update nav active state
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        const activeNav = document.querySelector(`.nav-item[data-page="${page}"]`);
-        if (activeNav) activeNav.classList.add('active');
+        document.querySelectorAll('.nav-link').forEach(link => {
+            const linkPage = link.getAttribute('data-page');
+            link.classList.toggle('active', linkPage === page);
+        });
 
-        // Show page section
-        document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-        const section = document.getElementById(`page-${page}`);
-        if (section) section.classList.add('active');
+        document.querySelectorAll('.page-section').forEach(sec => {
+            sec.classList.remove('active');
+        });
 
-        // Update header title
-        const titles = {
-            'dashboard': 'Dashboard Overview',
-            'master-data': 'Master Data',
-            'import': 'Import Excel',
-            'migrations': 'Database Migrations',
-        };
-        const headerTitle = document.getElementById('header-title');
-        if (headerTitle) headerTitle.textContent = titles[page] || 'Dashboard';
+        const activeSec = document.getElementById(`page-${page}`);
+        if (activeSec) {
+            activeSec.classList.add('active');
+        }
 
-        // Close mobile sidebar
-        document.querySelector('.sidebar')?.classList.remove('open');
-        document.querySelector('.sidebar-overlay')?.classList.remove('active');
-
-        // Load page data
-        switch (page) {
-            case 'dashboard':
-                loadDashboard();
-                break;
-            case 'master-data':
-                loadMasterData();
-                break;
-            case 'import':
-                loadImportPage();
-                break;
-            case 'migrations':
-                loadMigrations();
-                break;
+        if (page === 'master-data') {
+            loadMasterData();
+        } else if (page === 'summary') {
+            loadSummaryData();
         }
     }
 
-    // ── Dashboard ──────────────────────────────────────────────
+    // ── Page 1: Stock Opname Master Data with Pagination ────────
 
-    async function loadDashboard() {
+    async function loadMasterData() {
+        const tbody = document.getElementById('master-table-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="22" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    Loading records from PostgreSQL database...
+                </td>
+            </tr>
+        `;
+
         try {
-            const res = await fetch('api/dashboard.php');
+            const res = await fetch('api/reconciliation.php');
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Error', json.message || 'Failed to load dashboard');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
+                            ${json.message || 'Error loading records from database'}
+                        </td>
+                    </tr>
+                `;
                 return;
             }
 
-            const d = json.data;
-
-            // Update stat cards
-            updateStatCard('stat-total-assets', formatNumber(d.total_assets));
-            updateStatCard('stat-total-periods', formatNumber(d.total_periods));
-            updateStatCard('stat-total-value', formatCurrency(d.total_value));
-            updateStatCard('stat-book-value', formatCurrency(d.total_book_value));
-
-            // Render charts
-            renderCategoryChart(d.by_category);
-            renderPeriodChart(d.by_period);
-
-            // Recent imports
-            renderRecentImports(d.recent_imports);
-
+            allMasterRows = json.data || [];
+            populateColumnFilters();
+            applyFilterAndRender();
         } catch (err) {
-            showToast('error', 'Connection Error', 'Could not load dashboard data.');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        Network or server error while connecting to PostgreSQL.
+                    </td>
+                </tr>
+            `;
         }
     }
 
-    function updateStatCard(id, value) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
-    }
+    // ── Column Filter Dropdowns ────────────────────────────────
 
-    function renderCategoryChart(data) {
-        const ctx = document.getElementById('category-chart');
-        if (!ctx) return;
+    function populateColumnFilters() {
+        filterColumns.forEach(col => {
+            const select = document.querySelector(`.col-filter[data-col="${col}"]`);
+            if (!select) return;
 
-        if (categoryChart) categoryChart.destroy();
+            // Remember current selection
+            const currentVal = select.value;
 
-        const colors = [
-            'rgba(99, 128, 255, 0.8)',
-            'rgba(168, 85, 247, 0.8)',
-            'rgba(52, 211, 153, 0.8)',
-            'rgba(251, 191, 36, 0.8)',
-            'rgba(248, 113, 113, 0.8)',
-            'rgba(96, 165, 250, 0.8)',
-            'rgba(244, 114, 182, 0.8)',
-            'rgba(192, 132, 252, 0.8)',
-        ];
+            // Get unique values for this column
+            const uniqueVals = new Set();
+            allMasterRows.forEach(row => {
+                const val = row[col];
+                if (val !== null && val !== undefined && val !== '') {
+                    uniqueVals.add(String(val));
+                }
+            });
 
-        categoryChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: data.map(d => d.category || 'Uncategorized'),
-                datasets: [{
-                    data: data.map(d => parseInt(d.count, 10)),
-                    backgroundColor: colors.slice(0, data.length),
-                    borderColor: 'rgba(28, 31, 46, 1)',
-                    borderWidth: 3,
-                    hoverOffset: 8,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '65%',
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: '#8b8fa7',
-                            font: { family: "'Inter', sans-serif", size: 12 },
-                            padding: 16,
-                            usePointStyle: true,
-                            pointStyleWidth: 10,
-                        },
-                    },
-                    tooltip: {
-                        backgroundColor: '#252a3a',
-                        titleColor: '#e8eaf0',
-                        bodyColor: '#8b8fa7',
-                        borderColor: 'rgba(255,255,255,0.06)',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        padding: 12,
-                        titleFont: { family: "'Inter', sans-serif", weight: '600' },
-                        bodyFont: { family: "'Inter', sans-serif" },
-                    },
-                },
-            },
+            // Sort values
+            const sorted = Array.from(uniqueVals).sort((a, b) => {
+                const numA = parseFloat(a);
+                const numB = parseFloat(b);
+                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                return a.localeCompare(b);
+            });
+
+            // Rebuild options
+            let html = '<option value="">All</option>';
+            sorted.forEach(v => {
+                html += `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`;
+            });
+            select.innerHTML = html;
+
+            // Restore selection if still valid
+            if (currentVal && sorted.includes(currentVal)) {
+                select.value = currentVal;
+            }
         });
     }
 
-    function renderPeriodChart(data) {
-        const ctx = document.getElementById('period-chart');
-        if (!ctx) return;
-
-        if (periodChart) periodChart.destroy();
-
-        periodChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: data.map(d => d.label),
-                datasets: [{
-                    label: 'Number of Assets',
-                    data: data.map(d => parseInt(d.asset_count, 10)),
-                    backgroundColor: 'rgba(99, 128, 255, 0.6)',
-                    borderColor: 'rgba(99, 128, 255, 1)',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }, {
-                    label: 'Total Value (Millions)',
-                    data: data.map(d => parseFloat(d.total_value) / 1000000),
-                    backgroundColor: 'rgba(168, 85, 247, 0.4)',
-                    borderColor: 'rgba(168, 85, 247, 1)',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    type: 'line',
-                    yAxisID: 'y1',
-                    tension: 0.3,
-                    pointBackgroundColor: 'rgba(168, 85, 247, 1)',
-                    fill: false,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { intersect: false, mode: 'index' },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(255,255,255,0.03)' },
-                        ticks: { color: '#8b8fa7', font: { family: "'Inter', sans-serif", size: 11 } },
-                    },
-                    y: {
-                        position: 'left',
-                        grid: { color: 'rgba(255,255,255,0.03)' },
-                        ticks: { color: '#8b8fa7', font: { family: "'Inter', sans-serif", size: 11 } },
-                        title: { display: true, text: 'Assets Count', color: '#8b8fa7', font: { family: "'Inter', sans-serif" } },
-                    },
-                    y1: {
-                        position: 'right',
-                        grid: { drawOnChartArea: false },
-                        ticks: { color: '#8b8fa7', font: { family: "'Inter', sans-serif", size: 11 } },
-                        title: { display: true, text: 'Value (M)', color: '#8b8fa7', font: { family: "'Inter', sans-serif" } },
-                    },
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: '#8b8fa7',
-                            font: { family: "'Inter', sans-serif", size: 12 },
-                            usePointStyle: true,
-                            pointStyleWidth: 10,
-                        },
-                    },
-                    tooltip: {
-                        backgroundColor: '#252a3a',
-                        titleColor: '#e8eaf0',
-                        bodyColor: '#8b8fa7',
-                        borderColor: 'rgba(255,255,255,0.06)',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        padding: 12,
-                    },
-                },
-            },
+    function getColumnFilters() {
+        const filters = {};
+        filterColumns.forEach(col => {
+            const select = document.querySelector(`.col-filter[data-col="${col}"]`);
+            if (select && select.value) {
+                filters[col] = select.value;
+            }
         });
+        return filters;
     }
 
-    function renderRecentImports(imports) {
-        const tbody = document.getElementById('recent-imports-body');
+    // ── Search, Filter & Pagination ────────────────────────────
+
+    function handleSearch(query) {
+        searchQuery = (query || '').toLowerCase().trim();
+        currentPage = 1;
+        applyFilterAndRender();
+    }
+
+    function changePageSize(size) {
+        pageSize = size === 'all' ? allMasterRows.length : parseInt(size, 10);
+        currentPage = 1;
+        applyFilterAndRender();
+    }
+
+    function goToPage(page) {
+        const totalPages = Math.ceil(filteredMasterRows.length / pageSize) || 1;
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        renderMasterTable();
+    }
+
+    function applyFilterAndRender() {
+        let rows = allMasterRows.slice();
+
+        // Apply Month filter
+        const monthFilter = document.getElementById('filter-month');
+        if (monthFilter && monthFilter.value) {
+            const m = parseInt(monthFilter.value, 10);
+            rows = rows.filter(r => {
+                const startDate = r.period_start || '';
+                if (!startDate) return false;
+                // period_start is YYYY-MM-DD format
+                const parts = startDate.split('-');
+                if (parts.length >= 2) {
+                    return parseInt(parts[1], 10) === m;
+                }
+                return false;
+            });
+        }
+
+        // Apply Year filter
+        const yearFilter = document.getElementById('filter-year');
+        if (yearFilter && yearFilter.value) {
+            const y = parseInt(yearFilter.value, 10);
+            rows = rows.filter(r => {
+                const startDate = r.period_start || '';
+                if (!startDate) return false;
+                const parts = startDate.split('-');
+                if (parts.length >= 1) {
+                    return parseInt(parts[0], 10) === y;
+                }
+                return false;
+            });
+        }
+
+        // Apply per-column filters
+        const colFilters = getColumnFilters();
+        Object.keys(colFilters).forEach(col => {
+            const filterVal = colFilters[col];
+            rows = rows.filter(r => String(r[col] ?? '') === filterVal);
+        });
+
+        // Apply text search
+        if (searchQuery) {
+            rows = rows.filter(r => {
+                const profile = (r.profile || '').toLowerCase();
+                const start = (r.period_start || '').toLowerCase();
+                const end = (r.period_end || '').toLowerCase();
+                return profile.includes(searchQuery) || start.includes(searchQuery) || end.includes(searchQuery);
+            });
+        }
+
+        filteredMasterRows = rows;
+        currentPage = 1;
+        renderMasterTable();
+    }
+
+    function renderMasterTable() {
+        const tbody = document.getElementById('master-table-body');
+        const infoEl = document.getElementById('master-pagination-info');
+        const controlsEl = document.getElementById('master-pagination-controls');
         if (!tbody) return;
 
-        tbody.replaceChildren();
+        const totalItems = filteredMasterRows.length;
 
-        if (!imports || imports.length === 0) {
-            const tr = document.createElement('tr');
-            const td = document.createElement('td');
-            td.setAttribute('colspan', '5');
-            td.style.textAlign = 'center';
-            td.style.padding = '2rem';
-            td.style.color = 'var(--color-text-muted)';
-            td.textContent = 'No imports yet';
-            tr.appendChild(td);
-            tbody.appendChild(tr);
+        if (totalItems === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="22" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                        ${allMasterRows.length === 0 ? "No records found in database. Click 'Import Excel' to upload your data." : "No matching records data found."}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Showing 0 to 0 of 0 entries';
+            if (controlsEl) controlsEl.innerHTML = '';
             return;
         }
 
-        imports.forEach(imp => {
-            const tr = document.createElement('tr');
+        const effectivePageSize = pageSize > 0 ? pageSize : totalItems;
+        const totalPages = Math.ceil(totalItems / effectivePageSize) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
 
-            const tdFile = document.createElement('td');
-            tdFile.textContent = imp.original_filename;
+        const startIndex = (currentPage - 1) * effectivePageSize;
+        const endIndex = Math.min(startIndex + effectivePageSize, totalItems);
+        const pageRows = filteredMasterRows.slice(startIndex, endIndex);
 
-            const tdPeriod = document.createElement('td');
-            tdPeriod.textContent = imp.period_label;
+        let html = '';
+        pageRows.forEach(row => {
+            html += `
+                <tr>
+                    <td class="text-center col-action">
+                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRecord(${row.id})" title="Delete this record">
+                            🗑️
+                        </button>
+                    </td>
+                    <td class="text-left" style="font-weight: 500; max-width: 320px; white-space: normal;">
+                        ${escapeHtml(row.profile)}
+                    </td>
+                    <td class="text-center">${escapeHtml(row.period_start)}</td>
+                    <td class="text-center">${escapeHtml(row.period_end)}</td>
 
-            const tdRows = document.createElement('td');
-            tdRows.textContent = imp.rows_imported;
+                    <!-- RESULT MATCH -->
+                    <td class="text-right">${formatNumber(row.match_physic_qty)}</td>
+                    <td class="text-right">${parseFloat(row.match_physic_pct).toFixed(2)}%</td>
+                    <td class="text-right">${formatNumber(row.match_nbv_value)}</td>
+                    <td class="text-right">${parseFloat(row.match_nbv_pct).toFixed(2)}%</td>
 
-            const tdStatus = document.createElement('td');
-            const badge = document.createElement('span');
-            badge.classList.add('badge');
-            if (imp.status === 'completed') {
-                badge.classList.add('badge-success');
-                badge.textContent = 'Completed';
-            } else {
-                badge.classList.add('badge-warning');
-                badge.textContent = 'Partial';
-            }
-            tdStatus.appendChild(badge);
+                    <!-- RESULT PHYSIC -->
+                    <td class="text-right">${formatNumber(row.physic_physic_qty)}</td>
+                    <td class="text-right">${parseFloat(row.physic_physic_pct).toFixed(2)}%</td>
+                    <td class="text-right">${formatNumber(row.physic_nbv_value)}</td>
+                    <td class="text-right">${parseFloat(row.physic_nbv_pct).toFixed(2)}%</td>
 
-            const tdDate = document.createElement('td');
-            tdDate.textContent = formatDate(imp.imported_at);
+                    <!-- RESULT DB -->
+                    <td class="text-right">${formatNumber(row.db_physic_qty)}</td>
+                    <td class="text-right">${parseFloat(row.db_physic_pct).toFixed(2)}%</td>
+                    <td class="text-right">${formatNumber(row.db_nbv_value)}</td>
+                    <td class="text-right">${parseFloat(row.db_nbv_pct).toFixed(2)}%</td>
 
-            tr.append(tdFile, tdPeriod, tdRows, tdStatus, tdDate);
-            tbody.appendChild(tr);
+                    <!-- TOTAL -->
+                    <td class="text-right" style="font-weight: 600;">${formatNumber(row.total_physic_actual)}</td>
+                    <td class="text-right">${formatNumber(row.total_physic_target)}</td>
+                    <td class="text-right" style="font-weight: 600;">${parseFloat(row.total_physic_pct).toFixed(2)}%</td>
+                    <td class="text-right" style="font-weight: 600;">${formatNumber(row.total_nbv_actual)}</td>
+                    <td class="text-right">${formatNumber(row.total_nbv_target)}</td>
+                    <td class="text-right" style="font-weight: 600;">${parseFloat(row.total_nbv_pct).toFixed(2)}%</td>
+                </tr>
+            `;
         });
+        tbody.innerHTML = html;
+
+        // Update info text
+        if (infoEl) {
+            infoEl.textContent = `Showing ${(startIndex + 1).toLocaleString()} to ${endIndex.toLocaleString()} of ${totalItems.toLocaleString()} entries`;
+        }
+
+        // Generate pagination buttons
+        if (controlsEl) {
+            let btnsHtml = '';
+
+            // First & Prev buttons
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>« First</button>`;
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
+
+            // Window of page numbers
+            const maxButtons = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                btnsHtml += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="App.goToPage(${p})">${p}</button>`;
+            }
+
+            // Next & Last buttons
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next ›</button>`;
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>Last »</button>`;
+
+            controlsEl.innerHTML = btnsHtml;
+        }
     }
 
-    // ── Master Data ────────────────────────────────────────────
+    // ── Delete Record ──────────────────────────────────────────
 
-    async function loadMasterData() {
-        await loadPeriodsDropdown('master-period-filter');
-        initDataTable();
-    }
+    async function deleteRecord(id) {
+        if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
+            return;
+        }
 
-    async function loadPeriodsDropdown(selectId) {
         try {
-            const res = await fetch('api/periods.php');
+            const res = await fetch(`api/reconciliation.php?id=${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+
+            const json = await res.json();
+
+            if (json.success) {
+                showToast('success', 'Deleted', json.message || 'Record deleted successfully.');
+                // Remove from local data and re-render
+                allMasterRows = allMasterRows.filter(r => r.id != id);
+                populateColumnFilters();
+                applyFilterAndRender();
+            } else {
+                showToast('error', 'Delete Failed', json.message || 'Failed to delete record.');
+            }
+        } catch (err) {
+            showToast('error', 'Server Error', 'Failed to connect to the server.');
+        }
+    }
+
+    // ── Page 2: Stock Opname Summary (KPI & Overview) ───────────
+
+    async function loadSummaryData() {
+        const bodyEl = document.getElementById('summary-overview-body');
+        if (!bodyEl) return;
+
+        try {
+            const res = await fetch('api/reconciliation.php');
             const json = await res.json();
 
             if (!json.success) return;
 
-            const select = document.getElementById(selectId);
-            if (!select) return;
+            const t = json.totals || {};
+            const totalProfiles = parseInt(t.total_profiles || 0, 10);
+            const totalMatchQty = parseInt(t.total_match_qty || 0, 10);
+            const totalMatchNbv = parseFloat(t.total_match_nbv || 0);
+            const totalPhysicQty = parseInt(t.total_physic_qty || 0, 10);
+            const totalPhysicNbv = parseFloat(t.total_physic_nbv || 0);
+            const totalDbQty = parseInt(t.total_db_qty || 0, 10);
+            const totalDbNbv = parseFloat(t.total_db_nbv || 0);
+            const totalPhysicActual = parseInt(t.total_physic_actual || 0, 10);
+            const totalPhysicTarget = parseInt(t.total_physic_target || 0, 10);
+            const totalNbvActual = parseFloat(t.total_nbv_actual || 0);
+            const totalNbvTarget = parseFloat(t.total_nbv_target || 0);
 
-            // Keep the first "All Periods" option
-            const firstOption = select.querySelector('option');
-            select.replaceChildren();
-            if (firstOption) select.appendChild(firstOption);
+            // Update KPI cards
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val;
+            };
 
-            json.data.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.textContent = `${p.label} (${p.asset_count} assets)`;
-                select.appendChild(opt);
-            });
+            setVal('kpi-total-profiles', totalProfiles.toLocaleString());
+            setVal('kpi-match-qty', totalMatchQty.toLocaleString());
+            setVal('kpi-match-nbv', formatCurrency(totalMatchNbv));
+            setVal('kpi-physic-qty', totalPhysicQty.toLocaleString());
+            setVal('kpi-db-qty', totalDbQty.toLocaleString());
+
+            // Render Overview Table Row
+            bodyEl.innerHTML = `
+                <tr style="font-weight: 600;">
+                    <td class="text-left">Grand Total (${totalProfiles.toLocaleString()} Outlets)</td>
+                    <td class="text-right">${totalMatchQty.toLocaleString()}</td>
+                    <td class="text-right">${formatCurrency(totalMatchNbv)}</td>
+                    <td class="text-right">${totalPhysicQty.toLocaleString()}</td>
+                    <td class="text-right">${formatCurrency(totalPhysicNbv)}</td>
+                    <td class="text-right">${totalDbQty.toLocaleString()}</td>
+                    <td class="text-right">${formatCurrency(totalDbNbv)}</td>
+                    <td class="text-right">${totalPhysicTarget.toLocaleString()}</td>
+                    <td class="text-right">${formatCurrency(totalNbvTarget)}</td>
+                </tr>
+            `;
         } catch (err) {
-            // Silently fail — dropdown will just not populate
+            console.error('Error loading summary totals:', err);
         }
     }
 
-    function initDataTable() {
-        if (assetsTable) {
-            assetsTable.ajax.reload();
-            return;
-        }
+    // ── Import Modal & Drag-and-Drop ───────────────────────────
 
-        assetsTable = new DataTable('#assets-table', {
-            processing: true,
-            serverSide: true,
-            ajax: {
-                url: 'api/assets.php',
-                data: function (d) {
-                    const periodFilter = document.getElementById('master-period-filter');
-                    if (periodFilter && periodFilter.value) {
-                        d.period_id = periodFilter.value;
-                    }
-                },
-            },
-            columns: [
-                { data: 'id', visible: false },
-                { data: 'asset_number', title: 'Asset No.' },
-                { data: 'asset_name', title: 'Asset Name' },
-                { data: 'category', title: 'Category' },
-                { data: 'location', title: 'Location' },
-                {
-                    data: 'condition', title: 'Condition',
-                    render: function (data) {
-                        if (!data) return '-';
-                        const cls = data.toLowerCase() === 'good' || data.toLowerCase() === 'baik'
-                            ? 'badge-success'
-                            : data.toLowerCase() === 'poor' || data.toLowerCase() === 'rusak'
-                                ? 'badge-danger'
-                                : 'badge-warning';
-                        const span = document.createElement('span');
-                        span.className = `badge ${cls}`;
-                        span.textContent = data;
-                        const tmp = document.createElement('div');
-                        tmp.appendChild(span);
-                        return tmp.firstChild.outerHTML;
-                    },
-                },
-                {
-                    data: 'acquisition_value', title: 'Acq. Value',
-                    render: function (data) { return formatCurrency(parseFloat(data) || 0); },
-                },
-                {
-                    data: 'book_value', title: 'Book Value',
-                    render: function (data) { return formatCurrency(parseFloat(data) || 0); },
-                },
-                { data: 'period_label', title: 'Period' },
-                {
-                    data: null, title: 'Actions', orderable: false, searchable: false,
-                    render: function (data, type, row) {
-                        const editBtn = document.createElement('button');
-                        editBtn.className = 'btn btn-sm btn-secondary';
-                        editBtn.setAttribute('onclick', `App.editAsset(${row.id})`);
-                        editBtn.textContent = '✎ Edit';
+    function openImportModal() {
+        clearSelectedFile();
+        const statusDiv = document.getElementById('modal-import-status');
+        if (statusDiv) statusDiv.style.display = 'none';
 
-                        const delBtn = document.createElement('button');
-                        delBtn.className = 'btn btn-sm btn-danger';
-                        delBtn.setAttribute('onclick', `App.deleteAsset(${row.id})`);
-                        delBtn.textContent = '✕';
-                        delBtn.style.marginLeft = '4px';
+        const modal = document.getElementById('import-modal');
+        if (modal) modal.classList.add('active');
+    }
 
-                        const wrapper = document.createElement('div');
-                        wrapper.className = 'action-btns';
-                        wrapper.appendChild(editBtn);
-                        wrapper.appendChild(delBtn);
+    function closeImportModal() {
+        const modal = document.getElementById('import-modal');
+        if (modal) modal.classList.remove('active');
+    }
 
-                        const tmp = document.createElement('div');
-                        tmp.appendChild(wrapper);
-                        return tmp.firstChild.outerHTML;
-                    },
-                },
-            ],
-            order: [[1, 'asc']],
-            pageLength: 25,
-            lengthMenu: [10, 25, 50, 100],
-            language: {
-                search: 'Search:',
-                lengthMenu: 'Show _MENU_ entries',
-                info: 'Showing _START_ to _END_ of _TOTAL_ assets',
-                emptyTable: 'No asset data available. Import an Excel file to get started.',
-                processing: '<div class="spinner"></div> Loading...',
-            },
-            dom: '<"dataTables_top"lf>rt<"dataTables_bottom"ip>',
+    function setupDragAndDrop() {
+        const dropZone = document.getElementById('drag-drop-zone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
         });
 
-        // Period filter change
-        const periodFilter = document.getElementById('master-period-filter');
-        if (periodFilter) {
-            periodFilter.addEventListener('change', () => {
-                if (assetsTable) assetsTable.ajax.reload();
-            });
-        }
-    }
-
-    // ── Asset CRUD ────────────────────────────────────────────
-
-    async function editAsset(id) {
-        // Fetch asset data from current DataTable
-        if (!assetsTable) return;
-
-        const data = assetsTable.rows().data().toArray();
-        const asset = data.find(a => parseInt(a.id, 10) === id);
-        if (!asset) return;
-
-        // Populate edit modal
-        document.getElementById('edit-asset-id').value = asset.id;
-        document.getElementById('edit-asset-number').value = asset.asset_number || '';
-        document.getElementById('edit-asset-name').value = asset.asset_name || '';
-        document.getElementById('edit-category').value = asset.category || '';
-        document.getElementById('edit-location').value = asset.location || '';
-        document.getElementById('edit-condition').value = asset.condition || '';
-        document.getElementById('edit-acq-date').value = asset.acquisition_date || '';
-        document.getElementById('edit-acq-value').value = asset.acquisition_value || '';
-        document.getElementById('edit-book-value').value = asset.book_value || '';
-        document.getElementById('edit-useful-life').value = asset.useful_life || '';
-        document.getElementById('edit-description').value = asset.description || '';
-
-        openModal('edit-asset-modal');
-    }
-
-    async function saveAsset() {
-        const data = {
-            id: document.getElementById('edit-asset-id').value,
-            asset_number: document.getElementById('edit-asset-number').value,
-            asset_name: document.getElementById('edit-asset-name').value,
-            category: document.getElementById('edit-category').value,
-            location: document.getElementById('edit-location').value,
-            condition: document.getElementById('edit-condition').value,
-            acquisition_date: document.getElementById('edit-acq-date').value || null,
-            acquisition_value: document.getElementById('edit-acq-value').value || 0,
-            book_value: document.getElementById('edit-book-value').value || 0,
-            useful_life: document.getElementById('edit-useful-life').value || null,
-            description: document.getElementById('edit-description').value,
-        };
-
-        try {
-            const res = await fetch('api/assets.php', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken,
-                },
-                body: JSON.stringify(data),
-            });
-            const json = await res.json();
-
-            if (json.success) {
-                showToast('success', 'Updated', 'Asset updated successfully.');
-                closeModal('edit-asset-modal');
-                if (assetsTable) assetsTable.ajax.reload(null, false);
-            } else {
-                showToast('error', 'Error', json.message || 'Failed to update asset.');
-            }
-        } catch (err) {
-            showToast('error', 'Error', 'Could not update asset.');
-        }
-    }
-
-    async function deleteAsset(id) {
-        if (!window.confirm('Are you sure you want to delete this asset?')) return;
-
-        try {
-            const res = await fetch('api/assets.php', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken,
-                },
-                body: JSON.stringify({ id }),
-            });
-            const json = await res.json();
-
-            if (json.success) {
-                showToast('success', 'Deleted', 'Asset deleted successfully.');
-                if (assetsTable) assetsTable.ajax.reload(null, false);
-            } else {
-                showToast('error', 'Error', json.message || 'Failed to delete asset.');
-            }
-        } catch (err) {
-            showToast('error', 'Error', 'Could not delete asset.');
-        }
-    }
-
-    // ── Import ─────────────────────────────────────────────────
-
-    async function loadImportPage() {
-        await loadPeriodsDropdown('import-period-select');
-        loadImportPeriodsForCreate();
-    }
-
-    function loadImportPeriodsForCreate() {
-        // Populate month/year selectors for creating new periods
-        const monthSelect = document.getElementById('new-period-month');
-        const yearSelect = document.getElementById('new-period-year');
-
-        if (!monthSelect || !yearSelect) return;
-
-        // Only populate if empty
-        if (monthSelect.options.length <= 1) {
-            const months = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December',
-            ];
-            months.forEach((name, i) => {
-                const opt = document.createElement('option');
-                opt.value = i + 1;
-                opt.textContent = name;
-                monthSelect.appendChild(opt);
-            });
-        }
-
-        if (yearSelect.options.length <= 1) {
-            const currentYear = new Date().getFullYear();
-            for (let y = currentYear + 2; y >= 2020; y--) {
-                const opt = document.createElement('option');
-                opt.value = y;
-                opt.textContent = y;
-                yearSelect.appendChild(opt);
-            }
-        }
-    }
-
-    async function createPeriod() {
-        const month = document.getElementById('new-period-month').value;
-        const year = document.getElementById('new-period-year').value;
-
-        if (!month || !year) {
-            showToast('warning', 'Missing Fields', 'Please select both month and year.');
-            return;
-        }
-
-        try {
-            const res = await fetch('api/periods.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken,
-                },
-                body: JSON.stringify({ month: parseInt(month, 10), year: parseInt(year, 10) }),
-            });
-            const json = await res.json();
-
-            if (json.success) {
-                showToast('success', 'Period Created', `Period "${json.data.label}" is ready.`);
-                await loadPeriodsDropdown('import-period-select');
-                // Auto-select the new period
-                const select = document.getElementById('import-period-select');
-                if (select) select.value = json.data.id;
-            } else {
-                showToast('error', 'Error', json.message || 'Failed to create period.');
-            }
-        } catch (err) {
-            showToast('error', 'Error', 'Could not create period.');
-        }
-    }
-
-    function setupImportForm() {
-        const uploadZone = document.getElementById('upload-zone');
-        const fileInput = document.getElementById('excel-file-input');
-        const fileNameDisplay = document.getElementById('file-name-display');
-
-        if (!uploadZone || !fileInput) return;
-
-        // Drag and drop
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
         });
 
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-
-        uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                fileInput.files = e.dataTransfer.files;
-                showSelectedFile(e.dataTransfer.files[0]);
-            }
-        });
-
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length > 0) {
-                showSelectedFile(fileInput.files[0]);
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleFileSelect(dt.files);
             }
         });
     }
 
-    function showSelectedFile(file) {
-        const display = document.getElementById('file-name-display');
-        if (!display) return;
+    function handleFileSelect(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
 
-        display.style.display = 'flex';
-        const nameSpan = display.querySelector('.file-text');
-        if (nameSpan) nameSpan.textContent = file.name;
-    }
-
-    function removeSelectedFile() {
-        const fileInput = document.getElementById('excel-file-input');
-        const display = document.getElementById('file-name-display');
-
-        if (fileInput) fileInput.value = '';
-        if (display) display.style.display = 'none';
-    }
-
-    async function importExcel() {
-        const fileInput = document.getElementById('excel-file-input');
-        const periodSelect = document.getElementById('import-period-select');
-        const importBtn = document.getElementById('import-btn');
-
-        if (!periodSelect || !periodSelect.value) {
-            showToast('warning', 'Select Period', 'Please select a period before importing.');
-            return;
-        }
-
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            showToast('warning', 'Select File', 'Please select an Excel file to import.');
-            return;
-        }
-
-        const file = fileInput.files[0];
         const ext = file.name.split('.').pop().toLowerCase();
-        if (!['xlsx', 'xls'].includes(ext)) {
-            showToast('error', 'Invalid File', 'Only .xlsx and .xls files are supported.');
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            showToast('error', 'Invalid File', 'Only Excel files (.xlsx, .xls) are allowed.');
             return;
         }
 
-        // Size check (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            showToast('error', 'File Too Large', 'Maximum file size is 10MB.');
+        selectedFile = file;
+
+        const displayEl = document.getElementById('selected-file-display');
+        const nameEl = document.getElementById('selected-file-name');
+        const sizeEl = document.getElementById('selected-file-size');
+
+        if (displayEl && nameEl && sizeEl) {
+            nameEl.textContent = file.name;
+            const sizeKb = Math.round(file.size / 1024);
+            sizeEl.textContent = `(${sizeKb.toLocaleString()} KB)`;
+            displayEl.style.display = 'block';
+        }
+    }
+
+    function clearSelectedFile() {
+        selectedFile = null;
+        const fileInput = document.getElementById('import-file-input');
+        if (fileInput) fileInput.value = '';
+
+        const displayEl = document.getElementById('selected-file-display');
+        if (displayEl) displayEl.style.display = 'none';
+    }
+
+    async function submitImport() {
+        if (!selectedFile) {
+            showToast('error', 'File Missing', 'Please select or drag & drop an Excel file.');
             return;
         }
+
+        const monthSelect = document.getElementById('import-month');
+        const yearSelect = document.getElementById('import-year');
+        const submitBtn = document.getElementById('modal-upload-btn');
+        const statusDiv = document.getElementById('modal-import-status');
+
+        const month = monthSelect ? monthSelect.value : '';
+        const year = yearSelect ? yearSelect.value : '';
 
         const formData = new FormData();
-        formData.append('excel_file', file);
-        formData.append('period_id', periodSelect.value);
+        formData.append('month', month);
+        formData.append('year', year);
+        formData.append('excel_file', selectedFile);
         formData.append('csrf_token', csrfToken);
 
-        // Disable button
-        if (importBtn) {
-            importBtn.disabled = true;
-            importBtn.textContent = '⏳ Importing...';
-        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#eff6ff';
+        statusDiv.style.color = '#1d4ed8';
+        statusDiv.style.border = '1px solid #bfdbfe';
+        statusDiv.textContent = 'Uploading and processing Excel records...';
 
         try {
             const res = await fetch('api/import.php', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
             });
+
             const json = await res.json();
 
             if (json.success) {
-                showToast('success', 'Import Complete', json.message);
-                removeSelectedFile();
+                statusDiv.style.background = '#f0fdf4';
+                statusDiv.style.color = '#15803d';
+                statusDiv.style.border = '1px solid #bbf7d0';
+                statusDiv.textContent = `✓ ${json.message || 'Import successful!'}`;
+
+                showToast('success', 'Import Complete', json.message || 'Data imported successfully.');
+
+                // Reload master data table & summary
+                loadMasterData();
+                loadSummaryData();
+
+                setTimeout(() => {
+                    closeImportModal();
+                }, 1200);
             } else {
-                showToast('error', 'Import Failed', json.message || 'An error occurred.');
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = `✗ ${json.message || 'Import failed.'}`;
+                showToast('error', 'Import Failed', json.message || 'Failed to import file.');
             }
         } catch (err) {
-            showToast('error', 'Connection Error', 'Could not upload file.');
+            statusDiv.style.background = '#fef2f2';
+            statusDiv.style.color = '#b91c1c';
+            statusDiv.style.border = '1px solid #fecaca';
+            statusDiv.textContent = '✗ Connection error during file upload.';
+            showToast('error', 'Server Error', 'Failed to connect to the server.');
         } finally {
-            if (importBtn) {
-                importBtn.disabled = false;
-                importBtn.textContent = '📥 Import Data';
-            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Upload & Import';
         }
     }
 
-    // ── Migrations ─────────────────────────────────────────────
-
-    async function loadMigrations() {
-        try {
-            const res = await fetch('api/migrate.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken,
-                },
-                body: JSON.stringify({ action: 'status' }),
-            });
-            const json = await res.json();
-
-            if (!json.success) {
-                showToast('error', 'Error', json.message || 'Failed to load migration status.');
-                return;
-            }
-
-            renderMigrationList(json.migrations);
-        } catch (err) {
-            showToast('error', 'Connection Error', 'Could not load migration status.');
-        }
-    }
-
-    function renderMigrationList(migrations) {
-        const list = document.getElementById('migration-list');
-        if (!list) return;
-
-        list.replaceChildren();
-
-        if (!migrations || migrations.length === 0) {
-            const li = document.createElement('li');
-            li.className = 'migration-item';
-            li.style.justifyContent = 'center';
-            li.style.color = 'var(--color-text-muted)';
-            li.textContent = 'No migration files found';
-            list.appendChild(li);
-            return;
-        }
-
-        migrations.forEach(m => {
-            const li = document.createElement('li');
-            li.className = 'migration-item';
-
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'migration-name';
-            nameSpan.textContent = m.name;
-
-            const badge = document.createElement('span');
-            badge.className = `badge ${m.status === 'Applied' ? 'badge-success' : 'badge-warning'}`;
-            badge.textContent = m.status === 'Applied' ? `✓ Batch ${m.batch}` : '⏳ Pending';
-
-            li.appendChild(nameSpan);
-            li.appendChild(badge);
-            list.appendChild(li);
-        });
-    }
-
-    async function runMigration(action) {
-        const btn = document.querySelector(`[data-migrate-action="${action}"]`);
-        if (btn) {
-            btn.disabled = true;
-            const origText = btn.textContent;
-            btn.textContent = '⏳ Running...';
-        }
-
-        try {
-            const res = await fetch('api/migrate.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken,
-                },
-                body: JSON.stringify({ action }),
-            });
-            const json = await res.json();
-
-            if (json.success) {
-                const count = (json.applied || json.rolledBack || []).length;
-                const verb = action === 'rollback' ? 'rolled back' : 'applied';
-                showToast('success', 'Migration', `${count} migration(s) ${verb}.`);
-                loadMigrations();
-            } else {
-                const errors = json.errors || [];
-                showToast('error', 'Migration Error', errors.join(', ') || json.message || 'Failed');
-            }
-        } catch (err) {
-            showToast('error', 'Connection Error', 'Could not run migration.');
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-            }
-        }
-    }
-
-    // ── Modals ────────────────────────────────────────────────
-
-    function setupModals() {
-        document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.classList.remove('active');
-                }
-            });
-        });
-
-        document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const overlay = btn.closest('.modal-overlay');
-                if (overlay) overlay.classList.remove('active');
-            });
-        });
-    }
-
-    function openModal(id) {
-        const overlay = document.getElementById(id);
-        if (overlay) overlay.classList.add('active');
-    }
-
-    function closeModal(id) {
-        const overlay = document.getElementById(id);
-        if (overlay) overlay.classList.remove('active');
-    }
-
-    // ── Toast Notifications ───────────────────────────────────
+    // ── Utilities ──────────────────────────────────────────────
 
     function showToast(type, title, message) {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
-        const icons = {
-            success: '✓',
-            error: '✕',
-            warning: '⚠',
-            info: 'ℹ',
-        };
-
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'toast-icon';
-        iconSpan.textContent = icons[type] || 'ℹ';
-
-        const content = document.createElement('div');
-        content.className = 'toast-content';
-
-        const titleEl = document.createElement('div');
-        titleEl.className = 'toast-title';
-        titleEl.textContent = title;
-
-        const msgEl = document.createElement('div');
-        msgEl.className = 'toast-message';
-        msgEl.textContent = message;
-
-        content.appendChild(titleEl);
-        content.appendChild(msgEl);
-
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'toast-close';
-        closeBtn.textContent = '✕';
-        closeBtn.addEventListener('click', () => toast.remove());
-
-        toast.appendChild(iconSpan);
-        toast.appendChild(content);
-        toast.appendChild(closeBtn);
+        toast.innerHTML = `
+            <div class="toast-content">
+                <h4>${escapeHtml(title)}</h4>
+                <p>${escapeHtml(message)}</p>
+            </div>
+        `;
         container.appendChild(toast);
 
-        // Auto-remove after 5 seconds
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.style.transition = 'opacity 0.3s, transform 0.3s';
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => toast.remove(), 300);
-            }
-        }, 5000);
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 200);
+        }, 4000);
     }
-
-    // ── Utilities ──────────────────────────────────────────────
 
     function formatNumber(n) {
         return new Intl.NumberFormat('en-US').format(n || 0);
@@ -936,36 +610,38 @@ const App = (() => {
             style: 'currency',
             currency: 'IDR',
             minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
+            maximumFractionDigits: 0
         }).format(n || 0);
     }
 
-    function formatDate(dateStr) {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 
-    // ── Public API ─────────────────────────────────────────────
+    // ── Public Interface ───────────────────────────────────────
 
     return {
         init,
         navigateTo,
-        editAsset,
-        saveAsset,
-        deleteAsset,
-        createPeriod,
-        importExcel,
-        removeSelectedFile,
-        runMigration,
+        loadMasterData,
+        loadSummaryData,
+        changePageSize,
+        goToPage,
+        handleSearch,
+        applyFilterAndRender,
+        deleteRecord,
+        openImportModal,
+        closeImportModal,
+        handleFileSelect,
+        clearSelectedFile,
+        submitImport,
     };
 })();
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', App.init);
+
