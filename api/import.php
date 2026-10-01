@@ -112,13 +112,43 @@ if (!move_uploaded_file($file['tmp_name'], $storedPath)) {
 
 try {
     $spreadsheet = IOFactory::load($storedPath);
-    $worksheet = $spreadsheet->getActiveSheet();
-    $rawRows = $worksheet->toArray(null, true, true, true);
+
+    // 1. Intelligent Worksheet Selection:
+    // Workbooks may have multiple sheets (e.g. Sheet, Sheet1).
+    // Automatically select the sheet containing the full reconciliation columns if present.
+    $targetSheet = null;
+    $bestReconScore = -1;
+    $allSheets = $spreadsheet->getAllSheets();
+
+    foreach ($allSheets as $sheet) {
+        $raw = $sheet->toArray(null, true, true, true);
+        $score = 0;
+        for ($i = 1; $i <= min(5, count($raw)); $i++) {
+            $rowText = strtolower(implode(' ', array_map('strval', $raw[$i] ?? [])));
+            if (str_contains($rowText, 'result match')) $score += 20;
+            if (str_contains($rowText, 'result physic')) $score += 20;
+            if (str_contains($rowText, 'result db')) $score += 20;
+            if (str_contains($rowText, 'total')) $score += 5;
+            if (str_contains($rowText, 'physical')) $score += 5;
+            if (str_contains($rowText, 'nbv')) $score += 5;
+            if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $score += 2;
+        }
+        if ($score > $bestReconScore) {
+            $bestReconScore = $score;
+            $targetSheet = $sheet;
+        }
+    }
+
+    if (!$targetSheet || $bestReconScore < 10) {
+        $targetSheet = $spreadsheet->getActiveSheet();
+    }
+
+    $rawRows = $targetSheet->toArray(null, true, true, true);
 
     if (count($rawRows) < 2) {
         if (file_exists($storedPath)) unlink($storedPath);
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Excel file is empty or has no data rows']);
+        echo json_encode(['success' => false, 'message' => 'Excel sheet is empty or has no data rows']);
         exit;
     }
 
@@ -128,31 +158,125 @@ try {
         $rows[] = array_values($r);
     }
 
-    // Detect if this is a Reconciliation Summary spreadsheet (with Profile / Result Match / etc.)
-    $isReconciliation = false;
-    $reconKeywords = ['profile', 'result match', 'result physic', 'result db', 'physical', 'nbv'];
-    
-    // Check first 3 rows for keywords
-    for ($i = 0; $i < min(4, count($rows)); $i++) {
-        $rowText = strtolower(implode(' ', array_map('strval', $rows[$i])));
-        foreach ($reconKeywords as $kw) {
-            if (str_contains($rowText, $kw)) {
-                $isReconciliation = true;
-                break 2;
+    // Detect if this is a Reconciliation Summary spreadsheet
+    $isReconciliation = ($bestReconScore >= 20);
+    if (!$isReconciliation) {
+        $reconKeywords = ['result match', 'result physic', 'result db', 'match_physic'];
+        for ($i = 0; $i < min(4, count($rows)); $i++) {
+            $rowText = strtolower(implode(' ', array_map('strval', $rows[$i])));
+            foreach ($reconKeywords as $kw) {
+                if (str_contains($rowText, $kw)) {
+                    $isReconciliation = true;
+                    break 2;
+                }
             }
         }
     }
 
     // ── CASE A: RECONCILIATION SUMMARY SPREADSHEET ─────────────
     if ($isReconciliation) {
-        // Find where data rows start (skip header rows that contain 'profile', 'periode', etc.)
+        // Find where data rows start (skip header rows that contain 'profile', 'periode', 'header', etc.)
         $dataStartIndex = 0;
         for ($i = 0; $i < count($rows); $i++) {
             $col0 = strtolower(trim((string)($rows[$i][0] ?? '')));
-            if ($col0 !== '' && !in_array($col0, ['profile', 'profil', 'kategori', 'category', 'no', '#', 'header'])) {
+            if ($col0 !== '' && !in_array($col0, ['profile', 'profil', 'kategori', 'category', 'no', '#', 'header', 'periode', 'total'], true)) {
                 $dataStartIndex = $i;
                 break;
             }
+        }
+
+        // Dynamically build composite headers for each column from rows 0 to $dataStartIndex - 1
+        // Handles merged cells by carrying forward labels horizontally and stacking rows vertically
+        $maxCols = 0;
+        for ($i = 0; $i < $dataStartIndex; $i++) {
+            $maxCols = max($maxCols, count($rows[$i] ?? []));
+        }
+
+        $headerParts = [];
+        for ($c = 0; $c < $maxCols; $c++) {
+            $headerParts[$c] = [];
+        }
+
+        for ($i = 0; $i < $dataStartIndex; $i++) {
+            $currentMergedVal = '';
+            for ($c = 0; $c < $maxCols; $c++) {
+                $val = trim((string)($rows[$i][$c] ?? ''));
+                if ($val !== '') {
+                    $currentMergedVal = $val;
+                }
+                if ($currentMergedVal !== '') {
+                    $headerParts[$c][] = $currentMergedVal;
+                }
+            }
+        }
+
+        $compositeHeaders = [];
+        for ($c = 0; $c < $maxCols; $c++) {
+            $compositeHeaders[$c] = strtolower(implode(' ', $headerParts[$c]));
+        }
+
+        // Field mapping definitions matching database columns
+        $colMap = [];
+
+        // Profile
+        foreach ($compositeHeaders as $c => $h) {
+            if (str_contains($h, 'profile') || str_contains($h, 'profil')) {
+                $colMap['profile'] = $c;
+                break;
+            }
+        }
+        if (!isset($colMap['profile'])) $colMap['profile'] = 0;
+
+        // Period Start & End
+        foreach ($compositeHeaders as $c => $h) {
+            if ((str_contains($h, 'start') || str_contains($h, 'mulai')) && !isset($colMap['period_start'])) {
+                $colMap['period_start'] = $c;
+            } elseif ((str_contains($h, 'end') || str_contains($h, 'akhir') || str_contains($h, 'selesai')) && !isset($colMap['period_end'])) {
+                $colMap['period_end'] = $c;
+            }
+        }
+        if (!isset($colMap['period_start'])) $colMap['period_start'] = 1;
+        if (!isset($colMap['period_end'])) $colMap['period_end'] = 2;
+
+        // Metric fields
+        $definitions = [
+            'match_physic_qty'    => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'match_physic_pct'    => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && str_contains($h, '%'),
+            'match_nbv_value'     => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'match_nbv_pct'       => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && str_contains($h, '%'),
+
+            'physic_physic_qty'   => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'physic_physic_pct'   => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && str_contains($h, '%'),
+            'physic_nbv_value'    => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'physic_nbv_pct'      => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && str_contains($h, '%'),
+
+            'db_physic_qty'       => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'db_physic_pct'       => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && str_contains($h, '%'),
+            'db_nbv_value'        => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'db_nbv_pct'          => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && str_contains($h, '%'),
+
+            'total_physic_actual' => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && (str_contains($h, 'act') || str_contains($h, 'realisasi')),
+            'total_physic_target' => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && (str_contains($h, 'target') || str_contains($h, 'tgt')),
+            'total_physic_pct'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && str_contains($h, '%'),
+
+            'total_nbv_actual'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'act') || str_contains($h, 'realisasi')),
+            'total_nbv_target'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'target') || str_contains($h, 'tgt')),
+            'total_nbv_pct'       => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && str_contains($h, '%'),
+        ];
+
+        foreach ($definitions as $field => $matcher) {
+            foreach ($compositeHeaders as $c => $h) {
+                if ($matcher($h)) {
+                    $colMap[$field] = $c;
+                    break;
+                }
+            }
+        }
+
+        // If replace_existing is selected, clear existing reconciliation records
+        $replaceExisting = !empty($_POST['replace_existing']) && ($_POST['replace_existing'] === '1' || $_POST['replace_existing'] === 'true');
+        if ($replaceExisting) {
+            $db->exec('TRUNCATE TABLE asset_reconciliation RESTART IDENTITY');
         }
 
         $insRecon = $db->prepare('
@@ -182,7 +306,13 @@ try {
                 $excelTime = ((float)$v - 25569) * 86400;
                 return date('Y-m-d', (int)$excelTime);
             }
-            $ts = strtotime($v);
+            // Normalize Indonesian month names if present
+            $vNormalized = str_ireplace(
+                ['januari', 'pebruari', 'februari', 'maret', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'nopember', 'november', 'desember', 'ags', 'agu', 'okt', 'nop', 'des'],
+                ['january', 'february', 'february', 'march', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'november', 'december', 'aug', 'aug', 'oct', 'nov', 'dec'],
+                $v
+            );
+            $ts = strtotime($vNormalized);
             return $ts !== false ? date('Y-m-d', $ts) : $default;
         };
 
@@ -194,41 +324,45 @@ try {
 
         for ($i = $dataStartIndex; $i < count($rows); $i++) {
             $r = $rows[$i];
-            $profile = trim((string)($r[0] ?? ''));
+            $profile = isset($colMap['profile'], $r[$colMap['profile']]) ? trim((string)$r[$colMap['profile']]) : '';
             if ($profile === '') continue;
 
             $insRecon->execute([
                 ':profile'             => $profile,
-                ':period_start'        => $cleanDate($r[1] ?? '', $defaultStart),
-                ':period_end'          => $cleanDate($r[2] ?? '', $defaultEnd),
-                ':match_physic_qty'    => $cleanInt($r[3] ?? 0),
-                ':match_physic_pct'    => $cleanNum($r[4] ?? 0),
-                ':match_nbv_value'     => $cleanNum($r[5] ?? 0),
-                ':match_nbv_pct'       => $cleanNum($r[6] ?? 0),
-                ':physic_physic_qty'   => $cleanInt($r[7] ?? 0),
-                ':physic_physic_pct'   => $cleanNum($r[8] ?? 0),
-                ':physic_nbv_value'    => $cleanNum($r[9] ?? 0),
-                ':physic_nbv_pct'      => $cleanNum($r[10] ?? 0),
-                ':db_physic_qty'       => $cleanInt($r[11] ?? 0),
-                ':db_physic_pct'       => $cleanNum($r[12] ?? 0),
-                ':db_nbv_value'        => $cleanNum($r[13] ?? 0),
-                ':db_nbv_pct'          => $cleanNum($r[14] ?? 0),
-                ':total_physic_actual' => $cleanInt($r[15] ?? 0),
-                ':total_physic_target' => $cleanInt($r[16] ?? 0),
-                ':total_physic_pct'    => $cleanNum($r[17] ?? 0),
-                ':total_nbv_actual'    => $cleanNum($r[18] ?? 0),
-                ':total_nbv_target'    => $cleanNum($r[19] ?? 0),
-                ':total_nbv_pct'       => $cleanNum($r[20] ?? 0),
+                ':period_start'        => $cleanDate(isset($colMap['period_start']) ? ($r[$colMap['period_start']] ?? '') : '', $defaultStart),
+                ':period_end'          => $cleanDate(isset($colMap['period_end']) ? ($r[$colMap['period_end']] ?? '') : '', $defaultEnd),
+                ':match_physic_qty'    => isset($colMap['match_physic_qty']) ? $cleanInt($r[$colMap['match_physic_qty']] ?? 0) : 0,
+                ':match_physic_pct'    => isset($colMap['match_physic_pct']) ? $cleanNum($r[$colMap['match_physic_pct']] ?? 0) : 0,
+                ':match_nbv_value'     => isset($colMap['match_nbv_value']) ? $cleanNum($r[$colMap['match_nbv_value']] ?? 0) : 0,
+                ':match_nbv_pct'       => isset($colMap['match_nbv_pct']) ? $cleanNum($r[$colMap['match_nbv_pct']] ?? 0) : 0,
+                ':physic_physic_qty'   => isset($colMap['physic_physic_qty']) ? $cleanInt($r[$colMap['physic_physic_qty']] ?? 0) : 0,
+                ':physic_physic_pct'   => isset($colMap['physic_physic_pct']) ? $cleanNum($r[$colMap['physic_physic_pct']] ?? 0) : 0,
+                ':physic_nbv_value'    => isset($colMap['physic_nbv_value']) ? $cleanNum($r[$colMap['physic_nbv_value']] ?? 0) : 0,
+                ':physic_nbv_pct'      => isset($colMap['physic_nbv_pct']) ? $cleanNum($r[$colMap['physic_nbv_pct']] ?? 0) : 0,
+                ':db_physic_qty'       => isset($colMap['db_physic_qty']) ? $cleanInt($r[$colMap['db_physic_qty']] ?? 0) : 0,
+                ':db_physic_pct'       => isset($colMap['db_physic_pct']) ? $cleanNum($r[$colMap['db_physic_pct']] ?? 0) : 0,
+                ':db_nbv_value'        => isset($colMap['db_nbv_value']) ? $cleanNum($r[$colMap['db_nbv_value']] ?? 0) : 0,
+                ':db_nbv_pct'          => isset($colMap['db_nbv_pct']) ? $cleanNum($r[$colMap['db_nbv_pct']] ?? 0) : 0,
+                ':total_physic_actual' => isset($colMap['total_physic_actual']) ? $cleanInt($r[$colMap['total_physic_actual']] ?? 0) : 0,
+                ':total_physic_target' => isset($colMap['total_physic_target']) ? $cleanInt($r[$colMap['total_physic_target']] ?? 0) : 0,
+                ':total_physic_pct'    => isset($colMap['total_physic_pct']) ? $cleanNum($r[$colMap['total_physic_pct']] ?? 0) : 0,
+                ':total_nbv_actual'    => isset($colMap['total_nbv_actual']) ? $cleanNum($r[$colMap['total_nbv_actual']] ?? 0) : 0,
+                ':total_nbv_target'    => isset($colMap['total_nbv_target']) ? $cleanNum($r[$colMap['total_nbv_target']] ?? 0) : 0,
+                ':total_nbv_pct'       => isset($colMap['total_nbv_pct']) ? $cleanNum($r[$colMap['total_nbv_pct']] ?? 0) : 0,
             ]);
             $importedCount++;
         }
         $db->commit();
 
+        if (file_exists($storedPath)) {
+            unlink($storedPath);
+        }
+
         echo json_encode([
             'success' => true,
             'target'  => 'summary',
             'imported_rows' => $importedCount,
-            'message' => "Successfully imported $importedCount records into Stock Opname Summary!"
+            'message' => "Successfully imported $importedCount records into Stock Opname Data with all columns mapped correctly!"
         ]);
         exit;
     }

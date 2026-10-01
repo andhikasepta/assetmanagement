@@ -371,6 +371,42 @@ body {
 .reconciliation-table .text-right { text-align: right; }
 .reconciliation-table .align-middle { vertical-align: middle; }
 
+/* ---- Sortable Table Headers with Asc / Desc Arrow Indicators ---- */
+.reconciliation-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.reconciliation-table th.sortable:hover {
+    background-color: #e2e8f0 !important;
+    color: #0f172a;
+}
+
+.sort-indicator {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+    vertical-align: middle;
+    font-weight: normal;
+    transition: color 0.15s ease;
+}
+
+.reconciliation-table th.sortable.asc,
+.reconciliation-table th.sortable.desc {
+    background-color: #eff6ff !important;
+    color: #1d4ed8;
+}
+
+.reconciliation-table th.sortable.asc .sort-indicator,
+.reconciliation-table th.sortable.desc .sort-indicator {
+    color: #2563eb;
+    font-weight: bold;
+}
+
 /* ---- DataTables Overrides for Master Data ---- */
 table.dataTable {
     border-collapse: collapse !important;

@@ -13,15 +13,9 @@ const App = (() => {
     let selectedFile = null;
     let csrfToken = '';
 
-    // Column keys matching the filter dropdowns
-    const filterColumns = [
-        'profile', 'period_start', 'period_end',
-        'match_physic_qty', 'match_physic_pct', 'match_nbv_value', 'match_nbv_pct',
-        'physic_physic_qty', 'physic_physic_pct', 'physic_nbv_value', 'physic_nbv_pct',
-        'db_physic_qty', 'db_physic_pct', 'db_nbv_value', 'db_nbv_pct',
-        'total_physic_actual', 'total_physic_target', 'total_physic_pct',
-        'total_nbv_actual', 'total_nbv_target', 'total_nbv_pct'
-    ];
+    // Sorting state
+    let sortColumn = null;
+    let sortDirection = 'asc'; // 'asc' or 'desc'
 
     // ── Initialization ─────────────────────────────────────────
 
@@ -91,69 +85,8 @@ const App = (() => {
             }
 
             allMasterRows = json.data || [];
-            populateColumnFilters();
             applyFilterAndRender();
         } catch (err) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
-                        Network or server error while connecting to PostgreSQL.
-                    </td>
-                </tr>
-            `;
-        }
-    }
-
-    // ── Column Filter Dropdowns ────────────────────────────────
-
-    function populateColumnFilters() {
-        filterColumns.forEach(col => {
-            const select = document.querySelector(`.col-filter[data-col="${col}"]`);
-            if (!select) return;
-
-            // Remember current selection
-            const currentVal = select.value;
-
-            // Get unique values for this column
-            const uniqueVals = new Set();
-            allMasterRows.forEach(row => {
-                const val = row[col];
-                if (val !== null && val !== undefined && val !== '') {
-                    uniqueVals.add(String(val));
-                }
-            });
-
-            // Sort values
-            const sorted = Array.from(uniqueVals).sort((a, b) => {
-                const numA = parseFloat(a);
-                const numB = parseFloat(b);
-                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                return a.localeCompare(b);
-            });
-
-            // Rebuild options
-            let html = '<option value="">All</option>';
-            sorted.forEach(v => {
-                html += `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`;
-            });
-            select.innerHTML = html;
-
-            // Restore selection if still valid
-            if (currentVal && sorted.includes(currentVal)) {
-                select.value = currentVal;
-            }
-        });
-    }
-
-    function getColumnFilters() {
-        const filters = {};
-        filterColumns.forEach(col => {
-            const select = document.querySelector(`.col-filter[data-col="${col}"]`);
-            if (select && select.value) {
-                filters[col] = select.value;
-            }
-        });
-        return filters;
     }
 
     // ── Search, Filter & Pagination ────────────────────────────
@@ -212,13 +145,6 @@ const App = (() => {
             });
         }
 
-        // Apply per-column filters
-        const colFilters = getColumnFilters();
-        Object.keys(colFilters).forEach(col => {
-            const filterVal = colFilters[col];
-            rows = rows.filter(r => String(r[col] ?? '') === filterVal);
-        });
-
         // Apply text search
         if (searchQuery) {
             rows = rows.filter(r => {
@@ -229,9 +155,68 @@ const App = (() => {
             });
         }
 
+        // Apply Sorting (Asc / Desc on header click)
+        if (sortColumn) {
+            const isNumeric = [
+                'match_physic_qty', 'match_physic_pct', 'match_nbv_value', 'match_nbv_pct',
+                'physic_physic_qty', 'physic_physic_pct', 'physic_nbv_value', 'physic_nbv_pct',
+                'db_physic_qty', 'db_physic_pct', 'db_nbv_value', 'db_nbv_pct',
+                'total_physic_actual', 'total_physic_target', 'total_physic_pct',
+                'total_nbv_actual', 'total_nbv_target', 'total_nbv_pct'
+            ].includes(sortColumn);
+
+            rows.sort((a, b) => {
+                let valA = a[sortColumn];
+                let valB = b[sortColumn];
+
+                if (isNumeric) {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                    return sortDirection === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    valA = (valA || '').toString();
+                    valB = (valB || '').toString();
+                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+            });
+        }
+
         filteredMasterRows = rows;
         currentPage = 1;
         renderMasterTable();
+    }
+
+    // ── Table Header Sorting ───────────────────────────────────
+
+    function toggleSort(col) {
+        if (sortColumn === col) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = col;
+            sortDirection = 'asc';
+        }
+        applyFilterAndRender();
+        updateSortIndicators();
+    }
+
+    function updateSortIndicators() {
+        document.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('.sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (sortColumn) {
+            const activeTh = document.querySelector(`th.sortable[onclick*="'${sortColumn}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(sortDirection);
+            }
+            const activeInd = document.querySelector(`.sort-indicator[data-col="${sortColumn}"]`);
+            if (activeInd) {
+                activeInd.textContent = sortDirection === 'asc' ? '▲' : '▼';
+            }
+        }
     }
 
     function renderMasterTable() {
@@ -519,9 +504,12 @@ const App = (() => {
         const month = monthSelect ? monthSelect.value : '';
         const year = yearSelect ? yearSelect.value : '';
 
+        const replaceExisting = document.getElementById('import-replace-existing')?.checked ? '1' : '0';
+
         const formData = new FormData();
         formData.append('month', month);
         formData.append('year', year);
+        formData.append('replace_existing', replaceExisting);
         formData.append('excel_file', selectedFile);
         formData.append('csrf_token', csrfToken);
 
@@ -623,6 +611,112 @@ const App = (() => {
             .replace(/"/g, '&quot;');
     }
 
+    async function clearAllData() {
+        if (!confirm('Are you sure you want to clear all imported Stock Opname records from the database? This will allow you to do a clean re-import.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch('api/reconciliation.php?action=clear_all', {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Cleared', 'All records cleared successfully.');
+                loadMasterData();
+                loadSummaryData();
+            } else {
+                showToast('error', 'Error', json.message || 'Failed to clear records.');
+            }
+        } catch (err) {
+            showToast('error', 'Network Error', 'Failed to communicate with server.');
+        }
+    }
+
+    // ── Bulk Delete by Period & Year ──────────────────────────
+
+    function openBulkDeleteModal() {
+        const modal = document.getElementById('bulk-delete-modal');
+        if (!modal) return;
+
+        // Pre-select month/year from toolbar if active
+        const filterMonth = document.getElementById('filter-month')?.value;
+        const filterYear = document.getElementById('filter-year')?.value;
+        const modalMonth = document.getElementById('bulk-delete-month');
+        const modalYear = document.getElementById('bulk-delete-year');
+
+        if (modalMonth && filterMonth) modalMonth.value = filterMonth;
+        if (modalYear && filterYear) modalYear.value = filterYear;
+
+        modal.classList.add('active');
+    }
+
+    function closeBulkDeleteModal() {
+        const modal = document.getElementById('bulk-delete-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    async function submitBulkDelete() {
+        const monthSelect = document.getElementById('bulk-delete-month');
+        const yearSelect = document.getElementById('bulk-delete-year');
+        const submitBtn = document.getElementById('bulk-delete-submit-btn');
+
+        const month = monthSelect ? monthSelect.value : '';
+        const year = yearSelect ? yearSelect.value : '';
+
+        if (!year && !month) {
+            showToast('error', 'Selection Required', 'Please select at least a Year or Month to delete.');
+            return;
+        }
+
+        const monthName = month ? monthSelect.options[monthSelect.selectedIndex].text : 'All Months';
+        const confirmMsg = `Are you sure you want to permanently delete all Stock Opname records for:\nMonth: ${monthName}\nYear: ${year || 'All Years'}?\n\nThis cannot be undone!`;
+
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Deleting...';
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'bulk_delete'
+            });
+            if (month) params.append('month', month);
+            if (year) params.append('year', year);
+
+            const res = await fetch(`api/reconciliation.php?${params.toString()}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                showToast('success', 'Bulk Delete Complete', json.message || 'Records deleted successfully.');
+                closeBulkDeleteModal();
+                loadMasterData();
+                loadSummaryData();
+            } else {
+                showToast('error', 'Delete Failed', json.message || 'Failed to delete records.');
+            }
+        } catch (err) {
+            showToast('error', 'Server Error', 'Failed to communicate with the server.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🗑️ Delete Period Data';
+            }
+        }
+    }
+
     // ── Public Interface ───────────────────────────────────────
 
     return {
@@ -635,6 +729,11 @@ const App = (() => {
         handleSearch,
         applyFilterAndRender,
         deleteRecord,
+        clearAllData,
+        toggleSort,
+        openBulkDeleteModal,
+        closeBulkDeleteModal,
+        submitBulkDelete,
         openImportModal,
         closeImportModal,
         handleFileSelect,

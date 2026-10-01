@@ -77,6 +77,12 @@ $currentYear = (int) date('Y');
                         <button class="btn btn-secondary" onclick="App.loadMasterData()">
                             🔄 Refresh
                         </button>
+                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()" title="Delete bulk data by period month and year">
+                            🗑️ Bulk Delete
+                        </button>
+                        <button class="btn btn-danger" onclick="App.clearAllData()" title="Clear all imported records from database" style="background-color: #ef4444;">
+                            ⚠️ Clear All
+                        </button>
                         <button class="btn btn-primary" onclick="App.openImportModal()">
                             📥 Import Excel
                         </button>
@@ -146,7 +152,8 @@ $currentYear = (int) date('Y');
                                 <!-- Level 1 Header -->
                                 <tr>
                                     <th rowspan="3" class="text-center align-middle col-action">Action</th>
-                                    <th rowspan="3" class="text-center align-middle" style="min-width: 280px;">Profile
+                                    <th rowspan="3" class="text-center align-middle sortable" style="min-width: 280px;" onclick="App.toggleSort('profile')">
+                                        Profile <span class="sort-indicator" data-col="profile">⇅</span>
                                     </th>
                                     <th colspan="2" class="text-center">Periode</th>
                                     <th colspan="4" class="text-center">RESULT MATCH</th>
@@ -157,8 +164,12 @@ $currentYear = (int) date('Y');
 
                                 <!-- Level 2 Sub-Header -->
                                 <tr>
-                                    <th rowspan="2" class="text-center align-middle">Start</th>
-                                    <th rowspan="2" class="text-center align-middle">End</th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSort('period_start')">
+                                        Start <span class="sort-indicator" data-col="period_start">⇅</span>
+                                    </th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSort('period_end')">
+                                        End <span class="sort-indicator" data-col="period_end">⇅</span>
+                                    </th>
 
                                     <!-- RESULT MATCH -->
                                     <th colspan="2" class="text-center">PHYSICAL</th>
@@ -177,122 +188,33 @@ $currentYear = (int) date('Y');
                                     <th colspan="3" class="text-center">NBV</th>
                                 </tr>
 
-                                <!-- Level 3 Leaf Columns -->
+                                <!-- Level 3 Leaf Columns (Sortable Asc/Desc on Click) -->
                                 <tr>
                                     <!-- Under RESULT MATCH -->
-                                    <th>QTY</th>
-                                    <th>%</th>
-                                    <th>Value</th>
-                                    <th>%</th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_qty')">QTY <span class="sort-indicator" data-col="match_physic_qty">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_pct')">% <span class="sort-indicator" data-col="match_physic_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_value')">Value <span class="sort-indicator" data-col="match_nbv_value">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_pct')">% <span class="sort-indicator" data-col="match_nbv_pct">⇅</span></th>
 
                                     <!-- Under RESULT PHYSIC -->
-                                    <th>QTY</th>
-                                    <th>%</th>
-                                    <th>Value</th>
-                                    <th>%</th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_qty')">QTY <span class="sort-indicator" data-col="physic_physic_qty">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_pct')">% <span class="sort-indicator" data-col="physic_physic_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_value')">Value <span class="sort-indicator" data-col="physic_nbv_value">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_pct')">% <span class="sort-indicator" data-col="physic_nbv_pct">⇅</span></th>
 
                                     <!-- Under RESULT DB -->
-                                    <th>QTY</th>
-                                    <th>%</th>
-                                    <th>Value</th>
-                                    <th>%</th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_qty')">QTY <span class="sort-indicator" data-col="db_physic_qty">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_pct')">% <span class="sort-indicator" data-col="db_physic_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_value')">Value <span class="sort-indicator" data-col="db_nbv_value">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_pct')">% <span class="sort-indicator" data-col="db_nbv_pct">⇅</span></th>
 
                                     <!-- Under TOTAL -->
-                                    <th>ACTUAL</th>
-                                    <th>TARGET</th>
-                                    <th>%</th>
-                                    <th>ACTUAL</th>
-                                    <th>TARGET</th>
-                                    <th>%</th>
-                                </tr>
-
-                                <!-- Level 4: Column Filter Dropdowns -->
-                                <tr class="filter-row">
-                                    <th></th>
-                                    <th><select class="col-filter" data-col="profile"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="period_start"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="period_end"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="match_physic_qty"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="match_physic_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="match_nbv_value"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="match_nbv_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="physic_physic_qty"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="physic_physic_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="physic_nbv_value"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="physic_nbv_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="db_physic_qty"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="db_physic_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="db_nbv_value"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="db_nbv_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_physic_actual"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_physic_target"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_physic_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_nbv_actual"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_nbv_target"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
-                                    <th><select class="col-filter" data-col="total_nbv_pct"
-                                            onchange="App.applyFilterAndRender()">
-                                            <option value="">All</option>
-                                        </select></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_actual')">ACTUAL <span class="sort-indicator" data-col="total_physic_actual">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_target')">TARGET <span class="sort-indicator" data-col="total_physic_target">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_pct')">% <span class="sort-indicator" data-col="total_physic_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_actual')">ACTUAL <span class="sort-indicator" data-col="total_nbv_actual">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_target')">TARGET <span class="sort-indicator" data-col="total_nbv_target">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_pct')">% <span class="sort-indicator" data-col="total_nbv_pct">⇅</span></th>
                                 </tr>
                             </thead>
                             <tbody id="master-table-body">
@@ -470,6 +392,14 @@ $currentYear = (int) date('Y');
                     </div>
                 </div>
 
+                <!-- Overwrite Option -->
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
+                        <input type="checkbox" id="import-replace-existing" checked style="width: 16px; height: 16px; cursor: pointer;">
+                        <span><strong>Replace existing records</strong> (clears previous table data before importing new records)</span>
+                    </label>
+                </div>
+
                 <!-- Status message in modal -->
                 <div id="modal-import-status"
                     style="display: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-top: 12px;">
@@ -479,6 +409,57 @@ $currentYear = (int) date('Y');
                 <button class="btn btn-secondary" onclick="App.closeImportModal()">Cancel</button>
                 <button class="btn btn-primary" id="modal-upload-btn" onclick="App.submitImport()">Upload &amp;
                     Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Bulk Delete Data by Period & Year                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="bulk-delete-modal" class="modal-backdrop">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="color: #dc2626;">🗑️ Bulk Delete by Period</h3>
+                <button class="modal-close-btn" onclick="App.closeBulkDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: #64748b; margin-bottom: 1.25rem;">
+                    Select the Period Month and Year to delete matching Stock Opname records from the database.
+                </p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="bulk-delete-month">Period Month</label>
+                        <select id="bulk-delete-month" class="form-control">
+                            <option value="">All Months in Selected Year</option>
+                            <?php foreach ($monthList as $num => $name): ?>
+                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                    <?= $name ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="bulk-delete-year">Period Year</label>
+                        <select id="bulk-delete-year" class="form-control">
+                            <?php for ($y = 2024; $y <= 2030; $y++): ?>
+                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                    <?= $y ?>
+                                </option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 0.75rem 1rem; margin-top: 1rem; color: #991b1b; font-size: 12px; line-height: 1.4;">
+                    <strong>⚠️ Warning:</strong> This action permanently deletes records matching the selected period from the database. This cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="App.closeBulkDeleteModal()">Cancel</button>
+                <button class="btn btn-danger" id="bulk-delete-submit-btn" onclick="App.submitBulkDelete()">
+                    🗑️ Delete Period Data
+                </button>
             </div>
         </div>
     </div>

@@ -154,6 +154,52 @@ try {
         }
 
         $id = $_GET['id'] ?? null;
+        $action = $_GET['action'] ?? '';
+
+        if ($action === 'clear_all' || $id === 'all') {
+            $db->exec('TRUNCATE TABLE asset_reconciliation RESTART IDENTITY');
+            echo json_encode(['success' => true, 'message' => 'All reconciliation records cleared successfully']);
+            exit;
+        }
+
+        if ($action === 'bulk_delete') {
+            $month = isset($_GET['month']) && is_numeric($_GET['month']) ? (int) $_GET['month'] : 0;
+            $year = isset($_GET['year']) && is_numeric($_GET['year']) ? (int) $_GET['year'] : 0;
+
+            if ($month <= 0 && $year <= 0) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Please select a valid Month or Year to delete']);
+                exit;
+            }
+
+            $conditions = [];
+            $params = [];
+
+            if ($month >= 1 && $month <= 12 && $year >= 2000 && $year <= 2100) {
+                $conditions[] = '((EXTRACT(MONTH FROM period_start) = :m AND EXTRACT(YEAR FROM period_start) = :y) OR (EXTRACT(MONTH FROM period_end) = :m AND EXTRACT(YEAR FROM period_end) = :y))';
+                $params[':m'] = $month;
+                $params[':y'] = $year;
+            } elseif ($year >= 2000 && $year <= 2100) {
+                $conditions[] = '(EXTRACT(YEAR FROM period_start) = :y OR EXTRACT(YEAR FROM period_end) = :y)';
+                $params[':y'] = $year;
+            } elseif ($month >= 1 && $month <= 12) {
+                $conditions[] = '(EXTRACT(MONTH FROM period_start) = :m OR EXTRACT(MONTH FROM period_end) = :m)';
+                $params[':m'] = $month;
+            }
+
+            $sql = 'DELETE FROM asset_reconciliation WHERE ' . implode(' AND ', $conditions);
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $deletedCount = $stmt->rowCount();
+
+            echo json_encode([
+                'success' => true,
+                'deleted_count' => $deletedCount,
+                'message' => "Successfully deleted {$deletedCount} records for the selected period."
+            ]);
+            exit;
+        }
+
         if (!$id || !ctype_digit((string) $id)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Valid record ID is required']);
