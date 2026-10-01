@@ -75,16 +75,13 @@ $currentYear = (int) date('Y');
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <button class="btn btn-secondary" onclick="App.loadMasterData()">
-                            🔄 Refresh
+                            Refresh
                         </button>
-                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()" title="Delete bulk data by period month and year">
-                            🗑️ Bulk Delete
-                        </button>
-                        <button class="btn btn-danger" onclick="App.clearAllData()" title="Clear all imported records from database" style="background-color: #ef4444;">
-                            ⚠️ Clear All
+                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()" title="Delete data by month and year">
+                            Delete Data
                         </button>
                         <button class="btn btn-primary" onclick="App.openImportModal()">
-                            📥 Import Excel
+                            Import SO Data
                         </button>
                     </div>
                 </div>
@@ -220,7 +217,7 @@ $currentYear = (int) date('Y');
                             <tbody id="master-table-body">
                                 <tr>
                                     <td colspan="22" class="text-center" style="padding: 2rem; color: #64748b;">
-                                        Loading records from PostgreSQL...
+                                        Loading data...
                                     </td>
                                 </tr>
                             </tbody>
@@ -232,6 +229,133 @@ $currentYear = (int) date('Y');
                 <div class="table-pagination-footer">
                     <div id="master-pagination-info">Showing 0 to 0 of 0 entries</div>
                     <div class="pagination-controls" id="master-pagination-controls"></div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- CARD 2: Site Location                                       -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <div class="card" id="card-site-location" style="margin-top: 2rem;">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">Site Location</h2>
+                        <p class="card-subtitle">Site master infrastructure, organizations, regions, and physical locations</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="App.loadSiteLocations()">
+                            Refresh
+                        </button>
+                        <button class="btn btn-primary" onclick="App.openAddSiteModal()">
+                            Add Site
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table Toolbar: Page Size & Search -->
+                <div class="table-toolbar">
+                    <div class="table-toolbar-left">
+                        <label for="site-page-size">Show</label>
+                        <select id="site-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                            onchange="App.changeSitePageSize(this.value)">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
+                        <span>entries per page</span>
+                    </div>
+                    <div class="table-toolbar-right">
+                        <input type="text" id="site-search-input" class="table-search-input" placeholder="Search..."
+                            oninput="App.handleSiteSearch(this.value)">
+                    </div>
+                </div>
+
+                <!-- Site Location Table (Header matching the attachment) -->
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive">
+                        <table class="reconciliation-table" id="site-location-table">
+                            <thead>
+                                <!-- Level 1 Header -->
+                                <tr>
+                                    <th rowspan="2" class="text-center align-middle col-action">Action</th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('site_id')">
+                                        ID <span class="sort-indicator" data-site-col="site_id">⇅</span>
+                                    </th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('category')">
+                                        CATEGORY <span class="sort-indicator" data-site-col="category">⇅</span>
+                                    </th>
+                                    <th colspan="3" class="text-center">NAME</th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('organizations')">
+                                        ORGANIZATIONS <span class="sort-indicator" data-site-col="organizations">⇅</span>
+                                    </th>
+                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('manager')">
+                                        MANAGER <span class="sort-indicator" data-site-col="manager">⇅</span>
+                                    </th>
+                                    <th colspan="3" class="text-center">REGIONAL</th>
+                                    <th colspan="6" class="text-center">LOCATION</th>
+                                </tr>
+
+                                <!-- Level 2 Sub-Headers -->
+                                <tr>
+                                    <!-- Under NAME -->
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_intan')">
+                                        INTAN <span class="sort-indicator" data-site-col="name_intan">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_eproc')">
+                                        EPROC <span class="sort-indicator" data-site-col="name_eproc">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_ims')">
+                                        IMS <span class="sort-indicator" data-site-col="name_ims">⇅</span>
+                                    </th>
+
+                                    <!-- Under REGIONAL -->
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('region')">
+                                        REGION <span class="sort-indicator" data-site-col="region">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('area')">
+                                        AREA <span class="sort-indicator" data-site-col="area">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('cluster')">
+                                        CLUSTER <span class="sort-indicator" data-site-col="cluster">⇅</span>
+                                    </th>
+
+                                    <!-- Under LOCATION -->
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('addr')">
+                                        ADDR <span class="sort-indicator" data-site-col="addr">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('province')">
+                                        PROVINCE <span class="sort-indicator" data-site-col="province">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('city')">
+                                        CITY <span class="sort-indicator" data-site-col="city">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('sub_dis')">
+                                        SUB DIS <span class="sort-indicator" data-site-col="sub_dis">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('village')">
+                                        VILLAGE <span class="sort-indicator" data-site-col="village">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSiteSort('postal')">
+                                        POSTAL <span class="sort-indicator" data-site-col="postal">⇅</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="site-table-body">
+                                <tr>
+                                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                        Loading data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Table Pagination Footer -->
+                <div class="table-pagination-footer">
+                    <div id="site-pagination-info">Showing 0 to 0 of 0 entries</div>
+                    <div class="pagination-controls" id="site-pagination-controls"></div>
                 </div>
             </div>
         </section>
@@ -277,7 +401,7 @@ $currentYear = (int) date('Y');
                         <p class="card-subtitle">Aggregated totals across all profiles</p>
                     </div>
                     <button class="btn btn-secondary" onclick="App.loadSummaryData()">
-                        🔄 Refresh
+                        Refresh
                     </button>
                 </div>
                 <div class="card-body" style="padding: 0;">
@@ -323,7 +447,7 @@ $currentYear = (int) date('Y');
     <div id="import-modal" class="modal-backdrop">
         <div class="modal-dialog">
             <div class="modal-header">
-                <h3 class="modal-title">Import Excel Assets</h3>
+                <h3 class="modal-title">Import SO Data</h3>
                 <button class="modal-close-btn" onclick="App.closeImportModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -396,7 +520,7 @@ $currentYear = (int) date('Y');
                 <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
                     <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
                         <input type="checkbox" id="import-replace-existing" checked style="width: 16px; height: 16px; cursor: pointer;">
-                        <span><strong>Replace existing records</strong> (clears previous table data before importing new records)</span>
+                        <span><strong>Replace data existing</strong> (Hapus data sebelumnya)</span>
                     </label>
                 </div>
 
@@ -419,17 +543,17 @@ $currentYear = (int) date('Y');
     <div id="bulk-delete-modal" class="modal-backdrop">
         <div class="modal-dialog" style="max-width: 480px;">
             <div class="modal-header">
-                <h3 class="modal-title" style="color: #dc2626;">🗑️ Bulk Delete by Period</h3>
+                <h3 class="modal-title" style="color: #dc2626;">Delete Data by Period</h3>
                 <button class="modal-close-btn" onclick="App.closeBulkDeleteModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <p style="font-size: 13px; color: #64748b; margin-bottom: 1.25rem;">
-                    Select the Period Month and Year to delete matching Stock Opname records from the database.
+                    Pilih Periode Data yang akan dihapus permanen.
                 </p>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="bulk-delete-month">Period Month</label>
+                        <label class="form-label" for="bulk-delete-month">Periode Month</label>
                         <select id="bulk-delete-month" class="form-control">
                             <option value="">All Months in Selected Year</option>
                             <?php foreach ($monthList as $num => $name): ?>
@@ -452,14 +576,117 @@ $currentYear = (int) date('Y');
                 </div>
 
                 <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 0.75rem 1rem; margin-top: 1rem; color: #991b1b; font-size: 12px; line-height: 1.4;">
-                    <strong>⚠️ Warning:</strong> This action permanently deletes records matching the selected period from the database. This cannot be undone.
+                    <strong>Warning:</strong> Data akan dihapus permanent!
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="App.closeBulkDeleteModal()">Cancel</button>
                 <button class="btn btn-danger" id="bulk-delete-submit-btn" onclick="App.submitBulkDelete()">
-                    🗑️ Delete Period Data
+                    Delete Period Data
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Add Site Location                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="add-site-modal" class="modal-backdrop">
+        <div class="modal-dialog" style="max-width: 640px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New Site Location</h3>
+                <button class="modal-close-btn" onclick="App.closeAddSiteModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; padding: 1.25rem;">
+                <form id="add-site-form" onsubmit="event.preventDefault(); App.submitAddSite();">
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-id">Site ID *</label>
+                            <input type="text" id="add-site-id" class="form-control" placeholder="e.g. 0SMRKLA007" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-category">Category</label>
+                            <input type="text" id="add-site-category" class="form-control" placeholder="e.g. WAREHOUSE LA">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                        <label class="form-label" for="add-site-name-intan">Name (INTAN)</label>
+                        <input type="text" id="add-site-name-intan" class="form-control" placeholder="e.g. APLIKANUSA LINTASARTA - OUTLET BARU SEMARANG">
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-name-eproc">Name (EPROC)</label>
+                            <input type="text" id="add-site-name-eproc" class="form-control" placeholder="e.g. APLIKANUSA LINTASARTA - OUTLET BARU SEMARANG">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-name-ims">Name (IMS)</label>
+                            <input type="text" id="add-site-name-ims" class="form-control" placeholder="Optional IMS Name">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-org">Organizations</label>
+                            <input type="text" id="add-site-org" class="form-control" placeholder="e.g. ASSET MANAGEMENT CENTRAL JAVA">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-manager">Manager</label>
+                            <input type="text" id="add-site-manager" class="form-control" placeholder="Optional Manager Name">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-region">Region</label>
+                            <input type="text" id="add-site-region" class="form-control" placeholder="e.g. CENTRAL INDONESIA REGIONAL (CIR)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-area">Area</label>
+                            <input type="text" id="add-site-area" class="form-control" placeholder="e.g. CJDA">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-cluster">Cluster</label>
+                            <input type="text" id="add-site-cluster" class="form-control" placeholder="e.g. SEMARANG">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                        <label class="form-label" for="add-site-addr">Address (ADDR)</label>
+                        <textarea id="add-site-addr" class="form-control" rows="2" placeholder="Full street address"></textarea>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-province">Province</label>
+                            <input type="text" id="add-site-province" class="form-control" placeholder="e.g. JAWA TENGAH">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-city">City</label>
+                            <input type="text" id="add-site-city" class="form-control" placeholder="e.g. SEMARANG">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-subdis">Sub District (SUB DIS)</label>
+                            <input type="text" id="add-site-subdis" class="form-control" placeholder="e.g. GAJAHMUNGKUR">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-village">Village</label>
+                            <input type="text" id="add-site-village" class="form-control" placeholder="e.g. GAJAHMUNGKUR">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="add-site-postal">Postal Code</label>
+                            <input type="text" id="add-site-postal" class="form-control" placeholder="e.g. 50232">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="App.closeAddSiteModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="App.submitAddSite()">Save Site Location</button>
             </div>
         </div>
     </div>

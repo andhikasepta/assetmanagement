@@ -17,6 +17,15 @@ const App = (() => {
     let sortColumn = null;
     let sortDirection = 'asc'; // 'asc' or 'desc'
 
+    // Site Location state
+    let allSiteRows = [];
+    let filteredSiteRows = [];
+    let siteCurrentPage = 1;
+    let sitePageSize = 10;
+    let siteSearchQuery = '';
+    let siteSortCol = 'site_id';
+    let siteSortDir = 'asc';
+
     // ── Initialization ─────────────────────────────────────────
 
     function init() {
@@ -50,6 +59,7 @@ const App = (() => {
 
         if (page === 'master-data') {
             loadMasterData();
+            loadSiteLocations();
         } else if (page === 'summary') {
             loadSummaryData();
         }
@@ -87,6 +97,14 @@ const App = (() => {
             allMasterRows = json.data || [];
             applyFilterAndRender();
         } catch (err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        Network error loading records: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+        }
     }
 
     // ── Search, Filter & Pagination ────────────────────────────
@@ -200,19 +218,19 @@ const App = (() => {
     }
 
     function updateSortIndicators() {
-        document.querySelectorAll('th.sortable').forEach(th => {
+        document.querySelectorAll('#master-reconciliation-table th.sortable').forEach(th => {
             th.classList.remove('asc', 'desc');
         });
-        document.querySelectorAll('.sort-indicator').forEach(ind => {
+        document.querySelectorAll('#master-reconciliation-table .sort-indicator').forEach(ind => {
             ind.textContent = '⇅';
         });
 
         if (sortColumn) {
-            const activeTh = document.querySelector(`th.sortable[onclick*="'${sortColumn}'"]`);
+            const activeTh = document.querySelector(`#master-reconciliation-table th.sortable[onclick*="'${sortColumn}'"]`);
             if (activeTh) {
                 activeTh.classList.add(sortDirection);
             }
-            const activeInd = document.querySelector(`.sort-indicator[data-col="${sortColumn}"]`);
+            const activeInd = document.querySelector(`#master-reconciliation-table .sort-indicator[data-col="${sortColumn}"]`);
             if (activeInd) {
                 activeInd.textContent = sortDirection === 'asc' ? '▲' : '▼';
             }
@@ -254,7 +272,7 @@ const App = (() => {
                 <tr>
                     <td class="text-center col-action">
                         <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRecord(${row.id})" title="Delete this record">
-                            🗑️
+                            Delete
                         </button>
                     </td>
                     <td class="text-left" style="font-weight: 500; max-width: 320px; white-space: normal;">
@@ -347,10 +365,311 @@ const App = (() => {
                 showToast('success', 'Deleted', json.message || 'Record deleted successfully.');
                 // Remove from local data and re-render
                 allMasterRows = allMasterRows.filter(r => r.id != id);
-                populateColumnFilters();
                 applyFilterAndRender();
             } else {
                 showToast('error', 'Delete Failed', json.message || 'Failed to delete record.');
+            }
+        } catch (err) {
+            showToast('error', 'Server Error', 'Failed to connect to the server.');
+        }
+    }
+
+    // ── Site Location Master Data ───────────────────────────────
+
+    async function loadSiteLocations() {
+        const tbody = document.getElementById('site-table-body');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    Loading Site Location records...
+                </td>
+            </tr>
+        `;
+
+        try {
+            const res = await fetch('api/site_locations.php');
+            const json = await res.json();
+
+            if (!json.success) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="17" class="text-center" style="padding: 2rem; color: #dc2626;">
+                            ${escapeHtml(json.message || 'Error loading site locations')}
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allSiteRows = json.data || [];
+            applySiteFilterAndRender();
+        } catch (err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="17" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        Network error loading site locations: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function handleSiteSearch(query) {
+        siteSearchQuery = (query || '').toLowerCase().trim();
+        siteCurrentPage = 1;
+        applySiteFilterAndRender();
+    }
+
+    function changeSitePageSize(size) {
+        sitePageSize = size === 'all' ? allSiteRows.length : parseInt(size, 10);
+        siteCurrentPage = 1;
+        applySiteFilterAndRender();
+    }
+
+    function goToSitePage(page) {
+        const effectiveSize = sitePageSize > 0 ? sitePageSize : (filteredSiteRows.length || 1);
+        const totalPages = Math.ceil(filteredSiteRows.length / effectiveSize) || 1;
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        siteCurrentPage = page;
+        renderSiteTable();
+    }
+
+    function applySiteFilterAndRender() {
+        let rows = allSiteRows.slice();
+
+        if (siteSearchQuery) {
+            rows = rows.filter(r => {
+                const fields = [
+                    r.site_id, r.category, r.name_intan, r.name_eproc, r.name_ims,
+                    r.organizations, r.manager, r.region, r.area, r.cluster,
+                    r.addr, r.province, r.city, r.sub_dis, r.village, r.postal
+                ];
+                return fields.some(f => (f || '').toString().toLowerCase().includes(siteSearchQuery));
+            });
+        }
+
+        if (siteSortCol) {
+            rows.sort((a, b) => {
+                const valA = (a[siteSortCol] || '').toString();
+                const valB = (b[siteSortCol] || '').toString();
+                return siteSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            });
+        }
+
+        filteredSiteRows = rows;
+        renderSiteTable();
+        updateSiteSortIndicators();
+    }
+
+    function toggleSiteSort(col) {
+        if (siteSortCol === col) {
+            siteSortDir = siteSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            siteSortCol = col;
+            siteSortDir = 'asc';
+        }
+        applySiteFilterAndRender();
+    }
+
+    function updateSiteSortIndicators() {
+        document.querySelectorAll('#site-location-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#site-location-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (siteSortCol) {
+            const activeTh = document.querySelector(`#site-location-table th.sortable[onclick*="'${siteSortCol}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(siteSortDir);
+            }
+            const activeInd = document.querySelector(`#site-location-table .sort-indicator[data-site-col="${siteSortCol}"]`);
+            if (activeInd) {
+                activeInd.textContent = siteSortDir === 'asc' ? '▲' : '▼';
+            }
+        }
+    }
+
+    function renderSiteTable() {
+        const tbody = document.getElementById('site-table-body');
+        const infoEl = document.getElementById('site-pagination-info');
+        const controlsEl = document.getElementById('site-pagination-controls');
+        if (!tbody) return;
+
+        const totalItems = filteredSiteRows.length;
+
+        if (totalItems === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                        ${allSiteRows.length === 0 ? "No site locations found. Click 'Add Site' to create one." : "No matching site locations found."}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Showing 0 to 0 of 0 entries';
+            if (controlsEl) controlsEl.innerHTML = '';
+            return;
+        }
+
+        const effectiveSize = sitePageSize > 0 ? sitePageSize : totalItems;
+        const totalPages = Math.ceil(totalItems / effectiveSize) || 1;
+        if (siteCurrentPage > totalPages) siteCurrentPage = totalPages;
+
+        const startIndex = (siteCurrentPage - 1) * effectiveSize;
+        const endIndex = Math.min(startIndex + effectiveSize, totalItems);
+        const pageRows = filteredSiteRows.slice(startIndex, endIndex);
+
+        let html = '';
+        pageRows.forEach(row => {
+            html += `
+                <tr>
+                    <td class="text-center col-action">
+                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteSite(${row.id})" title="Delete this site">
+                            Delete
+                        </button>
+                    </td>
+                    <td class="text-center" style="white-space: nowrap;">
+                        <span class="badge-site-id">${escapeHtml(row.site_id || '')}</span>
+                    </td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.category || '')}</td>
+                    <td class="text-left" style="min-width: 200px;">${escapeHtml(row.name_intan || '')}</td>
+                    <td class="text-left" style="min-width: 200px;">${escapeHtml(row.name_eproc || '')}</td>
+                    <td class="text-left" style="min-width: 120px;">${escapeHtml(row.name_ims || '')}</td>
+                    <td class="text-left" style="min-width: 220px;">${escapeHtml(row.organizations || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.manager || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.region || '')}</td>
+                    <td class="text-center" style="white-space: nowrap;">${escapeHtml(row.area || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.cluster || '')}</td>
+                    <td class="text-left" style="min-width: 250px; font-size: 11px;">${escapeHtml(row.addr || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.province || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.city || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.sub_dis || '')}</td>
+                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.village || '')}</td>
+                    <td class="text-center" style="white-space: nowrap;">${escapeHtml(row.postal || '')}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+
+        if (infoEl) {
+            infoEl.textContent = `Showing ${(startIndex + 1).toLocaleString()} to ${endIndex.toLocaleString()} of ${totalItems.toLocaleString()} entries`;
+        }
+
+        if (controlsEl) {
+            let btnsHtml = '';
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToSitePage(1)" ${siteCurrentPage === 1 ? 'disabled' : ''}>« First</button>`;
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToSitePage(${siteCurrentPage - 1})" ${siteCurrentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
+
+            const maxButtons = 5;
+            let startPage = Math.max(1, siteCurrentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                btnsHtml += `<button class="pagination-btn ${p === siteCurrentPage ? 'active' : ''}" onclick="App.goToSitePage(${p})">${p}</button>`;
+            }
+
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToSitePage(${siteCurrentPage + 1})" ${siteCurrentPage === totalPages ? 'disabled' : ''}>Next ›</button>`;
+            btnsHtml += `<button class="pagination-btn" onclick="App.goToSitePage(${totalPages})" ${siteCurrentPage === totalPages ? 'disabled' : ''}>Last »</button>`;
+
+            controlsEl.innerHTML = btnsHtml;
+        }
+    }
+
+    async function deleteSite(id) {
+        if (!confirm('Are you sure you want to delete this site location? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`api/site_locations.php?id=${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Site Deleted', json.message || 'Site location deleted successfully.');
+                allSiteRows = allSiteRows.filter(r => r.id != id);
+                applySiteFilterAndRender();
+            } else {
+                showToast('error', 'Delete Failed', json.message || 'Failed to delete site location.');
+            }
+        } catch (err) {
+            showToast('error', 'Server Error', 'Failed to connect to the server.');
+        }
+    }
+
+    function openAddSiteModal() {
+        const modal = document.getElementById('add-site-modal');
+        if (modal) {
+            const form = document.getElementById('add-site-form');
+            if (form) form.reset();
+            modal.classList.add('active');
+        }
+    }
+
+    function closeAddSiteModal() {
+        const modal = document.getElementById('add-site-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    async function submitAddSite() {
+        const siteIdInput = document.getElementById('add-site-id');
+        const siteId = siteIdInput ? siteIdInput.value.trim() : '';
+
+        if (!siteId) {
+            showToast('error', 'Validation Error', 'Site ID is required.');
+            if (siteIdInput) siteIdInput.focus();
+            return;
+        }
+
+        const payload = {
+            site_id: siteId,
+            category: document.getElementById('add-site-category')?.value.trim() || '',
+            name_intan: document.getElementById('add-site-name-intan')?.value.trim() || '',
+            name_eproc: document.getElementById('add-site-name-eproc')?.value.trim() || '',
+            name_ims: document.getElementById('add-site-name-ims')?.value.trim() || '',
+            organizations: document.getElementById('add-site-org')?.value.trim() || '',
+            manager: document.getElementById('add-site-manager')?.value.trim() || '',
+            region: document.getElementById('add-site-region')?.value.trim() || '',
+            area: document.getElementById('add-site-area')?.value.trim() || '',
+            cluster: document.getElementById('add-site-cluster')?.value.trim() || '',
+            addr: document.getElementById('add-site-addr')?.value.trim() || '',
+            province: document.getElementById('add-site-province')?.value.trim() || '',
+            city: document.getElementById('add-site-city')?.value.trim() || '',
+            sub_dis: document.getElementById('add-site-subdis')?.value.trim() || '',
+            village: document.getElementById('add-site-village')?.value.trim() || '',
+            postal: document.getElementById('add-site-postal')?.value.trim() || '',
+        };
+
+        try {
+            const res = await fetch('api/site_locations.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Site Saved', json.message || 'Site location created successfully.');
+                closeAddSiteModal();
+                loadSiteLocations();
+            } else {
+                showToast('error', 'Save Failed', json.message || 'Failed to create site location.');
             }
         } catch (err) {
             showToast('error', 'Server Error', 'Failed to connect to the server.');
@@ -712,7 +1031,7 @@ const App = (() => {
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = '🗑️ Delete Period Data';
+                submitBtn.textContent = 'Delete Period Data';
             }
         }
     }
@@ -739,6 +1058,16 @@ const App = (() => {
         handleFileSelect,
         clearSelectedFile,
         submitImport,
+        // Site Location exports
+        loadSiteLocations,
+        changeSitePageSize,
+        goToSitePage,
+        handleSiteSearch,
+        toggleSiteSort,
+        deleteSite,
+        openAddSiteModal,
+        closeAddSiteModal,
+        submitAddSite,
     };
 })();
 

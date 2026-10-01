@@ -370,6 +370,8 @@ body {
 .reconciliation-table .text-center { text-align: center; }
 .reconciliation-table .text-right { text-align: right; }
 .reconciliation-table .align-middle { vertical-align: middle; }
+.reconciliation-table .col-action { width: 68px; min-width: 68px; text-align: center; }
+.btn-delete { padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 500; }
 
 /* ---- Sortable Table Headers with Asc / Desc Arrow Indicators ---- */
 .reconciliation-table th.sortable {
@@ -406,6 +408,7 @@ body {
     color: #2563eb;
     font-weight: bold;
 }
+
 
 /* ---- DataTables Overrides for Master Data ---- */
 table.dataTable {
@@ -766,3 +769,42 @@ table.dataTable tbody tr:hover td {
     font-weight: 500;
     white-space: nowrap;
 }
+
+/* ---- Sortable Table Headers ---- */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+th.sortable:hover {
+    background-color: #e2e8f0 !important;
+}
+
+.sort-indicator {
+    display: inline-block;
+    font-size: 10px;
+    margin-left: 3px;
+    color: #94a3b8;
+    vertical-align: middle;
+}
+
+th.sortable.asc .sort-indicator,
+th.sortable.desc .sort-indicator {
+    color: #2563eb;
+    font-weight: 700;
+}
+
+/* ---- Site Location Styles ---- */
+.badge-site-id {
+    display: inline-block;
+    background-color: #facc15;
+    color: #000000;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
