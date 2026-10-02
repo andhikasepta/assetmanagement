@@ -466,7 +466,7 @@ $currentYear = (int) date('Y');
             <div class="kpi-grid" id="achievement-cards"
                 style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));">
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-title">National Regional Achievement</div>
+                    <div class="kpi-title">National Regional Outlet Achievement</div>
                     <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-national-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-national-trend"></div>
@@ -532,7 +532,8 @@ $currentYear = (int) date('Y');
                             <h3 class="card-title"
                                 style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                 Trend Achievement SO Dept</h3>
-                            <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                            <p class="card-subtitle trend-chart-subtitle"
+                                style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
                                 Monthly Physical % (Jan - Dec 2026)</p>
                         </div>
                         <span class="badge"
@@ -555,7 +556,8 @@ $currentYear = (int) date('Y');
                                 <h3 class="card-title"
                                     style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                     Trend Achievement SO Outlet Regional Sub Dept</h3>
-                                <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                <p class="card-subtitle trend-chart-subtitle"
+                                    style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
                                     Monthly Physical % (Jan - Dec 2026)</p>
                             </div>
                             <span class="badge"
@@ -577,7 +579,8 @@ $currentYear = (int) date('Y');
                                 <h3 class="card-title"
                                     style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                     Trend Achievement SO PMD Sub Dept</h3>
-                                <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                <p class="card-subtitle trend-chart-subtitle"
+                                    style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
                                     Monthly Physical % (Jan - Dec 2026)</p>
                             </div>
                             <span class="badge"
