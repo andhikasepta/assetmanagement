@@ -42,7 +42,7 @@ $currentYear = (int) date('Y');
         rel="stylesheet">
 
     <!-- Clean Corporate App CSS -->
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 </head>
 
 <body>
@@ -430,10 +430,10 @@ $currentYear = (int) date('Y');
                     <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <label for="summary-filter-month"
-                                style="font-size: 13px; font-weight: 600; color: #334155;">MONTH</label>
+                                style="font-size: 13px; font-weight: 600; color: #334155;">BULAN</label>
                             <select id="summary-filter-month" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem;" onchange="App.loadSummaryData()">
-                                <option value="">All Months</option>
+                                <option value="">Semua Bulan</option>
                                 <option value="1">January</option>
                                 <option value="2">February</option>
                                 <option value="3">March</option>
@@ -450,7 +450,7 @@ $currentYear = (int) date('Y');
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <label for="summary-filter-year"
-                                style="font-size: 13px; font-weight: 600; color: #334155;">YEAR</label>
+                                style="font-size: 13px; font-weight: 600; color: #334155;">TAHUN</label>
                             <select id="summary-filter-year" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem;" onchange="App.loadSummaryData()">
                                 <option value="2026" selected>2026</option>
@@ -458,69 +458,66 @@ $currentYear = (int) date('Y');
                                 <option value="2028">2028</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary" onclick="App.loadSummaryData()">
-                            Load Data
-                        </button>
                     </div>
                 </div>
             </div>
 
             <!-- ── Achievement Cards (National, CRO, ERO, WRO, PMD) ── -->
             <div class="kpi-grid" id="achievement-cards"
-                style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));">
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-split-info">
-                        <div class="kpi-title">National Regional Achievement</div>
-                        <div class="kpi-subtext" id="kpi-national-subtext">Outlet Regional &amp; PMD (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-national-status"></div>
-                    </div>
-                    <div class="kpi-split-right">
+                    <div class="kpi-title">National Regional Achievement</div>
+                    <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-national-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-national-trend"></div>
                     </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-national-subtext">Outlet Regional &amp; PMD (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-national-status"></div>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-split-info">
-                        <div class="kpi-title">CRO Achievement</div>
-                        <div class="kpi-subtext" id="kpi-cro-subtext">Avg DEPT CRO (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-cro-status"></div>
-                    </div>
-                    <div class="kpi-split-right">
+                    <div class="kpi-title">CRO Achievement</div>
+                    <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-cro-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-cro-trend"></div>
                     </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-cro-subtext">Avg DEPT CRO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-cro-status"></div>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-split-info">
-                        <div class="kpi-title">ERO Achievement</div>
-                        <div class="kpi-subtext" id="kpi-ero-subtext">Avg DEPT ERO (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-ero-status"></div>
-                    </div>
-                    <div class="kpi-split-right">
+                    <div class="kpi-title">ERO Achievement</div>
+                    <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-ero-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-ero-trend"></div>
                     </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-ero-subtext">Avg DEPT ERO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-ero-status"></div>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-split-info">
-                        <div class="kpi-title">WRO Achievement</div>
-                        <div class="kpi-subtext" id="kpi-wro-subtext">Avg DEPT WRO (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-wro-status"></div>
-                    </div>
-                    <div class="kpi-split-right">
+                    <div class="kpi-title">WRO Achievement</div>
+                    <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-wro-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-wro-trend"></div>
                     </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-wro-subtext">Avg DEPT WRO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-wro-status"></div>
+                    </div>
                 </div>
                 <div class="kpi-card kpi-card-split">
-                    <div class="kpi-split-info">
-                        <div class="kpi-title">PMD Achievement</div>
-                        <div class="kpi-subtext" id="kpi-pmd-subtext">Avg DEPT PMD (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-pmd-status"></div>
-                    </div>
-                    <div class="kpi-split-right">
+                    <div class="kpi-title">PMD Achievement</div>
+                    <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-pmd-achievement">0.00%</div>
                         <div class="kpi-split-trend" id="kpi-pmd-trend"></div>
+                    </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-pmd-subtext">Avg DEPT PMD (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-pmd-status"></div>
                     </div>
                 </div>
             </div>
@@ -600,8 +597,7 @@ $currentYear = (int) date('Y');
                 <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
                         <h2 class="card-title">Chart Hasil SO Outlet Regional</h2>
-                        <p class="card-subtitle">Pencapaian dan Hasil Stock Opname berdasarkan
-                            Sub Dept</p>
+                        <p class="card-subtitle">Pencapaian dan Hasil Stock Opname Outlet Regional</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
