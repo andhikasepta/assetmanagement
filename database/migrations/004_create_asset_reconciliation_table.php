@@ -39,6 +39,10 @@ return [
                 total_nbv_target NUMERIC(18, 2) DEFAULT 0,
                 total_nbv_pct NUMERIC(18, 2) DEFAULT 0,
 
+                period_id INTEGER REFERENCES asset_periods(id) ON DELETE SET NULL,
+                period_month INTEGER,
+                period_year INTEGER,
+
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -52,6 +56,11 @@ return [
         $db->exec('
             CREATE INDEX IF NOT EXISTS idx_asset_reconciliation_periods 
             ON asset_reconciliation (period_start, period_end)
+        ');
+
+        $db->exec('
+            CREATE INDEX IF NOT EXISTS idx_asset_reconciliation_period_my 
+            ON asset_reconciliation (period_year, period_month)
         ');
     },
 

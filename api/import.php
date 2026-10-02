@@ -10,6 +10,11 @@ require_once __DIR__ . '/../config/database.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+ini_set('memory_limit', '1024M');
+set_time_limit(300);
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -69,84 +74,119 @@ try {
     exit;
 }
 
-// Validate file upload
-if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
-    $errorMessages = [
-        UPLOAD_ERR_INI_SIZE   => 'File exceeds server upload limit',
-        UPLOAD_ERR_FORM_SIZE  => 'File exceeds form upload limit',
-        UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded',
-        UPLOAD_ERR_NO_FILE    => 'No file was uploaded',
-        UPLOAD_ERR_NO_TMP_DIR => 'Server missing temporary folder',
-        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
-    ];
-    $errorCode = $_FILES['excel_file']['error'] ?? UPLOAD_ERR_NO_FILE;
-    $msg = $errorMessages[$errorCode] ?? 'Upload error';
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $msg]);
-    exit;
-}
-
-$file = $_FILES['excel_file'];
-$originalName = basename($file['name']);
-$extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-
-if (!in_array($extension, ['xlsx', 'xls'], true)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Only .xlsx and .xls files are allowed']);
-    exit;
-}
-
+// Resolve upload path: use existing file_token or uploaded excel_file
 $uploadDir = __DIR__ . '/../uploads/';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0750, true);
+$storedPath = null;
+
+if (!empty($_POST['file_token'])) {
+    $token = basename($_POST['file_token']);
+    $candidate = $uploadDir . $token;
+    if (file_exists($candidate) && is_file($candidate)) {
+        $storedPath = $candidate;
+    }
 }
 
-$storedFilename = bin2hex(random_bytes(16)) . '.' . $extension;
-$storedPath = $uploadDir . $storedFilename;
+if (!$storedPath) {
+    if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
+        $errorMessages = [
+            UPLOAD_ERR_INI_SIZE   => 'File exceeds server upload limit',
+            UPLOAD_ERR_FORM_SIZE  => 'File exceeds form upload limit',
+            UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE    => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Server missing temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+        ];
+        $errorCode = $_FILES['excel_file']['error'] ?? UPLOAD_ERR_NO_FILE;
+        $msg = $errorMessages[$errorCode] ?? 'Upload error';
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $msg]);
+        exit;
+    }
 
-if (!move_uploaded_file($file['tmp_name'], $storedPath)) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file']);
-    exit;
+    $file = $_FILES['excel_file'];
+    $originalName = basename($file['name']);
+    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+    if (!in_array($extension, ['xlsx', 'xls'], true)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Only .xlsx and .xls files are allowed']);
+        exit;
+    }
+
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0750, true);
+    }
+
+    $storedFilename = bin2hex(random_bytes(16)) . '.' . $extension;
+    $storedPath = $uploadDir . $storedFilename;
+
+    if (!move_uploaded_file($file['tmp_name'], $storedPath)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file']);
+        exit;
+    }
 }
 
 try {
-    $spreadsheet = IOFactory::load($storedPath);
+    $selectedSheetName = trim($_POST['sheet_name'] ?? '');
+    $bestReconScore = 0;
 
-    // 1. Intelligent Worksheet Selection:
-    // Workbooks may have multiple sheets (e.g. Sheet, Sheet1).
-    // Automatically select the sheet containing the full reconciliation columns if present.
-    $targetSheet = null;
-    $bestReconScore = -1;
-    $allSheets = $spreadsheet->getAllSheets();
+    $reader = IOFactory::createReaderForFile($storedPath);
+    $reader->setReadDataOnly(true);
+    if ($selectedSheetName !== '') {
+        $reader->setLoadSheetsOnly($selectedSheetName);
+    }
+    $spreadsheet = $reader->load($storedPath);
 
-    foreach ($allSheets as $sheet) {
-        $raw = $sheet->toArray(null, true, true, true);
-        $score = 0;
+    if ($selectedSheetName !== '' && $spreadsheet->sheetNameExists($selectedSheetName)) {
+        $targetSheet = $spreadsheet->getSheetByName($selectedSheetName);
+        $raw = $targetSheet->toArray(null, true, true, true);
         for ($i = 1; $i <= min(5, count($raw)); $i++) {
             $rowText = strtolower(implode(' ', array_map('strval', $raw[$i] ?? [])));
-            if (str_contains($rowText, 'result match')) $score += 20;
-            if (str_contains($rowText, 'result physic')) $score += 20;
-            if (str_contains($rowText, 'result db')) $score += 20;
-            if (str_contains($rowText, 'total')) $score += 5;
-            if (str_contains($rowText, 'physical')) $score += 5;
-            if (str_contains($rowText, 'nbv')) $score += 5;
-            if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $score += 2;
+            if (str_contains($rowText, 'result match')) $bestReconScore += 20;
+            if (str_contains($rowText, 'result physic')) $bestReconScore += 20;
+            if (str_contains($rowText, 'result db')) $bestReconScore += 20;
+            if (str_contains($rowText, 'total')) $bestReconScore += 5;
+            if (str_contains($rowText, 'physical')) $bestReconScore += 5;
+            if (str_contains($rowText, 'nbv')) $bestReconScore += 5;
+            if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $bestReconScore += 2;
         }
-        if ($score > $bestReconScore) {
-            $bestReconScore = $score;
-            $targetSheet = $sheet;
-        }
-    }
+    } else {
+        // 1. Intelligent Worksheet Selection:
+        // Workbooks may have multiple sheets (e.g. Sheet, Sheet1).
+        // Automatically select the sheet containing the full reconciliation columns if present.
+        $targetSheet = null;
+        $bestReconScore = -1;
+        $allSheets = $spreadsheet->getAllSheets();
 
-    if (!$targetSheet || $bestReconScore < 10) {
-        $targetSheet = $spreadsheet->getActiveSheet();
+        foreach ($allSheets as $sheet) {
+            $raw = $sheet->toArray(null, true, true, true);
+            $score = 0;
+            for ($i = 1; $i <= min(5, count($raw)); $i++) {
+                $rowText = strtolower(implode(' ', array_map('strval', $raw[$i] ?? [])));
+                if (str_contains($rowText, 'result match')) $score += 20;
+                if (str_contains($rowText, 'result physic')) $score += 20;
+                if (str_contains($rowText, 'result db')) $score += 20;
+                if (str_contains($rowText, 'total')) $score += 5;
+                if (str_contains($rowText, 'physical')) $score += 5;
+                if (str_contains($rowText, 'nbv')) $score += 5;
+                if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $score += 2;
+            }
+            if ($score > $bestReconScore) {
+                $bestReconScore = $score;
+                $targetSheet = $sheet;
+            }
+        }
+
+        if (!$targetSheet || $bestReconScore < 10) {
+            $targetSheet = $spreadsheet->getActiveSheet();
+        }
     }
 
     $rawRows = $targetSheet->toArray(null, true, true, true);
 
     if (count($rawRows) < 2) {
-        if (file_exists($storedPath)) unlink($storedPath);
+        if (!empty($storedPath) && file_exists($storedPath)) unlink($storedPath);
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Excel sheet is empty or has no data rows']);
         exit;
@@ -161,8 +201,8 @@ try {
     // Detect if this is a Reconciliation Summary spreadsheet
     $isReconciliation = ($bestReconScore >= 20);
     if (!$isReconciliation) {
-        $reconKeywords = ['result match', 'result physic', 'result db', 'match_physic'];
-        for ($i = 0; $i < min(4, count($rows)); $i++) {
+        $reconKeywords = ['result match', 'result physic', 'result db', 'match_physic', 'total physical', 'total physic'];
+        for ($i = 0; $i < min(6, count($rows)); $i++) {
             $rowText = strtolower(implode(' ', array_map('strval', $rows[$i])));
             foreach ($reconKeywords as $kw) {
                 if (str_contains($rowText, $kw)) {
@@ -282,6 +322,7 @@ try {
         $insRecon = $db->prepare('
             INSERT INTO asset_reconciliation (
                 profile, period_start, period_end,
+                period_id, period_month, period_year,
                 match_physic_qty, match_physic_pct, match_nbv_value, match_nbv_pct,
                 physic_physic_qty, physic_physic_pct, physic_nbv_value, physic_nbv_pct,
                 db_physic_qty, db_physic_pct, db_nbv_value, db_nbv_pct,
@@ -289,6 +330,7 @@ try {
                 total_nbv_actual, total_nbv_target, total_nbv_pct
             ) VALUES (
                 :profile, :period_start, :period_end,
+                :period_id, :period_month, :period_year,
                 :match_physic_qty, :match_physic_pct, :match_nbv_value, :match_nbv_pct,
                 :physic_physic_qty, :physic_physic_pct, :physic_nbv_value, :physic_nbv_pct,
                 :db_physic_qty, :db_physic_pct, :db_nbv_value, :db_nbv_pct,
@@ -315,6 +357,38 @@ try {
             $ts = strtotime($vNormalized);
             return $ts !== false ? date('Y-m-d', $ts) : $default;
         };
+        $cleanPct = function($v, $actual = null, $target = null) {
+            if ($v !== null && trim((string)$v) !== '') {
+                $str = trim((string)$v);
+                if (str_contains($str, ',') && !str_contains($str, '.')) {
+                    $str = str_replace(',', '.', $str);
+                }
+                $hasPctSign = str_contains($str, '%');
+                $num = (float) preg_replace('/[^0-9.\-]/', '', $str);
+
+                if ($hasPctSign) {
+                    return round($num, 2);
+                }
+
+                // If Excel cell was read as decimal ratio (e.g. 0.9993 for 99.93% or 1.0 for 100%)
+                // When actual and target are known, calculate exact percentage: (actual / target) * 100
+                if ($actual !== null && $target !== null && (float)$target > 0) {
+                    return round(((float)$actual / (float)$target) * 100, 2);
+                }
+
+                if ($num > 0 && $num <= 1.0) {
+                    return round($num * 100, 2);
+                }
+
+                return round($num, 2);
+            }
+
+            if ($actual !== null && $target !== null && (float)$target > 0) {
+                return round(((float)$actual / (float)$target) * 100, 2);
+            }
+
+            return 0.0;
+        };
 
         $defaultStart = sprintf('%04d-%02d-01', $year, $month);
         $defaultEnd = date('Y-m-t', strtotime($defaultStart));
@@ -327,28 +401,66 @@ try {
             $profile = isset($colMap['profile'], $r[$colMap['profile']]) ? trim((string)$r[$colMap['profile']]) : '';
             if ($profile === '') continue;
 
+            $recStartDate = $cleanDate(isset($colMap['period_start']) ? ($r[$colMap['period_start']] ?? '') : '', $defaultStart);
+            $recEndDate   = $cleanDate(isset($colMap['period_end']) ? ($r[$colMap['period_end']] ?? '') : '', $defaultEnd);
+
+            // Determine the record's period month & year
+            $rowMonth = $month;
+            $rowYear  = $year;
+            if ($rowMonth <= 0 || $rowMonth > 12) {
+                // If not provided in form, infer from period_end date (standard cut-off month)
+                $endTs = strtotime($recEndDate);
+                if ($endTs !== false) {
+                    $rowMonth = (int) date('n', $endTs);
+                    $rowYear  = (int) date('Y', $endTs);
+                }
+            }
+
+            $matchPhysicQty  = isset($colMap['match_physic_qty']) ? $cleanInt($r[$colMap['match_physic_qty']] ?? 0) : 0;
+            $matchNbvValue   = isset($colMap['match_nbv_value']) ? $cleanNum($r[$colMap['match_nbv_value']] ?? 0) : 0;
+            $physicPhysicQty = isset($colMap['physic_physic_qty']) ? $cleanInt($r[$colMap['physic_physic_qty']] ?? 0) : 0;
+            $physicNbvValue  = isset($colMap['physic_nbv_value']) ? $cleanNum($r[$colMap['physic_nbv_value']] ?? 0) : 0;
+            $dbPhysicQty     = isset($colMap['db_physic_qty']) ? $cleanInt($r[$colMap['db_physic_qty']] ?? 0) : 0;
+            $dbNbvValue      = isset($colMap['db_nbv_value']) ? $cleanNum($r[$colMap['db_nbv_value']] ?? 0) : 0;
+            $totPhysicActual = isset($colMap['total_physic_actual']) ? $cleanInt($r[$colMap['total_physic_actual']] ?? 0) : 0;
+            $totPhysicTarget = isset($colMap['total_physic_target']) ? $cleanInt($r[$colMap['total_physic_target']] ?? 0) : 0;
+            $totNbvActual    = isset($colMap['total_nbv_actual']) ? $cleanNum($r[$colMap['total_nbv_actual']] ?? 0) : 0;
+            $totNbvTarget    = isset($colMap['total_nbv_target']) ? $cleanNum($r[$colMap['total_nbv_target']] ?? 0) : 0;
+
+            $matchPhysicPct  = $cleanPct(isset($colMap['match_physic_pct']) ? ($r[$colMap['match_physic_pct']] ?? null) : null, $matchPhysicQty, $totPhysicTarget);
+            $matchNbvPct     = $cleanPct(isset($colMap['match_nbv_pct']) ? ($r[$colMap['match_nbv_pct']] ?? null) : null, $matchNbvValue, $totNbvTarget);
+            $physicPhysicPct = $cleanPct(isset($colMap['physic_physic_pct']) ? ($r[$colMap['physic_physic_pct']] ?? null) : null, $physicPhysicQty, $totPhysicTarget);
+            $physicNbvPct    = $cleanPct(isset($colMap['physic_nbv_pct']) ? ($r[$colMap['physic_nbv_pct']] ?? null) : null, $physicNbvValue, $totNbvTarget);
+            $dbPhysicPct     = $cleanPct(isset($colMap['db_physic_pct']) ? ($r[$colMap['db_physic_pct']] ?? null) : null, $dbPhysicQty, $totPhysicTarget);
+            $dbNbvPct        = $cleanPct(isset($colMap['db_nbv_pct']) ? ($r[$colMap['db_nbv_pct']] ?? null) : null, $dbNbvValue, $totNbvTarget);
+            $totPhysicPct    = $cleanPct(isset($colMap['total_physic_pct']) ? ($r[$colMap['total_physic_pct']] ?? null) : null, $totPhysicActual, $totPhysicTarget);
+            $totNbvPct       = $cleanPct(isset($colMap['total_nbv_pct']) ? ($r[$colMap['total_nbv_pct']] ?? null) : null, $totNbvActual, $totNbvTarget);
+
             $insRecon->execute([
                 ':profile'             => $profile,
-                ':period_start'        => $cleanDate(isset($colMap['period_start']) ? ($r[$colMap['period_start']] ?? '') : '', $defaultStart),
-                ':period_end'          => $cleanDate(isset($colMap['period_end']) ? ($r[$colMap['period_end']] ?? '') : '', $defaultEnd),
-                ':match_physic_qty'    => isset($colMap['match_physic_qty']) ? $cleanInt($r[$colMap['match_physic_qty']] ?? 0) : 0,
-                ':match_physic_pct'    => isset($colMap['match_physic_pct']) ? $cleanNum($r[$colMap['match_physic_pct']] ?? 0) : 0,
-                ':match_nbv_value'     => isset($colMap['match_nbv_value']) ? $cleanNum($r[$colMap['match_nbv_value']] ?? 0) : 0,
-                ':match_nbv_pct'       => isset($colMap['match_nbv_pct']) ? $cleanNum($r[$colMap['match_nbv_pct']] ?? 0) : 0,
-                ':physic_physic_qty'   => isset($colMap['physic_physic_qty']) ? $cleanInt($r[$colMap['physic_physic_qty']] ?? 0) : 0,
-                ':physic_physic_pct'   => isset($colMap['physic_physic_pct']) ? $cleanNum($r[$colMap['physic_physic_pct']] ?? 0) : 0,
-                ':physic_nbv_value'    => isset($colMap['physic_nbv_value']) ? $cleanNum($r[$colMap['physic_nbv_value']] ?? 0) : 0,
-                ':physic_nbv_pct'      => isset($colMap['physic_nbv_pct']) ? $cleanNum($r[$colMap['physic_nbv_pct']] ?? 0) : 0,
-                ':db_physic_qty'       => isset($colMap['db_physic_qty']) ? $cleanInt($r[$colMap['db_physic_qty']] ?? 0) : 0,
-                ':db_physic_pct'       => isset($colMap['db_physic_pct']) ? $cleanNum($r[$colMap['db_physic_pct']] ?? 0) : 0,
-                ':db_nbv_value'        => isset($colMap['db_nbv_value']) ? $cleanNum($r[$colMap['db_nbv_value']] ?? 0) : 0,
-                ':db_nbv_pct'          => isset($colMap['db_nbv_pct']) ? $cleanNum($r[$colMap['db_nbv_pct']] ?? 0) : 0,
-                ':total_physic_actual' => isset($colMap['total_physic_actual']) ? $cleanInt($r[$colMap['total_physic_actual']] ?? 0) : 0,
-                ':total_physic_target' => isset($colMap['total_physic_target']) ? $cleanInt($r[$colMap['total_physic_target']] ?? 0) : 0,
-                ':total_physic_pct'    => isset($colMap['total_physic_pct']) ? $cleanNum($r[$colMap['total_physic_pct']] ?? 0) : 0,
-                ':total_nbv_actual'    => isset($colMap['total_nbv_actual']) ? $cleanNum($r[$colMap['total_nbv_actual']] ?? 0) : 0,
-                ':total_nbv_target'    => isset($colMap['total_nbv_target']) ? $cleanNum($r[$colMap['total_nbv_target']] ?? 0) : 0,
-                ':total_nbv_pct'       => isset($colMap['total_nbv_pct']) ? $cleanNum($r[$colMap['total_nbv_pct']] ?? 0) : 0,
+                ':period_start'        => $recStartDate,
+                ':period_end'          => $recEndDate,
+                ':period_id'           => ($periodId > 0 ? $periodId : null),
+                ':period_month'        => ($rowMonth >= 1 && $rowMonth <= 12 ? $rowMonth : null),
+                ':period_year'         => ($rowYear >= 2000 && $rowYear <= 2100 ? $rowYear : null),
+                ':match_physic_qty'    => $matchPhysicQty,
+                ':match_physic_pct'    => $matchPhysicPct,
+                ':match_nbv_value'     => $matchNbvValue,
+                ':match_nbv_pct'       => $matchNbvPct,
+                ':physic_physic_qty'   => $physicPhysicQty,
+                ':physic_physic_pct'   => $physicPhysicPct,
+                ':physic_nbv_value'    => $physicNbvValue,
+                ':physic_nbv_pct'      => $physicNbvPct,
+                ':db_physic_qty'       => $dbPhysicQty,
+                ':db_physic_pct'       => $dbPhysicPct,
+                ':db_nbv_value'        => $dbNbvValue,
+                ':db_nbv_pct'          => $dbNbvPct,
+                ':total_physic_actual' => $totPhysicActual,
+                ':total_physic_target' => $totPhysicTarget,
+                ':total_physic_pct'    => $totPhysicPct,
+                ':total_nbv_actual'    => $totNbvActual,
+                ':total_nbv_target'    => $totNbvTarget,
+                ':total_nbv_pct'       => $totNbvPct,
             ]);
             $importedCount++;
         }
@@ -462,7 +574,7 @@ try {
     if (isset($db) && $db->inTransaction()) {
         $db->rollBack();
     }
-    if (file_exists($storedPath)) {
+    if (!empty($storedPath) && file_exists($storedPath)) {
         unlink($storedPath);
     }
     http_response_code(500);

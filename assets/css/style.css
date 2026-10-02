@@ -1,21 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap');
+
 /* ============================================================
    Asset Management — Clean, Simple Corporate White Theme
    ============================================================ */
 
-* {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-size: 13px;
     line-height: 1.5;
     color: #334155;
     background-color: #f8fafc;
     min-height: 100vh;
 }
+
+input, button, select, textarea, optgroup, table, th, td, label {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
 
 /* ---- Navbar ---- */
 .navbar {
@@ -272,11 +282,7 @@ body {
     background: #eff6ff;
 }
 
-.drag-drop-icon {
-    font-size: 2.25rem;
-    line-height: 1;
-    margin-bottom: 0.5rem;
-}
+
 
 .drag-drop-text {
     font-size: 13px;
@@ -342,12 +348,19 @@ body {
     border: 1px solid #e2e8f0;
 }
 
+th,
+.reconciliation-table thead th,
+table thead th {
+    text-transform: uppercase !important;
+}
+
 .reconciliation-table thead th {
     background-color: #f8fafc;
     color: #334155;
     font-weight: 600;
     text-align: center;
     vertical-align: middle;
+    text-transform: uppercase !important;
 }
 
 .reconciliation-table thead tr:first-child th {
@@ -355,6 +368,7 @@ body {
     font-size: 12px;
     color: #0f172a;
     font-weight: 700;
+    text-transform: uppercase !important;
 }
 
 .reconciliation-table tbody td {
@@ -687,6 +701,108 @@ table.dataTable tbody tr:hover td {
     font-weight: 500;
 }
 
+/* Achievement Card with Percentage on Right */
+.kpi-card-split {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 110px;
+    padding: 1.5rem 1.4rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-card-split:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-split-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    flex: 1;
+}
+
+.kpi-split-info .kpi-title {
+    margin-bottom: 0.35rem;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #475569;
+}
+
+.kpi-split-info .kpi-subtext {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 0;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kpi-split-info .kpi-status-box {
+    margin-top: 0.45rem;
+    display: flex;
+    align-items: center;
+}
+
+.kpi-split-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+    padding-left: 0.75rem;
+}
+
+.kpi-split-value {
+    text-align: right;
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.kpi-split-trend {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.kpi-target-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-target-indicator.target-up {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.kpi-target-indicator.target-down {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+
 /* ---- Action Column & Delete Button ---- */
 .col-action {
     width: 60px;
@@ -699,16 +815,51 @@ table.dataTable tbody tr:hover td {
     background: inherit;
 }
 
-.reconciliation-table thead th.col-action {
+.col-action-select {
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    text-align: center;
+    padding: 4px 2px !important;
+}
+
+.col-action-delete {
+    width: 58px;
+    min-width: 58px;
+    max-width: 58px;
+    text-align: center;
+    padding: 4px 6px !important;
+}
+
+.reconciliation-table thead th.col-action,
+.reconciliation-table thead th.col-action-group,
+.reconciliation-table thead th.col-action-select,
+.reconciliation-table thead th.col-action-delete {
     background-color: #f1f5f9;
 }
 
-.reconciliation-table tbody td.col-action {
+.reconciliation-table tbody td.col-action,
+.reconciliation-table tbody td.col-action-select,
+.reconciliation-table tbody td.col-action-delete {
     background-color: #ffffff;
 }
 
-.reconciliation-table tbody tr:hover td.col-action {
+.reconciliation-table tbody tr:hover td.col-action,
+.reconciliation-table tbody tr:hover td.col-action-select,
+.reconciliation-table tbody tr:hover td.col-action-delete {
     background-color: #f8fafc;
+}
+
+.reconciliation-table tbody tr.row-selected td {
+    background-color: #fef2f2 !important;
+}
+
+.site-row-checkbox {
+    cursor: pointer;
+    width: 15px;
+    height: 15px;
+    accent-color: #dc2626;
+    vertical-align: middle;
 }
 
 .btn-delete {
@@ -806,5 +957,391 @@ th.sortable.desc .sort-indicator {
     font-size: 11px;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+/* ── Site Regional Tabs ── */
+.sr-tabs-container {
+    padding: 0 1.25rem;
+    background: #fafbfc;
+}
+
+.sr-tabs-level1 {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.sr-tab-l1,
+.rekap-tab-l1 {
+    position: relative;
+    padding: 0.75rem 1.5rem;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.sr-tab-l1:hover,
+.rekap-tab-l1:hover {
+    color: #1e40af;
+    background: #eff6ff;
+}
+
+.sr-tab-l1.active,
+.rekap-tab-l1.active {
+    color: #1e40af;
+    border-bottom-color: #2563eb;
+    background: #eff6ff;
+}
+
+.sr-tabs-level2 {
+    display: flex;
+    gap: 0;
+    margin-top: 0.25rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sr-tab-l2,
+.rekap-tab-l2 {
+    position: relative;
+    padding: 0.5rem 1.25rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    border-radius: 4px 4px 0 0;
+}
+
+.sr-tab-l2:hover,
+.rekap-tab-l2:hover {
+    color: #475569;
+    background: #f1f5f9;
+}
+
+.sr-tab-l2.active,
+.rekap-tab-l2.active {
+    color: #0f172a;
+    background: #ffffff;
+    border-bottom-color: #0f172a;
+    font-weight: 600;
+}
+
+.badge-sitecode {
+    display: inline-block;
+    background-color: #dbeafe;
+    color: #1e40af;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.pct-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11.5px;
+    letter-spacing: 0.01em;
+}
+
+/* Color rules: >=85% Green, 75%-84.99% Orange, <75% Red */
+.pct-green,
+.pct-100,
+.pct-high {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.pct-orange,
+.pct-mid {
+    background-color: #ffedd5;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
+.pct-red,
+.pct-low {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.pct-none {
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+/* ---- Trend Charts Grid ---- */
+.trend-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+.trend-charts-row-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
+@media (max-width: 1280px) {
+    .trend-charts-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .trend-charts-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .trend-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---- Chart Hasil SO Outlet Regional Table & Progress ---- */
+.so-subdept-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.so-subdept-table td {
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.so-progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 170px;
+}
+
+.so-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.so-progress-track {
+    width: 100%;
+    height: 8px;
+    background-color: #e2e8f0;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.so-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.4s ease, background-color 0.3s ease;
+}
+
+.so-progress-green {
+    background-color: #16a34a !important;
+}
+
+.so-progress-orange {
+    background-color: #ea580c !important;
+}
+
+.so-progress-red {
+    background-color: #dc2626 !important;
+}
+
+.so-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 6px;
+    letter-spacing: 0.2px;
+}
+
+.so-status-badge.status-green {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.so-status-badge.status-orange {
+    background-color: #ffedd5;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
+.so-status-badge.status-red {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.so-status-badge.status-none {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+/* ---- Chart Hasil SO Outlet Regional Grid Layout & Pie Card ---- */
+.so-subdept-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+.so-subdept-table-wrapper {
+    min-width: 0;
+}
+
+.so-subdept-table td {
+    padding: 0.55rem 0.75rem;
+    font-size: 12.5px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.so-subdept-chart-wrapper {
+    min-width: 0;
+    display: flex;
+}
+
+.so-pie-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.so-pie-header {
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.so-pie-canvas-box {
+    position: relative;
+    height: 200px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.so-pie-stats {
+    margin-top: auto;
+    padding-top: 0.85rem;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.so-pie-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.so-pie-stat-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.so-pie-stat-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.so-pie-stat-val {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+@media (max-width: 1100px) {
+    .so-subdept-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---- SO Type Tab Slider (Summary Page) ---- */
+.summary-type-slider-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.summary-type-slider-wrapper {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 8px;
+    gap: 4px;
+    position: relative;
+}
+
+.summary-type-slider-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 1.25rem;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.summary-type-slider-btn:hover:not(.active) {
+    color: #0f172a;
+}
+
+.summary-type-slider-btn.active {
+    color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 

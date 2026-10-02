@@ -34,6 +34,13 @@ $currentYear = (int) date('Y');
     <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
     <title>Asset Management</title>
 
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap"
+        rel="stylesheet">
+
     <!-- Clean Corporate App CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -75,9 +82,10 @@ $currentYear = (int) date('Y');
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <button class="btn btn-secondary" onclick="App.loadMasterData()">
-                            Refresh
+                            Sync
                         </button>
-                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()" title="Delete data by month and year">
+                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()"
+                            title="Delete data by month and year">
                             Delete Data
                         </button>
                         <button class="btn btn-primary" onclick="App.openImportModal()">
@@ -149,7 +157,8 @@ $currentYear = (int) date('Y');
                                 <!-- Level 1 Header -->
                                 <tr>
                                     <th rowspan="3" class="text-center align-middle col-action">Action</th>
-                                    <th rowspan="3" class="text-center align-middle sortable" style="min-width: 280px;" onclick="App.toggleSort('profile')">
+                                    <th rowspan="3" class="text-center align-middle sortable" style="min-width: 280px;"
+                                        onclick="App.toggleSort('profile')">
                                         Profile <span class="sort-indicator" data-col="profile">⇅</span>
                                     </th>
                                     <th colspan="2" class="text-center">Periode</th>
@@ -161,10 +170,12 @@ $currentYear = (int) date('Y');
 
                                 <!-- Level 2 Sub-Header -->
                                 <tr>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSort('period_start')">
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSort('period_start')">
                                         Start <span class="sort-indicator" data-col="period_start">⇅</span>
                                     </th>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSort('period_end')">
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSort('period_end')">
                                         End <span class="sort-indicator" data-col="period_end">⇅</span>
                                     </th>
 
@@ -188,30 +199,58 @@ $currentYear = (int) date('Y');
                                 <!-- Level 3 Leaf Columns (Sortable Asc/Desc on Click) -->
                                 <tr>
                                     <!-- Under RESULT MATCH -->
-                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_qty')">QTY <span class="sort-indicator" data-col="match_physic_qty">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_pct')">% <span class="sort-indicator" data-col="match_physic_pct">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_value')">Value <span class="sort-indicator" data-col="match_nbv_value">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_pct')">% <span class="sort-indicator" data-col="match_nbv_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_qty')">QTY
+                                        <span class="sort-indicator" data-col="match_physic_qty">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_physic_pct')">%
+                                        <span class="sort-indicator" data-col="match_physic_pct">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_value')">Value
+                                        <span class="sort-indicator" data-col="match_nbv_value">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('match_nbv_pct')">% <span
+                                            class="sort-indicator" data-col="match_nbv_pct">⇅</span></th>
 
                                     <!-- Under RESULT PHYSIC -->
-                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_qty')">QTY <span class="sort-indicator" data-col="physic_physic_qty">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_pct')">% <span class="sort-indicator" data-col="physic_physic_pct">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_value')">Value <span class="sort-indicator" data-col="physic_nbv_value">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_pct')">% <span class="sort-indicator" data-col="physic_nbv_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_qty')">QTY
+                                        <span class="sort-indicator" data-col="physic_physic_qty">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_physic_pct')">%
+                                        <span class="sort-indicator" data-col="physic_physic_pct">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_value')">Value
+                                        <span class="sort-indicator" data-col="physic_nbv_value">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('physic_nbv_pct')">% <span
+                                            class="sort-indicator" data-col="physic_nbv_pct">⇅</span></th>
 
                                     <!-- Under RESULT DB -->
-                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_qty')">QTY <span class="sort-indicator" data-col="db_physic_qty">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_pct')">% <span class="sort-indicator" data-col="db_physic_pct">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_value')">Value <span class="sort-indicator" data-col="db_nbv_value">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_pct')">% <span class="sort-indicator" data-col="db_nbv_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_qty')">QTY <span
+                                            class="sort-indicator" data-col="db_physic_qty">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_physic_pct')">% <span
+                                            class="sort-indicator" data-col="db_physic_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_value')">Value
+                                        <span class="sort-indicator" data-col="db_nbv_value">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('db_nbv_pct')">% <span
+                                            class="sort-indicator" data-col="db_nbv_pct">⇅</span></th>
 
                                     <!-- Under TOTAL -->
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_actual')">ACTUAL <span class="sort-indicator" data-col="total_physic_actual">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_target')">TARGET <span class="sort-indicator" data-col="total_physic_target">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_pct')">% <span class="sort-indicator" data-col="total_physic_pct">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_actual')">ACTUAL <span class="sort-indicator" data-col="total_nbv_actual">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_target')">TARGET <span class="sort-indicator" data-col="total_nbv_target">⇅</span></th>
-                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_pct')">% <span class="sort-indicator" data-col="total_nbv_pct">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_actual')">
+                                        ACTUAL <span class="sort-indicator" data-col="total_physic_actual">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_target')">
+                                        TARGET <span class="sort-indicator" data-col="total_physic_target">⇅</span></th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_physic_pct')">%
+                                        <span class="sort-indicator" data-col="total_physic_pct">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_actual')">ACTUAL
+                                        <span class="sort-indicator" data-col="total_nbv_actual">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_target')">TARGET
+                                        <span class="sort-indicator" data-col="total_nbv_target">⇅</span>
+                                    </th>
+                                    <th class="sortable text-center" onclick="App.toggleSort('total_nbv_pct')">% <span
+                                            class="sort-indicator" data-col="total_nbv_pct">⇅</span></th>
                                 </tr>
                             </thead>
                             <tbody id="master-table-body">
@@ -233,20 +272,46 @@ $currentYear = (int) date('Y');
             </div>
 
             <!-- ═══════════════════════════════════════════════════════════ -->
-            <!-- CARD 2: Site Location                                       -->
+            <!-- CARD 2: Site Regional                                       -->
             <!-- ═══════════════════════════════════════════════════════════ -->
-            <div class="card" id="card-site-location" style="margin-top: 2rem;">
+            <div class="card" id="card-site-regional" style="margin-top: 2rem;">
                 <div class="card-header">
                     <div>
-                        <h2 class="card-title">Site Location</h2>
-                        <p class="card-subtitle">Site master infrastructure, organizations, regions, and physical locations</p>
+                        <h2 class="card-title">Site Regional</h2>
+                        <p class="card-subtitle">Regional Site master data</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <button class="btn btn-secondary" onclick="App.loadSiteLocations()">
-                            Refresh
+                        <button class="btn btn-secondary" onclick="App.loadSiteRegional()">
+                            Sync
                         </button>
-                        <button class="btn btn-primary" onclick="App.openAddSiteModal()">
-                            Add Site
+                        <button class="btn btn-danger" id="sr-bulk-delete-btn" style="display: none;"
+                            onclick="App.bulkDeleteSiteRegional()" title="Delete selected records">
+                            Delete Selected (<span id="sr-selected-count">0</span>)
+                        </button>
+                        <button class="btn btn-primary" onclick="App.openSiteRegionalImportModal()">
+                            Import Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ── Top-Level Tabs: Monthly / Quarterly ── -->
+                <div class="sr-tabs-container">
+                    <div class="sr-tabs-level1">
+                        <button class="sr-tab-l1 active" data-sr-l1="monthly" onclick="App.switchSRLevel1('monthly')">
+                            Monthly
+                        </button>
+                        <button class="sr-tab-l1" data-sr-l1="quarterly" onclick="App.switchSRLevel1('quarterly')">
+                            Quarterly
+                        </button>
+                    </div>
+
+                    <!-- ── Sub-Level Tabs: Outlet Regional / PMD (Monthly only) ── -->
+                    <div class="sr-tabs-level2" id="sr-tabs-level2">
+                        <button class="sr-tab-l2 active" data-sr-l2="outlet" onclick="App.switchSRLevel2('outlet')">
+                            Outlet Regional
+                        </button>
+                        <button class="sr-tab-l2" data-sr-l2="pmd" onclick="App.switchSRLevel2('pmd')">
+                            PMD
                         </button>
                     </div>
                 </div>
@@ -254,9 +319,9 @@ $currentYear = (int) date('Y');
                 <!-- Table Toolbar: Page Size & Search -->
                 <div class="table-toolbar">
                     <div class="table-toolbar-left">
-                        <label for="site-page-size">Show</label>
-                        <select id="site-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.changeSitePageSize(this.value)">
+                        <label for="sr-page-size">Show</label>
+                        <select id="sr-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                            onchange="App.changeSRPageSize(this.value)">
                             <option value="10" selected>10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -266,84 +331,55 @@ $currentYear = (int) date('Y');
                         <span>entries per page</span>
                     </div>
                     <div class="table-toolbar-right">
-                        <input type="text" id="site-search-input" class="table-search-input" placeholder="Search..."
-                            oninput="App.handleSiteSearch(this.value)">
+                        <input type="text" id="sr-search-input" class="table-search-input" placeholder="Search..."
+                            oninput="App.handleSRSearch(this.value)">
                     </div>
                 </div>
 
-                <!-- Site Location Table (Header matching the attachment) -->
+                <!-- Site Regional Table -->
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive">
-                        <table class="reconciliation-table" id="site-location-table">
+                        <table class="reconciliation-table" id="sr-table">
                             <thead>
-                                <!-- Level 1 Header -->
                                 <tr>
-                                    <th rowspan="2" class="text-center align-middle col-action">Action</th>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('site_id')">
-                                        ID <span class="sort-indicator" data-site-col="site_id">⇅</span>
+                                    <th colspan="2" class="text-center align-middle col-action-group">ACTION</th>
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSRSort('regional')">
+                                        REGIONAL <span class="sort-indicator" data-sr-col="regional">⇅</span>
                                     </th>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('category')">
-                                        CATEGORY <span class="sort-indicator" data-site-col="category">⇅</span>
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSRSort('dept')">
+                                        DEPT <span class="sort-indicator" data-sr-col="dept">⇅</span>
                                     </th>
-                                    <th colspan="3" class="text-center">NAME</th>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('organizations')">
-                                        ORGANIZATIONS <span class="sort-indicator" data-site-col="organizations">⇅</span>
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSRSort('sub_dept')">
+                                        SUB DEPT <span class="sort-indicator" data-sr-col="sub_dept">⇅</span>
                                     </th>
-                                    <th rowspan="2" class="text-center align-middle sortable" onclick="App.toggleSiteSort('manager')">
-                                        MANAGER <span class="sort-indicator" data-site-col="manager">⇅</span>
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSRSort('sitecode')">
+                                        SITECODE <span class="sort-indicator" data-sr-col="sitecode">⇅</span>
                                     </th>
-                                    <th colspan="3" class="text-center">REGIONAL</th>
-                                    <th colspan="6" class="text-center">LOCATION</th>
+                                    <th rowspan="2" class="text-center align-middle sortable"
+                                        onclick="App.toggleSRSort('name_site')">
+                                        NAME SITE <span class="sort-indicator" data-sr-col="name_site">⇅</span>
+                                    </th>
                                 </tr>
-
-                                <!-- Level 2 Sub-Headers -->
                                 <tr>
-                                    <!-- Under NAME -->
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_intan')">
-                                        INTAN <span class="sort-indicator" data-site-col="name_intan">⇅</span>
+                                    <!-- Under ACTION -->
+                                    <th class="text-center align-middle col-action-select" style="padding: 4px;">
+                                        <input type="checkbox" id="sr-select-all" title="Select all on current page"
+                                            onchange="App.toggleSelectAllSR(this.checked)"
+                                            style="cursor: pointer; width: 15px; height: 15px;">
                                     </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_eproc')">
-                                        EPROC <span class="sort-indicator" data-site-col="name_eproc">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('name_ims')">
-                                        IMS <span class="sort-indicator" data-site-col="name_ims">⇅</span>
-                                    </th>
-
-                                    <!-- Under REGIONAL -->
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('region')">
-                                        REGION <span class="sort-indicator" data-site-col="region">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('area')">
-                                        AREA <span class="sort-indicator" data-site-col="area">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('cluster')">
-                                        CLUSTER <span class="sort-indicator" data-site-col="cluster">⇅</span>
-                                    </th>
-
-                                    <!-- Under LOCATION -->
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('addr')">
-                                        ADDR <span class="sort-indicator" data-site-col="addr">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('province')">
-                                        PROVINCE <span class="sort-indicator" data-site-col="province">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('city')">
-                                        CITY <span class="sort-indicator" data-site-col="city">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('sub_dis')">
-                                        SUB DIS <span class="sort-indicator" data-site-col="sub_dis">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('village')">
-                                        VILLAGE <span class="sort-indicator" data-site-col="village">⇅</span>
-                                    </th>
-                                    <th class="sortable text-center" onclick="App.toggleSiteSort('postal')">
-                                        POSTAL <span class="sort-indicator" data-site-col="postal">⇅</span>
+                                    <th class="text-center align-middle col-action-delete"
+                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
+                                        DEL
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody id="site-table-body">
+                            <tbody id="sr-table-body">
                                 <tr>
-                                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                    <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
                                         Loading data...
                                     </td>
                                 </tr>
@@ -354,8 +390,8 @@ $currentYear = (int) date('Y');
 
                 <!-- Table Pagination Footer -->
                 <div class="table-pagination-footer">
-                    <div id="site-pagination-info">Showing 0 to 0 of 0 entries</div>
-                    <div class="pagination-controls" id="site-pagination-controls"></div>
+                    <div id="sr-pagination-info">Showing 0 to 0 of 0 entries</div>
+                    <div class="pagination-controls" id="sr-pagination-controls"></div>
                 </div>
             </div>
         </section>
@@ -364,77 +400,461 @@ $currentYear = (int) date('Y');
         <!-- PAGE 2: Stock Opname Summary (KPI Overview & Roll-Up)        -->
         <!-- ═══════════════════════════════════════════════════════════ -->
         <section id="page-summary" class="page-section">
-            <!-- KPI Summary Cards -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Outlets / Profiles</div>
-                    <div class="kpi-value" id="kpi-total-profiles">0</div>
-                    <div class="kpi-subtext">Registered Records</div>
+            <!-- ── Top Tab Slider: SO Type (Monthly / Quarterly) ────── -->
+            <div class="summary-type-slider-card">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 13px; font-weight: 700; color: #0f172a; letter-spacing: 0.02em;">SO
+                        TYPE</span>
+                    <div class="summary-type-slider-wrapper">
+                        <button type="button" class="summary-type-slider-btn active" id="btn-so-type-monthly"
+                            onclick="App.switchSOType('monthly')">
+                            <span>Monthly</span>
+                        </button>
+                        <button type="button" class="summary-type-slider-btn" id="btn-so-type-quarterly"
+                            onclick="App.switchSOType('quarterly')">
+                            <span>Quarterly</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Physical Match</div>
-                    <div class="kpi-value" id="kpi-match-qty">0</div>
-                    <div class="kpi-subtext">Units Verified</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Total NBV Match</div>
-                    <div class="kpi-value" id="kpi-match-nbv">Rp 0</div>
-                    <div class="kpi-subtext">Book Value Matched</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Physic Only</div>
-                    <div class="kpi-value" id="kpi-physic-qty">0</div>
-                    <div class="kpi-subtext">Unmatched in DB</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Total DB Only</div>
-                    <div class="kpi-value" id="kpi-db-qty">0</div>
-                    <div class="kpi-subtext">Missing Physical</div>
+                <div style="font-size: 12px; color: #64748b;" id="summary-so-type-status">
+                    <strong style="color: #2563eb;">Monthly</strong> Stock Opname Summary
                 </div>
             </div>
 
-            <!-- Grand Totals Overview Card -->
-            <div class="card">
+            <!-- ── Summary Toolbar: Pilih Periode Data ────────────── -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 class="card-title">PILIH PERIODE DATA</h2>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label for="summary-filter-month"
+                                style="font-size: 13px; font-weight: 600; color: #334155;">MONTH</label>
+                            <select id="summary-filter-month" class="form-control"
+                                style="width: auto; padding: 0.35rem 0.75rem;" onchange="App.loadSummaryData()">
+                                <option value="">All Months</option>
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9" selected>September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label for="summary-filter-year"
+                                style="font-size: 13px; font-weight: 600; color: #334155;">YEAR</label>
+                            <select id="summary-filter-year" class="form-control"
+                                style="width: auto; padding: 0.35rem 0.75rem;" onchange="App.loadSummaryData()">
+                                <option value="2026" selected>2026</option>
+                                <option value="2027">2027</option>
+                                <option value="2028">2028</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="App.loadSummaryData()">
+                            Load Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Achievement Cards (National, CRO, ERO, WRO, PMD) ── -->
+            <div class="kpi-grid" id="achievement-cards"
+                style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-split-info">
+                        <div class="kpi-title">National Regional Achievement</div>
+                        <div class="kpi-subtext" id="kpi-national-subtext">Outlet Regional &amp; PMD (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-national-status"></div>
+                    </div>
+                    <div class="kpi-split-right">
+                        <div class="kpi-split-value" id="kpi-national-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-national-trend"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-split-info">
+                        <div class="kpi-title">CRO Achievement</div>
+                        <div class="kpi-subtext" id="kpi-cro-subtext">Avg DEPT CRO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-cro-status"></div>
+                    </div>
+                    <div class="kpi-split-right">
+                        <div class="kpi-split-value" id="kpi-cro-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-cro-trend"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-split-info">
+                        <div class="kpi-title">ERO Achievement</div>
+                        <div class="kpi-subtext" id="kpi-ero-subtext">Avg DEPT ERO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-ero-status"></div>
+                    </div>
+                    <div class="kpi-split-right">
+                        <div class="kpi-split-value" id="kpi-ero-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-ero-trend"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-split-info">
+                        <div class="kpi-title">WRO Achievement</div>
+                        <div class="kpi-subtext" id="kpi-wro-subtext">Avg DEPT WRO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-wro-status"></div>
+                    </div>
+                    <div class="kpi-split-right">
+                        <div class="kpi-split-value" id="kpi-wro-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-wro-trend"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-split-info">
+                        <div class="kpi-title">PMD Achievement</div>
+                        <div class="kpi-subtext" id="kpi-pmd-subtext">Avg DEPT PMD (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-pmd-status"></div>
+                    </div>
+                    <div class="kpi-split-right">
+                        <div class="kpi-split-value" id="kpi-pmd-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-pmd-trend"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Trend Line Graphics (DEPT on top; Sub DEPT & PMD Sub DEPT below) ── -->
+            <div class="trend-charts-container" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Card 1: Trend Line DEPT (Full Width on top) -->
+                <div class="card" style="margin-bottom: 1.25rem;">
+                    <div class="card-header"
+                        style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 class="card-title"
+                                style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                Trend Achievement SO Dept</h3>
+                            <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                Monthly Physical % (Jan - Dec 2026)</p>
+                        </div>
+                        <span class="badge"
+                            style="background: #eff6ff; color: #2563eb; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">DEPT</span>
+                    </div>
+                    <div class="card-body" style="padding: 1rem; position: relative;">
+                        <div style="position: relative; height: 260px; width: 100%;">
+                            <canvas id="chart-trend-dept"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row below: Card 2 (Sub DEPT) & Card 3 (PMD Sub DEPT) -->
+                <div class="trend-charts-row-2">
+                    <!-- Card 2: Trend Line Sub DEPT -->
+                    <div class="card" style="margin-bottom: 0;">
+                        <div class="card-header"
+                            style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 class="card-title"
+                                    style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                    Trend Achievement SO Outlet Regional Sub Dept</h3>
+                                <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                    Monthly Physical % (Jan - Dec 2026)</p>
+                            </div>
+                            <span class="badge"
+                                style="background: #f0fdf4; color: #16a34a; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">Outlet
+                                Regional</span>
+                        </div>
+                        <div class="card-body" style="padding: 1rem; position: relative;">
+                            <div style="position: relative; height: 260px; width: 100%;">
+                                <canvas id="chart-trend-subdept"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Trend Line PMD Sub DEPT -->
+                    <div class="card" style="margin-bottom: 0;">
+                        <div class="card-header"
+                            style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 class="card-title"
+                                    style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                    Trend Achievement SO PMD Sub Dept</h3>
+                                <p class="card-subtitle trend-chart-subtitle" style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                    Monthly Physical % (Jan - Dec 2026)</p>
+                            </div>
+                            <span class="badge"
+                                style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
+                        </div>
+                        <div class="card-body" style="padding: 1rem; position: relative;">
+                            <div style="position: relative; height: 260px; width: 100%;">
+                                <canvas id="chart-trend-pmd"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Card: Chart Hasil SO Outlet Regional ─────────── -->
+            <div class="card" id="card-hasil-so-subdept" style="margin-top: 1rem;">
+                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h2 class="card-title">Chart Hasil SO Outlet Regional</h2>
+                        <p class="card-subtitle">Pencapaian dan Hasil Stock Opname berdasarkan
+                            Sub Dept</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label for="dept-result-filter"
+                                style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
+                                DEPT
+                            </label>
+                            <select id="dept-result-filter" class="form-control"
+                                style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
+                                onchange="App.onDeptResultFilterChange()">
+                                <option value="all">Semua DEPT</option>
+                                <option value="CRO" selected>CRO</option>
+                                <option value="ERO">ERO</option>
+                                <option value="WRO">WRO</option>
+                                <option value="PMD">PMD</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label for="subdept-result-filter"
+                                style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
+                                SUB DEPT
+                            </label>
+                            <select id="subdept-result-filter" class="form-control"
+                                style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
+                                onchange="App.loadSubDeptResults()">
+                                <option value="all">Semua Sub Dept (CRO)</option>
+                                <option value="CJDO" selected>CJDO</option>
+                                <option value="EKO">EKO</option>
+                                <option value="WJO">WJO</option>
+                                <option value="WKO">WKO</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" onclick="App.loadSubDeptResults()" title="Refresh data">
+                            Sync
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body" style="padding: 1rem 1.25rem;">
+                    <div class="so-subdept-layout">
+                        <!-- Left: Compact Shrunk Table -->
+                        <div class="so-subdept-table-wrapper">
+                            <div class="table-responsive"
+                                style="max-height: 480px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <table class="table so-subdept-table"
+                                    style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0;">
+                                    <thead>
+                                        <tr
+                                            style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
+                                            <th rowspan="2"
+                                                style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Site Code</th>
+                                            <th rowspan="2"
+                                                style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Name Site</th>
+                                            <th
+                                                style="text-align: right; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Result Match</th>
+                                            <th
+                                                style="text-align: right; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Result Physic</th>
+                                            <th
+                                                style="text-align: right; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Result DB</th>
+                                            <th
+                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Pencapaian</th>
+                                            <th rowspan="2"
+                                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 190px; min-width: 170px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Status</th>
+                                        </tr>
+                                        <tr
+                                            style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
+                                            <th
+                                                style="text-align: right; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                Physical (QTY)</th>
+                                            <th
+                                                style="text-align: right; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                Physical (QTY)</th>
+                                            <th
+                                                style="text-align: right; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                Physical (QTY)</th>
+                                            <th
+                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subdept-results-tbody">
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                                                Loading Hasil SO Outlet Regional...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot id="subdept-results-tfoot"
+                                        style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Right: Pie / Donut Chart for Tercapai vs Belum Tercapai -->
+                        <div class="so-subdept-chart-wrapper">
+                            <div class="so-pie-card">
+                                <div class="so-pie-header">
+                                    <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                        Status Pencapaian</h3>
+                                    <p style="font-size: 11px; color: #64748b; margin: 0;" id="subdept-pie-subtitle">
+                                        Tercapai vs Belum Tercapai</p>
+                                </div>
+                                <div class="so-pie-canvas-box">
+                                    <canvas id="chart-subdept-pie"></canvas>
+                                </div>
+                                <div class="so-pie-stats" id="subdept-pie-stats">
+                                    <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.5rem;">
+                                        Memuat grafik...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Card: Rekapitulasi 2026 ────────────────────────── -->
+            <div class="card" id="card-rekapitulasi" style="margin-top: 1rem;">
                 <div class="card-header">
                     <div>
-                        <h2 class="card-title">Stock Opname Summary Totals</h2>
-                        <p class="card-subtitle">Aggregated totals across all profiles</p>
+                        <h2 class="card-title">Rekapitulasi 2026</h2>
+                        <p class="card-subtitle">Monthly Stock Opname </p>
                     </div>
-                    <button class="btn btn-secondary" onclick="App.loadSummaryData()">
-                        Refresh
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="App.loadRekapitulasi()">
+                            Sync
+                        </button>
+                    </div>
                 </div>
+
+                <!-- ── Sub-Level Tabs: Outlet Regional / PMD ── -->
+                <div class="sr-tabs-container">
+                    <div class="sr-tabs-level2" id="rekap-tabs-level2"
+                        style="border-bottom: 2px solid #e2e8f0; margin-top: 0;">
+                        <button class="rekap-tab-l2 active" data-rekap-l2="outlet"
+                            onclick="App.switchRekapLevel2('outlet')">
+                            Outlet Regional
+                        </button>
+                        <button class="rekap-tab-l2" data-rekap-l2="pmd" onclick="App.switchRekapLevel2('pmd')">
+                            PMD
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table Toolbar: Page Size & Search -->
+                <div class="table-toolbar">
+                    <div class="table-toolbar-left">
+                        <label for="rekap-page-size">Show</label>
+                        <select id="rekap-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                            onchange="App.changeRekapPageSize(this.value)">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
+                        <span>entries per page</span>
+                    </div>
+                    <div class="table-toolbar-right">
+                        <input type="text" id="rekap-search-input" class="table-search-input" placeholder="Search..."
+                            oninput="App.handleRekapSearch(this.value)">
+                    </div>
+                </div>
+
+                <!-- Rekapitulasi Table -->
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive">
-                        <table class="reconciliation-table" id="summary-overview-table">
+                        <table class="reconciliation-table" id="rekap-table">
                             <thead>
                                 <tr>
-                                    <th rowspan="2" class="text-center align-middle">Scope</th>
-                                    <th colspan="2" class="text-center">RESULT MATCH</th>
-                                    <th colspan="2" class="text-center">RESULT PHYSIC</th>
-                                    <th colspan="2" class="text-center">RESULT DB</th>
-                                    <th colspan="2" class="text-center">TOTAL TARGET</th>
-                                </tr>
-                                <tr>
-                                    <th>Physical Qty</th>
-                                    <th>NBV Value</th>
-                                    <th>Physical Qty</th>
-                                    <th>NBV Value</th>
-                                    <th>Physical Qty</th>
-                                    <th>NBV Value</th>
-                                    <th>Physical Target</th>
-                                    <th>NBV Target</th>
+                                    <th class="text-center align-middle sortable"
+                                        onclick="App.toggleRekapSort('regional')">
+                                        REGIONAL <span class="sort-indicator" data-rekap-col="regional">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('dept')">
+                                        DEPT <span class="sort-indicator" data-rekap-col="dept">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable"
+                                        onclick="App.toggleRekapSort('sub_dept')">
+                                        SUB DEPT <span class="sort-indicator" data-rekap-col="sub_dept">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable"
+                                        onclick="App.toggleRekapSort('sitecode')">
+                                        SITECODE <span class="sort-indicator" data-rekap-col="sitecode">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable"
+                                        onclick="App.toggleRekapSort('name_site')">
+                                        NAME SITE <span class="sort-indicator" data-rekap-col="name_site">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m1')">
+                                        JANUARY <span class="sort-indicator" data-rekap-col="m1">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m2')">
+                                        FEBRUARY <span class="sort-indicator" data-rekap-col="m2">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m3')">
+                                        MARCH <span class="sort-indicator" data-rekap-col="m3">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m4')">
+                                        APRIL <span class="sort-indicator" data-rekap-col="m4">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m5')">
+                                        MAY <span class="sort-indicator" data-rekap-col="m5">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m6')">
+                                        JUNE <span class="sort-indicator" data-rekap-col="m6">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m7')">
+                                        JULY <span class="sort-indicator" data-rekap-col="m7">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m8')">
+                                        AUGUST <span class="sort-indicator" data-rekap-col="m8">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m9')">
+                                        SEPTEMBER <span class="sort-indicator" data-rekap-col="m9">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m10')">
+                                        OCTOBER <span class="sort-indicator" data-rekap-col="m10">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m11')">
+                                        NOVEMBER <span class="sort-indicator" data-rekap-col="m11">⇅</span>
+                                    </th>
+                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m12')">
+                                        DECEMBER <span class="sort-indicator" data-rekap-col="m12">⇅</span>
+                                    </th>
                                 </tr>
                             </thead>
-                            <tbody id="summary-overview-body">
+                            <tbody id="rekap-table-body">
                                 <tr>
-                                    <td colspan="9" class="text-center" style="padding: 2rem; color: #64748b;">
-                                        Loading summary totals...
+                                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                        Loading Rekapitulasi 2026 data...
                                     </td>
                                 </tr>
                             </tbody>
+                            <tfoot id="rekap-table-foot"
+                                style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                            </tfoot>
                         </table>
                     </div>
+                </div>
+
+                <!-- Table Pagination Footer -->
+                <div class="table-pagination-footer">
+                    <div id="rekap-pagination-info">Showing 0 to 0 of 0 entries</div>
+                    <div class="pagination-controls" id="rekap-pagination-controls"></div>
                 </div>
             </div>
         </section>
@@ -495,7 +915,6 @@ $currentYear = (int) date('Y');
                     <label class="form-label">Upload File (.xlsx, .xls)</label>
                     <div id="drag-drop-zone" class="drag-drop-zone"
                         onclick="document.getElementById('import-file-input').click()">
-                        <div class="drag-drop-icon">📥</div>
                         <div class="drag-drop-text">Drag &amp; drop Excel file here</div>
                         <div class="drag-drop-subtext">or click to browse from local computer</div>
                     </div>
@@ -506,7 +925,6 @@ $currentYear = (int) date('Y');
                     <div id="selected-file-display" style="display: none;">
                         <div class="selected-file-badge">
                             <div class="selected-file-info">
-                                <span>📄</span>
                                 <span id="selected-file-name">file.xlsx</span>
                                 <span id="selected-file-size" style="color: #64748b; font-size: 11px;">(0 KB)</span>
                             </div>
@@ -516,10 +934,21 @@ $currentYear = (int) date('Y');
                     </div>
                 </div>
 
+                <!-- Sheet Selection Group -->
+                <div class="form-group" id="import-sheet-group" style="display: none; margin-top: 1rem;">
+                    <label class="form-label" for="import-sheet-select">Select Sheet</label>
+                    <select id="import-sheet-select" class="form-control" style="cursor: pointer;">
+                        <option value="">Reading sheets...</option>
+                    </select>
+                    <div id="import-sheet-hint" style="font-size: 11px; color: #64748b; margin-top: 4px;"></div>
+                </div>
+
                 <!-- Overwrite Option -->
                 <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
-                        <input type="checkbox" id="import-replace-existing" checked style="width: 16px; height: 16px; cursor: pointer;">
+                    <label
+                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
+                        <input type="checkbox" id="import-replace-existing" checked
+                            style="width: 16px; height: 16px; cursor: pointer;">
                         <span><strong>Replace data existing</strong> (Hapus data sebelumnya)</span>
                     </label>
                 </div>
@@ -575,7 +1004,8 @@ $currentYear = (int) date('Y');
                     </div>
                 </div>
 
-                <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 0.75rem 1rem; margin-top: 1rem; color: #991b1b; font-size: 12px; line-height: 1.4;">
+                <div
+                    style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 0.75rem 1rem; margin-top: 1rem; color: #991b1b; font-size: 12px; line-height: 1.4;">
                     <strong>Warning:</strong> Data akan dihapus permanent!
                 </div>
             </div>
@@ -589,109 +1019,84 @@ $currentYear = (int) date('Y');
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- MODAL: Add Site Location                                     -->
+    <!-- MODAL: Import Site Regional Data                              -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div id="add-site-modal" class="modal-backdrop">
-        <div class="modal-dialog" style="max-width: 640px; max-height: 90vh; display: flex; flex-direction: column;">
+    <div id="sr-import-modal" class="modal-backdrop">
+        <div class="modal-dialog" style="max-width: 540px;">
             <div class="modal-header">
-                <h3 class="modal-title">Add New Site Location</h3>
-                <button class="modal-close-btn" onclick="App.closeAddSiteModal()">&times;</button>
+                <h3 class="modal-title">Import Site Regional Data</h3>
+                <button class="modal-close-btn" onclick="App.closeSiteRegionalImportModal()">&times;</button>
             </div>
-            <div class="modal-body" style="overflow-y: auto; padding: 1.25rem;">
-                <form id="add-site-form" onsubmit="event.preventDefault(); App.submitAddSite();">
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-id">Site ID *</label>
-                            <input type="text" id="add-site-id" class="form-control" placeholder="e.g. 0SMRKLA007" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-category">Category</label>
-                            <input type="text" id="add-site-category" class="form-control" placeholder="e.g. WAREHOUSE LA">
-                        </div>
-                    </div>
 
-                    <div class="form-group" style="margin-bottom: 0.75rem;">
-                        <label class="form-label" for="add-site-name-intan">Name (INTAN)</label>
-                        <input type="text" id="add-site-name-intan" class="form-control" placeholder="e.g. APLIKANUSA LINTASARTA - OUTLET BARU SEMARANG">
-                    </div>
+            <div class="modal-body" style="padding: 1.25rem;">
 
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-name-eproc">Name (EPROC)</label>
-                            <input type="text" id="add-site-name-eproc" class="form-control" placeholder="e.g. APLIKANUSA LINTASARTA - OUTLET BARU SEMARANG">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-name-ims">Name (IMS)</label>
-                            <input type="text" id="add-site-name-ims" class="form-control" placeholder="Optional IMS Name">
-                        </div>
-                    </div>
+                <!-- Active Tab Category Indicator -->
+                <div
+                    style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 13px; color: #1d4ed8;">
+                    Import data to: <strong id="sr-import-category-label">Monthly - Outlet Regional</strong>
+                </div>
 
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-org">Organizations</label>
-                            <input type="text" id="add-site-org" class="form-control" placeholder="e.g. ASSET MANAGEMENT CENTRAL JAVA">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-manager">Manager</label>
-                            <input type="text" id="add-site-manager" class="form-control" placeholder="Optional Manager Name">
-                        </div>
+                <!-- Drag and Drop Upload Area -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Upload File (.xlsx, .xls)</label>
+                    <div id="sr-drag-drop-zone" class="drag-drop-zone"
+                        onclick="document.getElementById('sr-import-file-input').click()">
+                        <div class="drag-drop-text">Drag &amp; drop Excel file here</div>
+                        <div class="drag-drop-subtext">or click to browse from local computer</div>
                     </div>
+                    <input type="file" id="sr-import-file-input" accept=".xlsx,.xls" style="display: none;"
+                        onchange="App.handleSRFileSelect(this.files)">
 
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-region">Region</label>
-                            <input type="text" id="add-site-region" class="form-control" placeholder="e.g. CENTRAL INDONESIA REGIONAL (CIR)">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-area">Area</label>
-                            <input type="text" id="add-site-area" class="form-control" placeholder="e.g. CJDA">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-cluster">Cluster</label>
-                            <input type="text" id="add-site-cluster" class="form-control" placeholder="e.g. SEMARANG">
+                    <!-- Selected File Display -->
+                    <div id="sr-selected-file-display" style="display: none;">
+                        <div class="selected-file-badge">
+                            <div class="selected-file-info">
+                                <span id="sr-selected-file-name">file.xlsx</span>
+                                <span id="sr-selected-file-size" style="color: #64748b; font-size: 11px;">(0
+                                    KB)</span>
+                            </div>
+                            <button type="button" class="selected-file-remove"
+                                onclick="App.clearSRSelectedFile()">&times;</button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="form-group" style="margin-bottom: 0.75rem;">
-                        <label class="form-label" for="add-site-addr">Address (ADDR)</label>
-                        <textarea id="add-site-addr" class="form-control" rows="2" placeholder="Full street address"></textarea>
-                    </div>
+                <!-- Sheet Selection Group -->
+                <div class="form-group" id="sr-import-sheet-group" style="display: none; margin-top: 1rem;">
+                    <label class="form-label" for="sr-import-sheet-select">Select Sheet</label>
+                    <select id="sr-import-sheet-select" class="form-control" style="cursor: pointer;">
+                        <option value="">Reading sheets...</option>
+                    </select>
+                    <div id="sr-import-sheet-hint" style="font-size: 11px; color: #64748b; margin-top: 4px;"></div>
+                </div>
 
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-province">Province</label>
-                            <input type="text" id="add-site-province" class="form-control" placeholder="e.g. JAWA TENGAH">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-city">City</label>
-                            <input type="text" id="add-site-city" class="form-control" placeholder="e.g. SEMARANG">
-                        </div>
-                    </div>
+                <!-- Overwrite Option -->
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <label
+                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
+                        <input type="checkbox" id="sr-import-replace-existing"
+                            style="width: 16px; height: 16px; cursor: pointer;">
+                        <span><strong>Replace data existing</strong> (Hapus data sebelumnya)</span>
+                    </label>
+                </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-subdis">Sub District (SUB DIS)</label>
-                            <input type="text" id="add-site-subdis" class="form-control" placeholder="e.g. GAJAHMUNGKUR">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-village">Village</label>
-                            <input type="text" id="add-site-village" class="form-control" placeholder="e.g. GAJAHMUNGKUR">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="add-site-postal">Postal Code</label>
-                            <input type="text" id="add-site-postal" class="form-control" placeholder="e.g. 50232">
-                        </div>
-                    </div>
-                </form>
+                <!-- Status message in modal -->
+                <div id="sr-modal-import-status"
+                    style="display: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-top: 12px;">
+                </div>
             </div>
+
+            <!-- Footer Buttons -->
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeAddSiteModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="App.submitAddSite()">Save Site Location</button>
+                <button class="btn btn-secondary" onclick="App.closeSiteRegionalImportModal()">Cancel</button>
+                <button class="btn btn-primary" id="sr-modal-import-btn" onclick="App.submitSRImport()">Upload &amp;
+                    Import</button>
             </div>
         </div>
     </div>
 
     <!-- Scripts -->
+    <script src="assets/js/chart.umd.min.js"></script>
     <script src="assets/js/app.js"></script>
 
 </body>
