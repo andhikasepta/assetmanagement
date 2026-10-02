@@ -40,26 +40,84 @@ const App = (() => {
     let filteredRekapRows = [];
     let rekapMonthAverages = {};
     let rekapCurrentPage = 1;
-    let rekapPageSize = 25;
+    let rekapPageSize = 10;
     let rekapSearchQuery = '';
     let rekapSortCol = 'regional';
     let rekapSortDir = 'asc';
 
     // Summary SO Type state (Monthly / Quarterly)
     let summarySOType = 'monthly';
+    let summaryInitialized = false;
 
     // Trend Charts state
     let chartTrendDept = null;
     let chartTrendSubDept = null;
     let chartTrendPmd = null;
 
-    // ── Initialization ─────────────────────────────────────────
+    function resetMasterFilters() {
+        const monthFilter = document.getElementById('filter-month');
+        if (monthFilter) monthFilter.value = '';
+
+        const yearFilter = document.getElementById('filter-year');
+        if (yearFilter) yearFilter.value = '';
+
+        const searchInput = document.getElementById('master-search-input');
+        if (searchInput) searchInput.value = '';
+
+        const pageSizeSelect = document.getElementById('master-page-size');
+        if (pageSizeSelect) pageSizeSelect.value = '10';
+
+        searchQuery = '';
+        currentPage = 1;
+        pageSize = 10;
+        sortColumn = null;
+        sortDirection = 'asc';
+    }
+
+    function resetSRFilters() {
+        const srSearchInput = document.getElementById('sr-search-input');
+        if (srSearchInput) srSearchInput.value = '';
+
+        const srPageSizeSelect = document.getElementById('sr-page-size');
+        if (srPageSizeSelect) srPageSizeSelect.value = '10';
+
+        const selectAll = document.getElementById('sr-select-all');
+        if (selectAll) selectAll.checked = false;
+
+        srSearchQuery = '';
+        srCurrentPage = 1;
+        srPageSize = 10;
+        srSortCol = null;
+        srSortDir = 'asc';
+        selectedSRIds.clear();
+        updateSRSortIndicators();
+    }
+
+    function resetRekapFilters() {
+        const rekapSearchInput = document.getElementById('rekap-search-input');
+        if (rekapSearchInput) rekapSearchInput.value = '';
+
+        const rekapPageSizeSelect = document.getElementById('rekap-page-size');
+        if (rekapPageSizeSelect) rekapPageSizeSelect.value = '10';
+
+        rekapSearchQuery = '';
+        rekapCurrentPage = 1;
+        rekapPageSize = 10;
+        rekapSortCol = 'regional';
+        rekapSortDir = 'asc';
+        updateRekapSortIndicators();
+    }
 
     function init() {
         const metaCsrf = document.querySelector('meta[name="csrf-token"]');
         if (metaCsrf) {
             csrfToken = metaCsrf.getAttribute('content');
         }
+
+        // Always clear/reset all filters on page reload
+        resetMasterFilters();
+        resetSRFilters();
+        resetRekapFilters();
 
         setupDragAndDrop();
         setupSRDragAndDrop();
@@ -1176,6 +1234,60 @@ const App = (() => {
 
     // ── Page 2: Stock Opname Summary (KPI & Overview) ───────────
 
+    const MONTHS_MONTHLY = [
+        { val: '', label: 'Semua Bulan' },
+        { val: '1', label: 'Januari' },
+        { val: '2', label: 'Februari' },
+        { val: '3', label: 'Maret' },
+        { val: '4', label: 'April' },
+        { val: '5', label: 'Mei' },
+        { val: '6', label: 'Juni' },
+        { val: '7', label: 'Juli' },
+        { val: '8', label: 'Agustus' },
+        { val: '9', label: 'September' },
+        { val: '10', label: 'Oktober' },
+        { val: '11', label: 'November' },
+        { val: '12', label: 'Desember' }
+    ];
+
+    const MONTHS_QUARTERLY = [
+        { val: '', label: 'Semua Bulan' },
+        { val: '1', label: 'Januari' },
+        { val: '4', label: 'April' },
+        { val: '7', label: 'Juli' },
+        { val: '10', label: 'Oktober' }
+    ];
+
+    function updateSummaryMonthDropdown() {
+        const monthSelect = document.getElementById('summary-filter-month');
+        if (!monthSelect) return;
+
+        const currentVal = monthSelect.value;
+        const optionsList = summarySOType === 'quarterly' ? MONTHS_QUARTERLY : MONTHS_MONTHLY;
+
+        monthSelect.innerHTML = '';
+        optionsList.forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt.val;
+            el.textContent = opt.label;
+            monthSelect.appendChild(el);
+        });
+
+        // Try to keep previous value if it exists in the new option list, otherwise choose best default
+        const hasCurrent = optionsList.some(o => o.val === currentVal);
+        if (hasCurrent) {
+            monthSelect.value = currentVal;
+        } else if (summarySOType === 'quarterly') {
+            // Find closest quarterly month (1, 4, 7, 10)
+            const num = parseInt(currentVal, 10) || 1;
+            let qMonth = '1';
+            if (num >= 10) qMonth = '10';
+            else if (num >= 7) qMonth = '7';
+            else if (num >= 4) qMonth = '4';
+            monthSelect.value = qMonth;
+        }
+    }
+
     function switchSOType(type) {
         summarySOType = type;
 
@@ -1192,6 +1304,9 @@ const App = (() => {
             statusText.innerHTML = `<strong style="color: #2563eb;">${type === 'monthly' ? 'Monthly' : 'Quarterly'}</strong> Stock Opname Summary`;
         }
 
+        // Update BULAN dropdown based on SO Type (Monthly = 12 months, Quarterly = per 3 months)
+        updateSummaryMonthDropdown();
+
         // Toggle Rekapitulasi sub-tabs (Outlet Regional / PMD only apply to Monthly)
         const rekapSubTabs = document.getElementById('rekap-tabs-level2');
         if (rekapSubTabs) {
@@ -1201,8 +1316,8 @@ const App = (() => {
         const rekapSubtitle = document.querySelector('#card-rekapitulasi .card-subtitle');
         if (rekapSubtitle) {
             rekapSubtitle.textContent = type === 'monthly'
-                ? 'Monthly Stock Opname Reconciliation by Site Regional'
-                : 'Quarterly Stock Opname Reconciliation by Site Regional';
+                ? 'Monthly Stock Opname'
+                : 'Quarterly Stock Opname';
         }
 
         // Update Trend Chart Subtitles
@@ -1216,12 +1331,54 @@ const App = (() => {
         loadRekapitulasi();
     }
 
-    async function loadSummaryData() {
+    async function loadSummaryData(forcedPeriod = null) {
         const monthSelect = document.getElementById('summary-filter-month');
         const yearSelect = document.getElementById('summary-filter-year');
 
-        const month = monthSelect ? monthSelect.value : '9';
-        const year = yearSelect ? yearSelect.value : '2026';
+        // If forcedPeriod provided (e.g. after upload), set dropdown values directly
+        if (forcedPeriod && forcedPeriod.month && forcedPeriod.year) {
+            if (monthSelect) monthSelect.value = forcedPeriod.month.toString();
+            if (yearSelect) {
+                // Ensure the year option exists in dropdown
+                const yStr = forcedPeriod.year.toString();
+                if (!Array.from(yearSelect.options).some(opt => opt.value === yStr)) {
+                    const opt = document.createElement('option');
+                    opt.value = yStr;
+                    opt.textContent = yStr;
+                    yearSelect.appendChild(opt);
+                }
+                yearSelect.value = yStr;
+            }
+            summaryInitialized = true;
+        }
+
+        // On first initial page load, if not initialized yet, fetch the latest period first
+        if (!summaryInitialized) {
+            try {
+                const initRes = await fetch('api/reconciliation.php?action=summary&so_type=' + summarySOType);
+                const initJson = await initRes.json();
+                if (initJson.success && initJson.latest_period && initJson.latest_period.period_month && initJson.latest_period.period_year) {
+                    const lp = initJson.latest_period;
+                    if (monthSelect) monthSelect.value = lp.period_month.toString();
+                    if (yearSelect) {
+                        const yStr = lp.period_year.toString();
+                        if (!Array.from(yearSelect.options).some(opt => opt.value === yStr)) {
+                            const opt = document.createElement('option');
+                            opt.value = yStr;
+                            opt.textContent = yStr;
+                            yearSelect.appendChild(opt);
+                        }
+                        yearSelect.value = yStr;
+                    }
+                }
+            } catch (initErr) {
+                console.warn('Could not determine latest period, fallback to current dropdown:', initErr);
+            }
+            summaryInitialized = true;
+        }
+
+        const month = monthSelect ? monthSelect.value : '';
+        const year = yearSelect ? yearSelect.value : '';
 
         // Update achievement card helper
         const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel) => {
@@ -1248,7 +1405,7 @@ const App = (() => {
                 } else if (pct >= 85.0) {
                     statusEl.innerHTML = '<span class="so-status-badge status-green">Tercapai</span>';
                 } else {
-                    statusEl.innerHTML = '<span class="so-status-badge status-red">Belum tercapai</span>';
+                    statusEl.innerHTML = '<span class="so-status-badge status-red">Tidak Tercapai</span>';
                 }
             }
 
@@ -1373,6 +1530,11 @@ const App = (() => {
         if (!tbody) return;
 
         if (summarySOType === 'quarterly') {
+            const periodBadge = document.getElementById('subdept-period-badge');
+            if (periodBadge) {
+                const year = yearSelect ? yearSelect.value : '2026';
+                periodBadge.textContent = `Quarterly ${year}`;
+            }
             tbody.innerHTML = `
                 <tr>
                     <td colspan="7" style="text-align: center; padding: 2.5rem; color: #64748b;">
@@ -1393,6 +1555,15 @@ const App = (() => {
         const subDept = subDeptSelect ? subDeptSelect.value : 'CJDO';
         const month = monthSelect ? monthSelect.value : '9';
         const year = yearSelect ? yearSelect.value : '2026';
+
+        // Update period badge next to title
+        const periodBadge = document.getElementById('subdept-period-badge');
+        if (periodBadge) {
+            const monthText = monthSelect && monthSelect.selectedIndex >= 0 && monthSelect.options[monthSelect.selectedIndex]
+                ? monthSelect.options[monthSelect.selectedIndex].text
+                : (month ? `Bulan ${month}` : 'Semua Bulan');
+            periodBadge.textContent = `${monthText} ${year}`;
+        }
 
         tbody.innerHTML = `
             <tr>
@@ -1457,7 +1628,7 @@ const App = (() => {
             }
 
             let countTercapai = 0;
-            let countBelumTercapai = 0;
+            let countTidakTercapai = 0;
 
             let html = '';
             rows.forEach((r) => {
@@ -1474,7 +1645,7 @@ const App = (() => {
                     const pct = parseFloat(r.total_physic_pct);
                     pctDisplay = `${pct.toFixed(2)}%`;
 
-                    let statusText = 'Belum Tercapai';
+                    let statusText = 'Tidak Tercapai';
                     let statusClass = 'status-red';
                     let progressClass = 'so-progress-red';
                     let color = '#dc2626';
@@ -1486,17 +1657,17 @@ const App = (() => {
                         color = '#16a34a';
                         countTercapai++;
                     } else if (pct >= 75.0) {
-                        statusText = 'Belum Tercapai';
+                        statusText = 'Tidak Tercapai';
                         statusClass = 'status-orange';
                         progressClass = 'so-progress-orange';
                         color = '#ea580c';
-                        countBelumTercapai++;
+                        countTidakTercapai++;
                     } else {
-                        statusText = 'Belum Tercapai';
+                        statusText = 'Tidak Tercapai';
                         statusClass = 'status-red';
                         progressClass = 'so-progress-red';
                         color = '#dc2626';
-                        countBelumTercapai++;
+                        countTidakTercapai++;
                     }
 
                     const clampedPct = Math.min(Math.max(pct, 0), 100);
@@ -1513,7 +1684,7 @@ const App = (() => {
                         </div>
                     `;
                 } else {
-                    countBelumTercapai++;
+                    countTidakTercapai++;
                 }
 
                 html += `
@@ -1552,12 +1723,12 @@ const App = (() => {
                         overallProgressClass = 'so-progress-green';
                         overallColor = '#16a34a';
                     } else if (avgPct >= 75.0) {
-                        overallText = 'Belum Tercapai';
+                        overallText = 'Tidak Tercapai';
                         overallStatusClass = 'status-orange';
                         overallProgressClass = 'so-progress-orange';
                         overallColor = '#ea580c';
                     } else {
-                        overallText = 'Belum Tercapai';
+                        overallText = 'Tidak Tercapai';
                         overallStatusClass = 'status-red';
                         overallProgressClass = 'so-progress-red';
                         overallColor = '#dc2626';
@@ -1595,7 +1766,7 @@ const App = (() => {
             }
 
             // Render Right-Side Pie / Doughnut Chart
-            renderSubDeptPieChart(countTercapai, countBelumTercapai, rows.length);
+            renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length);
 
         } catch (err) {
             console.error('Error loading subdept results:', err);
@@ -1610,11 +1781,11 @@ const App = (() => {
         }
     }
 
-    // ── Pie Chart: Tercapai vs Belum Tercapai ─────────────────────
+    // ── Pie Chart: Tercapai vs Tidak Tercapai ─────────────────────
 
     let subDeptPieChart = null;
 
-    function renderSubDeptPieChart(tercapai, belumTercapai, total) {
+    function renderSubDeptPieChart(tercapai, tidakTercapai, total) {
         const canvas = document.getElementById('chart-subdept-pie');
         const statsContainer = document.getElementById('subdept-pie-stats');
         if (!canvas) return;
@@ -1652,8 +1823,8 @@ const App = (() => {
             return;
         }
 
-        const labels = ['Tercapai', 'Belum Tercapai'];
-        const data = [tercapai, belumTercapai];
+        const labels = ['Tercapai', 'Tidak Tercapai'];
+        const data = [tercapai, tidakTercapai];
         const colors = ['#16a34a', '#dc2626'];
 
         const ctx = canvas.getContext('2d');
@@ -1701,7 +1872,7 @@ const App = (() => {
 
         if (statsContainer) {
             const pctTercapai = total > 0 ? ((tercapai / total) * 100).toFixed(1) : '0.0';
-            const pctBelum = total > 0 ? ((belumTercapai / total) * 100).toFixed(1) : '0.0';
+            const pctTidak = total > 0 ? ((tidakTercapai / total) * 100).toFixed(1) : '0.0';
 
             let statsHtml = `
                 <div class="so-pie-stat-row">
@@ -1716,10 +1887,10 @@ const App = (() => {
                 <div class="so-pie-stat-row">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
-                        Belum Tercapai (<85%)
+                        Tidak Tercapai (<85%)
                     </span>
                     <span class="so-pie-stat-val" style="color: #dc2626;">
-                        ${belumTercapai} <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctBelum}%)</span>
+                        ${tidakTercapai} <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
                     </span>
                 </div>
                 <div class="so-pie-stat-row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
@@ -2570,9 +2741,9 @@ const App = (() => {
 
                 showToast('success', 'Import Complete', json.message || 'Data imported successfully.');
 
-                // Reload master data table & summary
+                // Reload master data table & summary (automatically switched to newly uploaded period)
                 loadMasterData();
-                loadSummaryData();
+                loadSummaryData(month && year ? { month: parseInt(month, 10), year: parseInt(year, 10) } : null);
 
                 setTimeout(() => {
                     closeImportModal();

@@ -99,7 +99,7 @@ $currentYear = (int) date('Y');
                     <div class="table-toolbar-left">
                         <label for="master-page-size">Show</label>
                         <select id="master-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.changePageSize(this.value)">
+                            autocomplete="off" onchange="App.changePageSize(this.value)">
                             <option value="10" selected>10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -110,34 +110,34 @@ $currentYear = (int) date('Y');
 
                         <span style="margin-left: 1rem; border-left: 1px solid #e2e8f0; padding-left: 1rem;"></span>
 
-                        <label for="filter-month">Month</label>
+                        <label for="filter-month">BULAN</label>
                         <select id="filter-month" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.applyFilterAndRender()">
-                            <option value="">All Months</option>
+                            autocomplete="off" onchange="App.applyFilterAndRender()">
+                            <option value="" selected>Semua Bulan</option>
                             <?php
                             $monthNames = [
-                                1 => 'January',
-                                2 => 'February',
-                                3 => 'March',
+                                1 => 'Januari',
+                                2 => 'Februari',
+                                3 => 'Maret',
                                 4 => 'April',
-                                5 => 'May',
-                                6 => 'June',
-                                7 => 'July',
-                                8 => 'August',
+                                5 => 'Mei',
+                                6 => 'Juni',
+                                7 => 'Juli',
+                                8 => 'Agustus',
                                 9 => 'September',
-                                10 => 'October',
+                                10 => 'Oktober',
                                 11 => 'November',
-                                12 => 'December'
+                                12 => 'Desember'
                             ];
                             foreach ($monthNames as $num => $name): ?>
                                 <option value="<?= $num ?>"><?= $name ?></option>
                             <?php endforeach; ?>
                         </select>
 
-                        <label for="filter-year">Year</label>
+                        <label for="filter-year">TAHUN</label>
                         <select id="filter-year" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.applyFilterAndRender()">
-                            <option value="">All Years</option>
+                            autocomplete="off" onchange="App.applyFilterAndRender()">
+                            <option value="" selected>Semua Tahun</option>
                             <?php for ($y = $currentYear; $y <= $currentYear + 5; $y++): ?>
                                 <option value="<?= $y ?>"><?= $y ?></option>
                             <?php endfor; ?>
@@ -145,7 +145,7 @@ $currentYear = (int) date('Y');
                     </div>
                     <div class="table-toolbar-right">
                         <input type="text" id="master-search-input" class="table-search-input" placeholder="Search..."
-                            oninput="App.handleSearch(this.value)">
+                            autocomplete="off" value="" oninput="App.handleSearch(this.value)">
                     </div>
                 </div>
 
@@ -321,7 +321,7 @@ $currentYear = (int) date('Y');
                     <div class="table-toolbar-left">
                         <label for="sr-page-size">Show</label>
                         <select id="sr-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.changeSRPageSize(this.value)">
+                            autocomplete="off" onchange="App.changeSRPageSize(this.value)">
                             <option value="10" selected>10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -332,7 +332,7 @@ $currentYear = (int) date('Y');
                     </div>
                     <div class="table-toolbar-right">
                         <input type="text" id="sr-search-input" class="table-search-input" placeholder="Search..."
-                            oninput="App.handleSRSearch(this.value)">
+                            autocomplete="off" value="" oninput="App.handleSRSearch(this.value)">
                     </div>
                 </div>
 
@@ -434,18 +434,18 @@ $currentYear = (int) date('Y');
                             <select id="summary-filter-month" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem;" onchange="App.loadSummaryData()">
                                 <option value="">Semua Bulan</option>
-                                <option value="1">January</option>
-                                <option value="2">February</option>
-                                <option value="3">March</option>
+                                <option value="1">Januari</option>
+                                <option value="2">Februari</option>
+                                <option value="3">Maret</option>
                                 <option value="4">April</option>
-                                <option value="5">May</option>
-                                <option value="6">June</option>
-                                <option value="7">July</option>
-                                <option value="8">August</option>
+                                <option value="5">Mei</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">Agustus</option>
                                 <option value="9" selected>September</option>
-                                <option value="10">October</option>
+                                <option value="10">Oktober</option>
                                 <option value="11">November</option>
-                                <option value="12">December</option>
+                                <option value="12">Desember</option>
                             </select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -462,7 +462,7 @@ $currentYear = (int) date('Y');
                 </div>
             </div>
 
-            <!-- ── Achievement Cards (National, CRO, ERO, WRO, PMD) ── -->
+            <!-- ── Achievement Cards (National, PMD, WRO, CRO, ERO) ── -->
             <div class="kpi-grid" id="achievement-cards"
                 style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));">
                 <div class="kpi-card kpi-card-split">
@@ -474,6 +474,28 @@ $currentYear = (int) date('Y');
                     <div class="kpi-card-meta">
                         <div class="kpi-subtext" id="kpi-national-subtext">Outlet Regional &amp; PMD (0 Sites)</div>
                         <div class="kpi-status-box" id="kpi-national-status"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-title">PMD Achievement</div>
+                    <div class="kpi-card-main">
+                        <div class="kpi-split-value" id="kpi-pmd-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-pmd-trend"></div>
+                    </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-pmd-subtext">Avg DEPT PMD (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-pmd-status"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-card-split">
+                    <div class="kpi-title">WRO Achievement</div>
+                    <div class="kpi-card-main">
+                        <div class="kpi-split-value" id="kpi-wro-achievement">0.00%</div>
+                        <div class="kpi-split-trend" id="kpi-wro-trend"></div>
+                    </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext" id="kpi-wro-subtext">Avg DEPT WRO (0 Sites)</div>
+                        <div class="kpi-status-box" id="kpi-wro-status"></div>
                     </div>
                 </div>
                 <div class="kpi-card kpi-card-split">
@@ -498,31 +520,9 @@ $currentYear = (int) date('Y');
                         <div class="kpi-status-box" id="kpi-ero-status"></div>
                     </div>
                 </div>
-                <div class="kpi-card kpi-card-split">
-                    <div class="kpi-title">WRO Achievement</div>
-                    <div class="kpi-card-main">
-                        <div class="kpi-split-value" id="kpi-wro-achievement">0.00%</div>
-                        <div class="kpi-split-trend" id="kpi-wro-trend"></div>
-                    </div>
-                    <div class="kpi-card-meta">
-                        <div class="kpi-subtext" id="kpi-wro-subtext">Avg DEPT WRO (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-wro-status"></div>
-                    </div>
-                </div>
-                <div class="kpi-card kpi-card-split">
-                    <div class="kpi-title">PMD Achievement</div>
-                    <div class="kpi-card-main">
-                        <div class="kpi-split-value" id="kpi-pmd-achievement">0.00%</div>
-                        <div class="kpi-split-trend" id="kpi-pmd-trend"></div>
-                    </div>
-                    <div class="kpi-card-meta">
-                        <div class="kpi-subtext" id="kpi-pmd-subtext">Avg DEPT PMD (0 Sites)</div>
-                        <div class="kpi-status-box" id="kpi-pmd-status"></div>
-                    </div>
-                </div>
             </div>
 
-            <!-- ── Trend Line Graphics (DEPT on top; Sub DEPT & PMD Sub DEPT below) ── -->
+            <!-- ── Trend Line Graphics (DEPT on top; PMD Sub DEPT & Sub DEPT below) ── -->
             <div class="trend-charts-container" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                 <!-- Card 1: Trend Line DEPT (Full Width on top) -->
                 <div class="card" style="margin-bottom: 1.25rem;">
@@ -546,9 +546,31 @@ $currentYear = (int) date('Y');
                     </div>
                 </div>
 
-                <!-- Row below: Card 2 (Sub DEPT) & Card 3 (PMD Sub DEPT) -->
+                <!-- Row below: Card 2 (PMD Sub DEPT) & Card 3 (Sub DEPT) -->
                 <div class="trend-charts-row-2">
-                    <!-- Card 2: Trend Line Sub DEPT -->
+                    <!-- Card 2: Trend Line PMD Sub DEPT -->
+                    <div class="card" style="margin-bottom: 0;">
+                        <div class="card-header"
+                            style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 class="card-title"
+                                    style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                    Trend Achievement SO PMD Sub Dept</h3>
+                                <p class="card-subtitle trend-chart-subtitle"
+                                    style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                                    Monthly Physical % (Jan - Dec 2026)</p>
+                            </div>
+                            <span class="badge"
+                                style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
+                        </div>
+                        <div class="card-body" style="padding: 1rem; position: relative;">
+                            <div style="position: relative; height: 260px; width: 100%;">
+                                <canvas id="chart-trend-pmd"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Trend Line Sub DEPT -->
                     <div class="card" style="margin-bottom: 0;">
                         <div class="card-header"
                             style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
@@ -570,28 +592,6 @@ $currentYear = (int) date('Y');
                             </div>
                         </div>
                     </div>
-
-                    <!-- Card 3: Trend Line PMD Sub DEPT -->
-                    <div class="card" style="margin-bottom: 0;">
-                        <div class="card-header"
-                            style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <h3 class="card-title"
-                                    style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
-                                    Trend Achievement SO PMD Sub Dept</h3>
-                                <p class="card-subtitle trend-chart-subtitle"
-                                    style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
-                                    Monthly Physical % (Jan - Dec 2026)</p>
-                            </div>
-                            <span class="badge"
-                                style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
-                        </div>
-                        <div class="card-body" style="padding: 1rem; position: relative;">
-                            <div style="position: relative; height: 260px; width: 100%;">
-                                <canvas id="chart-trend-pmd"></canvas>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -599,8 +599,15 @@ $currentYear = (int) date('Y');
             <div class="card" id="card-hasil-so-subdept" style="margin-top: 1rem;">
                 <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
-                        <h2 class="card-title">Chart Hasil SO Outlet Regional</h2>
-                        <p class="card-subtitle">Pencapaian dan Hasil Stock Opname Outlet Regional</p>
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <h2 class="card-title" style="margin: 0;">Chart Hasil SO Outlet Regional</h2>
+                            <span id="subdept-period-badge" class="badge"
+                                style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
+                                September 2026
+                            </span>
+                        </div>
+                        <p class="card-subtitle" style="margin-top: 2px;">Pencapaian dan Hasil Stock Opname Outlet
+                            Regional</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -702,14 +709,14 @@ $currentYear = (int) date('Y');
                             </div>
                         </div>
 
-                        <!-- Right: Pie / Donut Chart for Tercapai vs Belum Tercapai -->
+                        <!-- Right: Pie / Donut Chart for Tercapai vs Tidak Tercapai -->
                         <div class="so-subdept-chart-wrapper">
                             <div class="so-pie-card">
                                 <div class="so-pie-header">
                                     <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                         Status Pencapaian</h3>
                                     <p style="font-size: 11px; color: #64748b; margin: 0;" id="subdept-pie-subtitle">
-                                        Tercapai vs Belum Tercapai</p>
+                                        Tercapai vs Tidak Tercapai</p>
                                 </div>
                                 <div class="so-pie-canvas-box">
                                     <canvas id="chart-subdept-pie"></canvas>
@@ -758,9 +765,9 @@ $currentYear = (int) date('Y');
                     <div class="table-toolbar-left">
                         <label for="rekap-page-size">Show</label>
                         <select id="rekap-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
-                            onchange="App.changeRekapPageSize(this.value)">
-                            <option value="10">10</option>
-                            <option value="25" selected>25</option>
+                            autocomplete="off" onchange="App.changeRekapPageSize(this.value)">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
                             <option value="50">50</option>
                             <option value="100">100</option>
                             <option value="all">All</option>
@@ -769,7 +776,7 @@ $currentYear = (int) date('Y');
                     </div>
                     <div class="table-toolbar-right">
                         <input type="text" id="rekap-search-input" class="table-search-input" placeholder="Search..."
-                            oninput="App.handleRekapSearch(this.value)">
+                            autocomplete="off" oninput="App.handleRekapSearch(this.value)">
                     </div>
                 </div>
 

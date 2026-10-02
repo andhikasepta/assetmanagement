@@ -172,6 +172,16 @@ try {
 
         $achievements = $getAchievements($db, $month, $year, $srCategories);
 
+        // Query the latest uploaded period in asset_reconciliation
+        $latestStmt = $db->query("
+            SELECT period_month, period_year 
+            FROM asset_reconciliation 
+            WHERE period_year IS NOT NULL AND period_month IS NOT NULL 
+            ORDER BY period_year DESC, period_month DESC, id DESC 
+            LIMIT 1
+        ");
+        $latestPeriod = $latestStmt->fetch(PDO::FETCH_ASSOC);
+
         // If summary action requested, return without fetching all rows
         if ($action === 'summary') {
             echo json_encode([
@@ -179,6 +189,7 @@ try {
                 'so_type' => $soType,
                 'month' => $month,
                 'year' => $year,
+                'latest_period' => $latestPeriod ?: null,
                 'totals' => $totals,
                 'achievements' => $achievements,
             ]);
@@ -302,8 +313,8 @@ try {
 
                 // Thresholds:
                 // >= 85%: Tercapai (green)
-                // 75% <= pct < 85%: Belum Tercapai (orange progress)
-                // < 75%: Belum Tercapai (red progress)
+                // 75% <= pct < 85%: Tidak Tercapai (orange progress)
+                // < 75%: Tidak Tercapai (red progress)
                 $statusText = 'Belum Ada Data';
                 $statusClass = 'none';
                 if ($pct !== null) {
@@ -311,10 +322,10 @@ try {
                         $statusText = 'Tercapai';
                         $statusClass = 'green';
                     } elseif ($pct >= 75.0) {
-                        $statusText = 'Belum Tercapai';
+                        $statusText = 'Tidak Tercapai';
                         $statusClass = 'orange';
                     } else {
-                        $statusText = 'Belum Tercapai';
+                        $statusText = 'Tidak Tercapai';
                         $statusClass = 'red';
                     }
                 }
@@ -345,10 +356,10 @@ try {
                     $overallStatusText = 'Tercapai';
                 } elseif ($avgPct >= 75.0) {
                     $overallStatus = 'orange';
-                    $overallStatusText = 'Belum Tercapai';
+                    $overallStatusText = 'Tidak Tercapai';
                 } else {
                     $overallStatus = 'red';
-                    $overallStatusText = 'Belum Tercapai';
+                    $overallStatusText = 'Tidak Tercapai';
                 }
             }
 
