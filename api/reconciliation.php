@@ -22,11 +22,48 @@ try {
         $year = isset($_GET['year']) && $_GET['year'] !== '' ? (int) $_GET['year'] : null;
         $soType = trim($_GET['so_type'] ?? 'monthly');
         $srCategories = ($soType === 'quarterly')
-            ? "'quarterly', 'quarterly_outlet', 'quarterly_pmd'"
+            ? "'quarterly', 'quarterly_outlet'"
             : "'monthly_outlet', 'monthly_pmd'";
 
+        // Helper function to get effective group types for a given period
+        $getEffectiveTypes = function(PDO $db, ?int $y, ?int $m): array {
+            $year = $y ?: (int)date('Y');
+            $month = $m ?: (int)date('n');
+
+            $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+            $map = [];
+            $pmdSites = [];
+            foreach ($sites as $s) {
+                $sc = strtoupper(trim($s['sitecode']));
+                if (strtoupper(trim($s['dept'])) === 'PMD') {
+                    $map[$sc] = 'monthly';
+                    $pmdSites[$sc] = true;
+                } else {
+                    $map[$sc] = $s['group_type'];
+                }
+            }
+
+            $stmt = $db->prepare("
+                SELECT DISTINCT ON (sitecode) sitecode, group_type
+                FROM site_group_history
+                WHERE effective_year < :y OR (effective_year = :y AND effective_month <= :m)
+                ORDER BY sitecode, effective_year DESC, effective_month DESC
+            ");
+            $stmt->execute([':y' => $year, ':m' => $month]);
+            $historyRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($historyRules as $hr) {
+                $sc = strtoupper(trim($hr['sitecode']));
+                if (isset($map[$sc]) && empty($pmdSites[$sc])) {
+                    $map[$sc] = $hr['group_type'];
+                }
+            }
+
+            return $map;
+        };
+
         // Helper function to calculate regional & national achievements
-        $getAchievements = function (PDO $db, ?int $m = null, ?int $y = null, string $srCats = "'monthly_outlet', 'monthly_pmd'") {
+        $getAchievements = function (PDO $db, ?int $m = null, ?int $y = null, string $srCats = "", string $type = 'monthly') use ($getEffectiveTypes) {
             $whereParts = [];
             $params = [];
             if ($y) {
@@ -36,6 +73,11 @@ try {
             if ($m) {
                 $whereParts[] = 'period_month = :m';
                 $params[':m'] = $m;
+            }
+            if ($type === 'quarterly') {
+                $whereParts[] = "profile ~* '\\mQ[1-4]\\M'";
+            } else {
+                $whereParts[] = "profile !~* '\\mQ[1-4]\\M'";
             }
             $whereSql = !empty($whereParts) ? 'WHERE ' . implode(' AND ', $whereParts) : '';
 
@@ -60,13 +102,41 @@ try {
                 }
             }
 
-            $sites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site FROM site_regional WHERE category IN ($srCats)")->fetchAll(PDO::FETCH_ASSOC);
+            // Dynamic site filtering based on effective group type for the period
+            $effectiveMap = $getEffectiveTypes($db, $y, $m);
+            $allSites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(is_active, TRUE) as is_active FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+
+            $sites = [];
+            foreach ($allSites as $s) {
+                $sc = strtoupper(trim($s['sitecode'] ?? ''));
+                $effType = $effectiveMap[$sc] ?? 'monthly';
+
+                // If site is inactive in this period, do not include in expected sites (do not lookup for that inactive)
+                if ($effType === 'inactive') {
+                    continue;
+                }
+
+                $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                if ($type === 'quarterly') {
+                    if (!$isPmd && $effType === 'quarterly') {
+                        $sites[] = $s;
+                    }
+                } else {
+                    if ($isPmd || $effType === 'monthly') {
+                        $sites[] = $s;
+                    }
+                }
+            }
 
             $deptStats = [
                 'CRO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
                 'ERO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
                 'WRO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
                 'PMD' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+            ];
+            $subDeptStats = [
+                'DNO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'DSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
             ];
             $nationalSum = 0.0;
             $nationalCount = 0;
@@ -75,8 +145,12 @@ try {
             foreach ($sites as $s) {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
                 $dept = strtoupper(trim($s['dept'] ?? ''));
+                $sub = strtoupper(trim($s['sub_dept'] ?? ''));
                 if (isset($deptStats[$dept])) {
                     $deptStats[$dept]['total']++;
+                }
+                if (isset($subDeptStats[$sub])) {
+                    $subDeptStats[$sub]['total']++;
                 }
 
                 $pct = null;
@@ -106,34 +180,57 @@ try {
                         $deptStats[$dept]['sum'] += $pct;
                         $deptStats[$dept]['count']++;
                     }
+                    if (isset($subDeptStats[$sub])) {
+                        $subDeptStats[$sub]['sum'] += $pct;
+                        $subDeptStats[$sub]['count']++;
+                    }
                 }
             }
 
+            $outletCount = $deptStats['CRO']['count'] + $deptStats['ERO']['count'] + $deptStats['WRO']['count'];
+            $outletSum = $deptStats['CRO']['sum'] + $deptStats['ERO']['sum'] + $deptStats['WRO']['sum'];
+            $totalOutletSites = $deptStats['CRO']['total'] + $deptStats['ERO']['total'] + $deptStats['WRO']['total'];
+
             return [
                 'national' => [
-                    'pct' => $nationalCount > 0 ? round($nationalSum / $nationalCount, 2) : 0.0,
+                    'pct' => $nationalCount > 0 ? round($nationalSum / $nationalCount) : 0,
                     'count' => $nationalCount,
                     'total_sites' => $totalNationalSites,
                 ],
+                'outlet_national' => [
+                    'pct' => $outletCount > 0 ? round($outletSum / $outletCount) : 0,
+                    'count' => $outletCount,
+                    'total_sites' => $totalOutletSites,
+                ],
                 'cro' => [
-                    'pct' => $deptStats['CRO']['count'] > 0 ? round($deptStats['CRO']['sum'] / $deptStats['CRO']['count'], 2) : 0.0,
+                    'pct' => $deptStats['CRO']['count'] > 0 ? round($deptStats['CRO']['sum'] / $deptStats['CRO']['count']) : 0,
                     'count' => $deptStats['CRO']['count'],
                     'total_sites' => $deptStats['CRO']['total'],
                 ],
                 'ero' => [
-                    'pct' => $deptStats['ERO']['count'] > 0 ? round($deptStats['ERO']['sum'] / $deptStats['ERO']['count'], 2) : 0.0,
+                    'pct' => $deptStats['ERO']['count'] > 0 ? round($deptStats['ERO']['sum'] / $deptStats['ERO']['count']) : 0,
                     'count' => $deptStats['ERO']['count'],
                     'total_sites' => $deptStats['ERO']['total'],
                 ],
                 'wro' => [
-                    'pct' => $deptStats['WRO']['count'] > 0 ? round($deptStats['WRO']['sum'] / $deptStats['WRO']['count'], 2) : 0.0,
+                    'pct' => $deptStats['WRO']['count'] > 0 ? round($deptStats['WRO']['sum'] / $deptStats['WRO']['count']) : 0,
                     'count' => $deptStats['WRO']['count'],
                     'total_sites' => $deptStats['WRO']['total'],
                 ],
                 'pmd' => [
-                    'pct' => $deptStats['PMD']['count'] > 0 ? round($deptStats['PMD']['sum'] / $deptStats['PMD']['count'], 2) : 0.0,
+                    'pct' => $deptStats['PMD']['count'] > 0 ? round($deptStats['PMD']['sum'] / $deptStats['PMD']['count']) : 0,
                     'count' => $deptStats['PMD']['count'],
                     'total_sites' => $deptStats['PMD']['total'],
+                ],
+                'dno' => [
+                    'pct' => $subDeptStats['DNO']['count'] > 0 ? round($subDeptStats['DNO']['sum'] / $subDeptStats['DNO']['count']) : 0,
+                    'count' => $subDeptStats['DNO']['count'],
+                    'total_sites' => $subDeptStats['DNO']['total'],
+                ],
+                'dso' => [
+                    'pct' => $subDeptStats['DSO']['count'] > 0 ? round($subDeptStats['DSO']['sum'] / $subDeptStats['DSO']['count']) : 0,
+                    'count' => $subDeptStats['DSO']['count'],
+                    'total_sites' => $subDeptStats['DSO']['total'],
                 ],
             ];
         };
@@ -148,6 +245,11 @@ try {
         if ($year) {
             $filterWhere[] = 'period_year = :fy';
             $filterParams[':fy'] = $year;
+        }
+        if ($soType === 'quarterly') {
+            $filterWhere[] = "profile ~* '\\mQ[1-4]\\M'";
+        } else {
+            $filterWhere[] = "profile !~* '\\mQ[1-4]\\M'";
         }
         $filterSql = !empty($filterWhere) ? 'WHERE ' . implode(' AND ', $filterWhere) : '';
 
@@ -170,13 +272,16 @@ try {
         $totalsStmt->execute($filterParams);
         $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC);
 
-        $achievements = $getAchievements($db, $month, $year, $srCategories);
+        $achievements = $getAchievements($db, $month, $year, $srCategories, $soType);
 
         // Query the latest uploaded period in asset_reconciliation
+        $latestWhere = ($soType === 'quarterly')
+            ? "AND profile ~* '\\mQ[1-4]\\M'"
+            : "AND profile !~* '\\mQ[1-4]\\M'";
         $latestStmt = $db->query("
             SELECT period_month, period_year 
             FROM asset_reconciliation 
-            WHERE period_year IS NOT NULL AND period_month IS NOT NULL 
+            WHERE period_year IS NOT NULL AND period_month IS NOT NULL $latestWhere
             ORDER BY period_year DESC, period_month DESC, id DESC 
             LIMIT 1
         ");
@@ -201,9 +306,20 @@ try {
             $dept = trim($_GET['dept'] ?? '');
             $subDept = trim($_GET['sub_dept'] ?? '');
 
+            $category = trim($_GET['category'] ?? '');
+
             // 1. Get sites for this dept and/or sub_dept
-            $where = ["category IN ($srCategories)"];
+            $where = [];
             $params = [];
+            if ($category === 'outlet' || $category === 'outlet_regional') {
+                $where[] = "dept != 'PMD'";
+            } elseif ($category === 'outlet_subarep') {
+                $where[] = "dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL)";
+            } elseif ($category === 'warehouse_hub') {
+                $where[] = "dept != 'PMD' AND info IN ('Under Warehouse', 'HUB')";
+            } elseif ($category === 'pmd') {
+                $where[] = "dept = 'PMD'";
+            }
             if (!empty($dept) && strtolower($dept) !== 'all') {
                 $where[] = "dept = :dept";
                 $params[':dept'] = $dept;
@@ -212,16 +328,33 @@ try {
                 $where[] = "sub_dept = :sub_dept";
                 $params[':sub_dept'] = $subDept;
             }
-            $whereSql = 'WHERE ' . implode(' AND ', $where);
+            $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
             $siteStmt = $db->prepare("
-                SELECT id, category, regional, dept, sub_dept, sitecode, name_site
+                SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
                 FROM site_regional
                 $whereSql
                 ORDER BY dept ASC, sub_dept ASC, sitecode ASC
             ");
             $siteStmt->execute($params);
-            $sites = $siteStmt->fetchAll(PDO::FETCH_ASSOC);
+            $rawSites = $siteStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Filter sites dynamically by effective group type for the period
+            $effectiveMap = $getEffectiveTypes($db, $year, $month);
+            $sites = [];
+            foreach ($rawSites as $s) {
+                $sc = strtoupper(trim($s['sitecode'] ?? ''));
+                $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                if ($soType === 'quarterly') {
+                    if (!$isPmd && ($effectiveMap[$sc] ?? 'monthly') === 'quarterly') {
+                        $sites[] = $s;
+                    }
+                } else {
+                    if ($isPmd || ($effectiveMap[$sc] ?? 'monthly') === 'monthly') {
+                        $sites[] = $s;
+                    }
+                }
+            }
 
             // 2. Get reconciliation records for this month and year
             $recWhere = [];
@@ -233,6 +366,11 @@ try {
             if ($month) {
                 $recWhere[] = 'period_month = :rm';
                 $recParams[':rm'] = $month;
+            }
+            if ($soType === 'quarterly') {
+                $recWhere[] = "profile ~* '\\mQ[1-4]\\M'";
+            } else {
+                $recWhere[] = "profile !~* '\\mQ[1-4]\\M'";
             }
             $recWhereSql = !empty($recWhere) ? 'WHERE ' . implode(' AND ', $recWhere) : '';
 
@@ -312,21 +450,32 @@ try {
                 $totalDbQty += $dbQty;
 
                 // Thresholds:
-                // >= 85%: Tercapai (green)
-                // 75% <= pct < 85%: Tidak Tercapai (orange progress)
-                // < 75%: Tidak Tercapai (red progress)
+                // For PMD: >= 98%: Tercapai (green), < 98%: Tidak Tercapai (red)
+                // For Others: >= 85%: Tercapai (green), 75%-85%: Tidak Tercapai (orange), < 75%: Tidak Tercapai (red)
+                $isPmdItem = (strtoupper($s['dept'] ?? '') === 'PMD' || strtoupper($dept) === 'PMD');
                 $statusText = 'Belum Ada Data';
                 $statusClass = 'none';
                 if ($pct !== null) {
-                    if ($pct >= 85.0) {
-                        $statusText = 'Tercapai';
-                        $statusClass = 'green';
-                    } elseif ($pct >= 75.0) {
-                        $statusText = 'Tidak Tercapai';
-                        $statusClass = 'orange';
+                    $evalPct = (float) round($pct);
+                    if ($isPmdItem) {
+                        if ($evalPct >= 98.0) {
+                            $statusText = 'Tercapai';
+                            $statusClass = 'green';
+                        } else {
+                            $statusText = 'Tidak Tercapai';
+                            $statusClass = 'red';
+                        }
                     } else {
-                        $statusText = 'Tidak Tercapai';
-                        $statusClass = 'red';
+                        if ($evalPct >= 85.0) {
+                            $statusText = 'Tercapai';
+                            $statusClass = 'green';
+                        } elseif ($evalPct >= 75.0) {
+                            $statusText = 'Tidak Tercapai';
+                            $statusClass = 'orange';
+                        } else {
+                            $statusText = 'Tidak Tercapai';
+                            $statusClass = 'red';
+                        }
                     }
                 }
 
@@ -340,26 +489,37 @@ try {
                     'db_physic_qty'       => $dbQty,
                     'total_physic_actual' => $actual,
                     'total_physic_target' => $target,
-                    'total_physic_pct'    => $pct,
+                    'total_physic_pct'    => $pct !== null ? round($pct) : null,
                     'status'              => $statusText,
                     'status_class'        => $statusClass,
                     'has_data'            => $hasData,
                 ];
             }
 
-            $avgPct = $countWithData > 0 ? round($totalPctSum / $countWithData, 2) : 0.0;
+            $avgPct = $countWithData > 0 ? round($totalPctSum / $countWithData) : 0;
             $overallStatus = 'none';
             $overallStatusText = 'Belum Ada Data';
+            $isPmdOverall = (strtoupper($dept) === 'PMD');
             if ($countWithData > 0) {
-                if ($avgPct >= 85.0) {
-                    $overallStatus = 'green';
-                    $overallStatusText = 'Tercapai';
-                } elseif ($avgPct >= 75.0) {
-                    $overallStatus = 'orange';
-                    $overallStatusText = 'Tidak Tercapai';
+                if ($isPmdOverall) {
+                    if ($avgPct >= 98.0) {
+                        $overallStatus = 'green';
+                        $overallStatusText = 'Tercapai';
+                    } else {
+                        $overallStatus = 'red';
+                        $overallStatusText = 'Tidak Tercapai';
+                    }
                 } else {
-                    $overallStatus = 'red';
-                    $overallStatusText = 'Tidak Tercapai';
+                    if ($avgPct >= 85.0) {
+                        $overallStatus = 'green';
+                        $overallStatusText = 'Tercapai';
+                    } elseif ($avgPct >= 75.0) {
+                        $overallStatus = 'orange';
+                        $overallStatusText = 'Tidak Tercapai';
+                    } else {
+                        $overallStatus = 'red';
+                        $overallStatusText = 'Tidak Tercapai';
+                    }
                 }
             }
 

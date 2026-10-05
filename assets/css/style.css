@@ -132,9 +132,10 @@ input, button, select, textarea, optgroup, table, th, td, label {
 .card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     margin-bottom: 1.5rem;
+    overflow: hidden;
 }
 
 .card-header {
@@ -184,14 +185,28 @@ input, button, select, textarea, optgroup, table, th, td, label {
     color: #0f172a;
     background-color: #ffffff;
     border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    transition: border-color 0.15s ease;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+select.form-control,
+select.sr-table-select {
+    border-radius: 8px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 10px 10px;
+    padding-right: 1.75rem !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 .form-control:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .form-row {
@@ -206,10 +221,10 @@ input, button, select, textarea, optgroup, table, th, td, label {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    padding: 0.45rem 0.9rem;
+    padding: 0.45rem 0.95rem;
     font-size: 13px;
     font-weight: 500;
-    border-radius: 4px;
+    border-radius: 8px;
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -221,47 +236,69 @@ input, button, select, textarea, optgroup, table, th, td, label {
     background-color: #2563eb;
     color: #ffffff;
     border-color: #2563eb;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
 }
 
 .btn-primary:hover {
     background-color: #1d4ed8;
     border-color: #1d4ed8;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
 }
 
 .btn-secondary {
     background-color: #ffffff;
     color: #334155;
     border-color: #cbd5e1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .btn-secondary:hover {
+    background-color: #f8fafc;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+.btn-outline-secondary {
+    background-color: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+}
+
+.btn-outline-secondary:hover {
     background-color: #f1f5f9;
     color: #0f172a;
+    border-color: #94a3b8;
 }
 
 .btn-success {
     background-color: #16a34a;
     color: #ffffff;
     border-color: #16a34a;
+    box-shadow: 0 1px 2px rgba(22, 163, 74, 0.2);
 }
 
 .btn-success:hover {
     background-color: #15803d;
+    border-color: #15803d;
 }
 
 .btn-danger {
     background-color: #dc2626;
     color: #ffffff;
     border-color: #dc2626;
+    box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
 }
 
 .btn-danger:hover {
     background-color: #b91c1c;
+    border-color: #b91c1c;
 }
 
 .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 11px;
+    padding: 0.25rem 0.6rem;
+    font-size: 11.5px;
+    border-radius: 6px;
 }
 
 /* ---- Drag & Drop Zone for Import Modal ---- */
@@ -331,7 +368,7 @@ input, button, select, textarea, optgroup, table, th, td, label {
     overflow-x: auto;
     width: 100%;
     border: 1px solid #e2e8f0;
-    border-radius: 4px;
+    border-radius: 8px;
 }
 
 .reconciliation-table {
@@ -476,7 +513,7 @@ table.dataTable tbody tr:hover td {
 
 .modal-dialog {
     background: #ffffff;
-    border-radius: 6px;
+    border-radius: 12px;
     width: 100%;
     max-width: 600px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -603,17 +640,18 @@ table.dataTable tbody tr:hover td {
 }
 
 .table-search-input {
-    padding: 0.4rem 0.65rem;
-    font-size: 12px;
+    padding: 0.45rem 0.75rem;
+    font-size: 12.5px;
     border: 1px solid #cbd5e1;
-    border-radius: 4px;
+    border-radius: 8px;
     min-width: 240px;
     outline: none;
+    transition: all 0.15s ease;
 }
 
 .table-search-input:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .table-pagination-footer {
@@ -632,16 +670,16 @@ table.dataTable tbody tr:hover td {
 .pagination-controls {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
 }
 
 .pagination-btn {
-    padding: 0.3rem 0.6rem;
+    padding: 0.35rem 0.65rem;
     font-size: 12px;
     border: 1px solid #cbd5e1;
     background: #ffffff;
     color: #334155;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -674,9 +712,9 @@ table.dataTable tbody tr:hover td {
 .kpi-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    border-radius: 12px;
     padding: 1rem 1.25rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .kpi-title {
@@ -709,7 +747,7 @@ table.dataTable tbody tr:hover td {
     gap: 0.65rem;
     min-height: 125px;
     padding: 1.15rem 1.25rem;
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     white-space: nowrap;
@@ -809,51 +847,71 @@ table.dataTable tbody tr:hover td {
     border: 1px solid #fecaca;
 }
 
+.kpi-target-indicator.target-neutral {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
 
 /* ---- Action Column & Delete Button ---- */
 .col-action {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
+    width: 72px;
+    min-width: 72px;
     text-align: center;
     position: sticky;
     left: 0;
     z-index: 2;
-    background: inherit;
+    background-color: #ffffff;
+    box-sizing: border-box;
 }
 
 .col-action-select {
-    width: 36px;
-    min-width: 36px;
-    max-width: 36px;
+    width: 38px;
+    min-width: 38px;
+    max-width: 42px;
     text-align: center;
     padding: 4px 2px !important;
+    box-sizing: border-box;
 }
 
 .col-action-delete {
-    width: 58px;
-    min-width: 58px;
-    max-width: 58px;
+    width: 68px;
+    min-width: 68px;
     text-align: center;
     padding: 4px 6px !important;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.col-action-active {
+    width: 44px;
+    min-width: 44px;
+    max-width: 48px;
+    text-align: center;
+    padding: 4px 2px !important;
+    box-sizing: border-box;
 }
 
 .reconciliation-table thead th.col-action,
 .reconciliation-table thead th.col-action-group,
 .reconciliation-table thead th.col-action-select,
-.reconciliation-table thead th.col-action-delete {
+.reconciliation-table thead th.col-action-delete,
+.reconciliation-table thead th.col-action-active {
     background-color: #f1f5f9;
 }
 
 .reconciliation-table tbody td.col-action,
 .reconciliation-table tbody td.col-action-select,
-.reconciliation-table tbody td.col-action-delete {
+.reconciliation-table tbody td.col-action-delete,
+.reconciliation-table tbody td.col-action-active {
     background-color: #ffffff;
 }
 
 .reconciliation-table tbody tr:hover td.col-action,
 .reconciliation-table tbody tr:hover td.col-action-select,
-.reconciliation-table tbody tr:hover td.col-action-delete {
+.reconciliation-table tbody tr:hover td.col-action-delete,
+.reconciliation-table tbody tr:hover td.col-action-active {
     background-color: #f8fafc;
 }
 
@@ -870,16 +928,20 @@ table.dataTable tbody tr:hover td {
 }
 
 .btn-delete {
-    padding: 0.2rem 0.45rem;
-    font-size: 12px;
-    line-height: 1;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
     border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
     transition: all 0.15s ease;
 }
 
 .btn-delete:hover {
     background-color: #991b1b;
-    transform: scale(1.05);
 }
 
 /* ---- Column Filter Row ---- */
@@ -892,28 +954,28 @@ table.dataTable tbody tr:hover td {
     width: 100%;
     min-width: 60px;
     max-width: 140px;
-    padding: 3px 4px;
+    padding: 3px 6px;
     font-size: 11px;
     border: 1px solid #cbd5e1;
-    border-radius: 3px;
+    border-radius: 6px;
     background-color: #ffffff;
     color: #334155;
     cursor: pointer;
     outline: none;
-    transition: border-color 0.15s ease;
+    transition: all 0.15s ease;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 4px center;
+    background-position: right 5px center;
     background-size: 8px;
     padding-right: 16px;
 }
 
 .col-filter:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .col-filter:hover {
@@ -964,6 +1026,28 @@ th.sortable.desc .sort-indicator {
     font-size: 11px;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+/* ── Site Regional Table Selects & Badges ── */
+.sr-table-select {
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background-color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.sr-table-select:focus {
+    border-color: #3b82f6;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+.sr-table-select.is-saved {
+    background-color: #dcfce7 !important;
+    border-color: #16a34a !important;
+    color: #166534 !important;
 }
 
 /* ── Site Regional Tabs ── */
@@ -1105,6 +1189,10 @@ th.sortable.desc .sort-indicator {
     gap: 1.25rem;
 }
 
+.trend-charts-row-2.single-chart {
+    grid-template-columns: 1fr;
+}
+
 @media (max-width: 1280px) {
     .trend-charts-grid {
         grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -1237,7 +1325,7 @@ th.sortable.desc .sort-indicator {
 .so-pie-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.15rem;
     display: flex;
     flex-direction: column;
@@ -1306,7 +1394,7 @@ th.sortable.desc .sort-indicator {
 .summary-type-slider-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 0.5rem 0.75rem;
     margin-bottom: 1.25rem;
     display: flex;
@@ -1322,7 +1410,7 @@ th.sortable.desc .sort-indicator {
     align-items: center;
     background: #f1f5f9;
     padding: 4px;
-    border-radius: 8px;
+    border-radius: 10px;
     gap: 4px;
     position: relative;
 }
@@ -1337,7 +1425,7 @@ th.sortable.desc .sort-indicator {
     color: #64748b;
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
@@ -1351,5 +1439,82 @@ th.sortable.desc .sort-indicator {
     color: #2563eb;
     background: #ffffff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Site Movement History & Comparison Card ─────────── */
+.badge-status-monthly {
+    background: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+    line-height: 1.2;
+}
+
+.badge-status-quarterly {
+    background: #e0f2fe;
+    color: #0284c7;
+    border: 1px solid #bae6fd;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+    line-height: 1.2;
+}
+
+.badge-status-inactive {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-block;
+    line-height: 1.2;
+}
+
+.diff-badge-positive {
+    background: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+    font-weight: 700;
+}
+
+.diff-badge-negative {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    font-weight: 700;
+}
+
+.diff-badge-neutral {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    font-weight: 600;
+}
+
+.card-highlight-pulse {
+    animation: cardPulse 1.8s ease-in-out;
+}
+
+@keyframes cardPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.5);
+        border-color: #0284c7;
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(2, 132, 199, 0.2);
+        border-color: #0284c7;
+    }
+    100% {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border-color: #e2e8f0;
+    }
 }
 

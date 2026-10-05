@@ -34,27 +34,54 @@ try {
 
     if ($action === 'trends') {
         $soType = trim($_GET['so_type'] ?? 'monthly');
-        $srCategories = ($soType === 'quarterly')
-            ? "'quarterly', 'quarterly_outlet', 'quarterly_pmd'"
-            : "'monthly_outlet', 'monthly_pmd'";
 
-        // Fetch all sites for the selected SO type
-        $siteStmt = $db->prepare("
-            SELECT id, category, regional, dept, sub_dept, sitecode, name_site
+        // Fetch all sites
+        $siteStmt = $db->query("
+            SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
             FROM site_regional
-            WHERE category IN ($srCategories)
-            ORDER BY category ASC, dept ASC, sub_dept ASC, sitecode ASC
+            ORDER BY dept ASC, sub_dept ASC, sitecode ASC
         ");
-        $siteStmt->execute();
         $sites = $siteStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fetch reconciliation records for this year
-        $recStmt = $db->prepare('
+        // Preload monthly effective types
+        $baseTypes = [];
+        $pmdSites = [];
+        foreach ($sites as $s) {
+            $sc = strtoupper(trim($s['sitecode'] ?? ''));
+            if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+                $baseTypes[$sc] = 'monthly';
+                $pmdSites[$sc] = true;
+            } else {
+                $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+            }
+        }
+
+        $histStmt = $db->prepare("
+            SELECT DISTINCT ON (sitecode) sitecode, group_type
+            FROM site_group_history
+            WHERE effective_year < :y OR (effective_year = :y AND effective_month <= :m)
+            ORDER BY sitecode, effective_year DESC, effective_month DESC
+        ");
+
+        $monthlyEffMap = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $monthlyEffMap[$m] = $baseTypes;
+            $histStmt->execute([':y' => $year, ':m' => $m]);
+            foreach ($histStmt->fetchAll(PDO::FETCH_ASSOC) as $hr) {
+                $sc = strtoupper(trim($hr['sitecode']));
+                if (isset($monthlyEffMap[$m][$sc]) && empty($pmdSites[$sc])) {
+                    $monthlyEffMap[$m][$sc] = $hr['group_type'];
+                }
+            }
+        }
+
+        // Fetch reconciliation records for this year (fetch all so quarterly and monthly profiles are available)
+        $recStmt = $db->prepare("
             SELECT id, profile, period_month, period_year, total_physic_pct
             FROM asset_reconciliation
             WHERE period_year = :year
             ORDER BY period_month ASC, id ASC
-        ');
+        ");
         $recStmt->execute([':year' => $year]);
         $recRows = $recStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -64,17 +91,27 @@ try {
             $m = (int)$r['period_month'];
             $profile = trim($r['profile'] ?? '');
             $pct = (float)$r['total_physic_pct'];
+            $isQ = (bool)preg_match('/\bQ[1-4]\b/i', $profile);
 
             $recByMonthList[$m][] = [
                 'profile' => $profile,
                 'pct'     => $pct,
+                'is_q'    => $isQ,
             ];
 
             $parts = explode('-', $profile);
             foreach ($parts as $p) {
                 $token = strtoupper(trim($p));
-                if ($token !== '' && !isset($recByCodeAndMonth[$token][$m])) {
-                    $recByCodeAndMonth[$token][$m] = $pct;
+                if ($token !== '') {
+                    if ($isQ && !isset($recByCodeAndMonth[$token][$m]['q'])) {
+                        $recByCodeAndMonth[$token][$m]['q'] = $pct;
+                    }
+                    if (!$isQ && !isset($recByCodeAndMonth[$token][$m]['m'])) {
+                        $recByCodeAndMonth[$token][$m]['m'] = $pct;
+                    }
+                    if (!isset($recByCodeAndMonth[$token][$m]['any'])) {
+                        $recByCodeAndMonth[$token][$m]['any'] = $pct;
+                    }
                 }
             }
         }
@@ -112,11 +149,25 @@ try {
             }
 
             for ($m = 1; $m <= 12; $m++) {
+                $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
+                $isPmd = ($dept === 'PMD' || $cat === 'monthly_pmd');
+                if ($soType === 'quarterly') {
+                    if ($isPmd || $eff !== 'quarterly') continue;
+                } else {
+                    if (!$isPmd && $eff !== 'monthly') continue;
+                }
+
                 $val = null;
                 if ($sitecode !== '') {
                     if (isset($recByCodeAndMonth[$upperCode][$m])) {
-                        $val = $recByCodeAndMonth[$upperCode][$m];
+                        $entry = $recByCodeAndMonth[$upperCode][$m];
+                        if ($soType === 'quarterly') {
+                            $val = $entry['q'] ?? $entry['any'] ?? null;
+                        } else {
+                            $val = $entry['m'] ?? null;
+                        }
                     } elseif (!empty($recByMonthList[$m])) {
+                        $matchedItem = null;
                         foreach ($recByMonthList[$m] as $item) {
                             if (
                                 stripos($item['profile'], " - {$sitecode} - ") !== false ||
@@ -124,10 +175,19 @@ try {
                                 stripos($item['profile'], " {$sitecode} ") !== false ||
                                 stripos($item['profile'], $sitecode) !== false
                             ) {
-                                $val = $item['pct'];
-                                $recByCodeAndMonth[$upperCode][$m] = $val;
-                                break;
+                                if ($soType === 'quarterly' && !empty($item['is_q'])) {
+                                    $matchedItem = $item;
+                                    break;
+                                } elseif ($soType !== 'quarterly' && empty($item['is_q'])) {
+                                    $matchedItem = $item;
+                                    break;
+                                } elseif ($matchedItem === null) {
+                                    $matchedItem = $item;
+                                }
                             }
+                        }
+                        if ($matchedItem !== null) {
+                            $val = $matchedItem['pct'];
                         }
                     }
                 }
@@ -155,10 +215,17 @@ try {
             }
         }
 
-        $toSeries = function($buckets) {
+        $toSeries = function($buckets) use ($soType) {
             $res = [];
-            for ($m = 1; $m <= 12; $m++) {
-                $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count'], 2) : null;
+            if ($soType === 'quarterly') {
+                $quarters = [3, 6, 9, 12];
+                foreach ($quarters as $m) {
+                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count']) : null;
+                }
+            } else {
+                for ($m = 1; $m <= 12; $m++) {
+                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count']) : null;
+                }
             }
             return $res;
         };
@@ -178,6 +245,16 @@ try {
                 'dept'   => $data['dept'],
                 'values' => $toSeries($data['months']),
             ];
+        }
+
+        // For quarterly summary, remove all CRO trends (CRO has no quarterly sites)
+        if ($soType === 'quarterly') {
+            unset($deptSeries['CRO']);
+            foreach ($subDeptSeries as $subKey => $data) {
+                if (($data['dept'] ?? '') === 'CRO') {
+                    unset($subDeptSeries[$subKey]);
+                }
+            }
         }
 
         // 3. PMD Sub DEPT series
@@ -200,21 +277,59 @@ try {
         exit;
     }
 
-    $category = trim($_GET['category'] ?? 'monthly_outlet');
+    $category = trim($_GET['category'] ?? 'pmd');
 
     // 1. Fetch Site Regional records for this category
-    $siteStmt = $db->prepare('
-        SELECT id, category, regional, dept, sub_dept, sitecode, name_site
+    if ($category === 'pmd' || $category === 'monthly_pmd') {
+        $whereSql = "WHERE dept = 'PMD'";
+    } elseif ($category === 'quarterly_subarep') {
+        $whereSql = "WHERE dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL) AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+    } elseif ($category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
+        $whereSql = "WHERE dept != 'PMD' AND info IN ('Under Warehouse', 'HUB') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+    } elseif ($category === 'quarterly' || $category === 'quarterly_outlet') {
+        $whereSql = "WHERE dept != 'PMD' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+    } else {
+        $whereSql = "WHERE dept != 'PMD'";
+    }
+
+    $siteStmt = $db->query("
+        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
         FROM site_regional
-        WHERE category = :category
+        $whereSql
         ORDER BY regional ASC, dept ASC, sub_dept ASC, sitecode ASC, id ASC
-    ');
-    $siteStmt->execute([':category' => $category]);
+    ");
     $sites = $siteStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Fetch Reconciliation records for this year
-    // Extracts profile, period_month, period_year, total_physic_pct
-    $recStmt = $db->prepare('
+    // Preload monthly effective types from site_group_history for each site across 12 months
+    $baseTypes = [];
+    foreach ($sites as $s) {
+        $sc = strtoupper(trim($s['sitecode'] ?? ''));
+        $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+    }
+
+    $histStmt = $db->prepare("
+        SELECT DISTINCT ON (sitecode) sitecode, group_type
+        FROM site_group_history
+        WHERE effective_year < :y OR (effective_year = :y AND effective_month <= :m)
+        ORDER BY sitecode, effective_year DESC, effective_month DESC
+    ");
+
+    $monthlyEffMap = [];
+    for ($m = 1; $m <= 12; $m++) {
+        $monthlyEffMap[$m] = $baseTypes;
+        $histStmt->execute([':y' => $year, ':m' => $m]);
+        foreach ($histStmt->fetchAll(PDO::FETCH_ASSOC) as $hr) {
+            $sc = strtoupper(trim($hr['sitecode']));
+            if (isset($monthlyEffMap[$m][$sc])) {
+                $monthlyEffMap[$m][$sc] = $hr['group_type'];
+            }
+        }
+    }
+
+    // 2. Fetch ALL Reconciliation records for this year
+    // Do not restrict by profile regex so historical Jan-Mar monthly records remain preserved
+    $isQuarterlyCat = in_array($category, ['quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub'], true);
+    $recStmt = $db->prepare("
         SELECT 
             id,
             profile,
@@ -226,13 +341,11 @@ try {
         FROM asset_reconciliation
         WHERE period_year = :year
         ORDER BY period_month ASC, id ASC
-    ');
+    ");
     $recStmt->execute([':year' => $year]);
     $recRows = $recStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 3. Build index of reconciliation data by sitecode and month
-    // We parse sitecode candidates from profile (typically formatted as "SO ... - SITECODE - NAME ...")
-    // and also store full profile strings for regex/substring fallback.
     $recByCodeAndMonth = [];
     $recByMonthList = [];
 
@@ -240,10 +353,12 @@ try {
         $m = (int)$r['period_month'];
         $profile = trim($r['profile'] ?? '');
         $pct = (float)$r['total_physic_pct'];
+        $isQ = (bool)preg_match('/\bQ[1-4]\b/i', $profile);
 
         $recByMonthList[$m][] = [
             'profile' => $profile,
             'pct'     => $pct,
+            'is_q'    => $isQ,
             'actual'  => (int)$r['total_physic_actual'],
             'target'  => (int)$r['total_physic_target'],
         ];
@@ -252,8 +367,16 @@ try {
         $parts = explode('-', $profile);
         foreach ($parts as $p) {
             $token = strtoupper(trim($p));
-            if ($token !== '' && !isset($recByCodeAndMonth[$token][$m])) {
-                $recByCodeAndMonth[$token][$m] = $pct;
+            if ($token !== '') {
+                if ($isQ && !isset($recByCodeAndMonth[$token][$m]['q'])) {
+                    $recByCodeAndMonth[$token][$m]['q'] = $pct;
+                }
+                if (!$isQ && !isset($recByCodeAndMonth[$token][$m]['m'])) {
+                    $recByCodeAndMonth[$token][$m]['m'] = $pct;
+                }
+                if (!isset($recByCodeAndMonth[$token][$m]['any'])) {
+                    $recByCodeAndMonth[$token][$m]['any'] = $pct;
+                }
             }
         }
     }
@@ -269,13 +392,39 @@ try {
         $months = [];
         for ($m = 1; $m <= 12; $m++) {
             $val = null;
+            $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
 
-            if ($sitecode !== '') {
-                // Fast direct token match
+            // Determine if this month should be displayed (based on effective type of that period):
+            // - 'inactive' period: never looked up, shown as -
+            // - Quarterly view: ONLY quarter-end months (Mar/Q1, Jun/Q2, Sep/Q3, Dec/Q4),
+            //   and only if the site is effectively quarterly in that period. Periods when the
+            //   site was monthly stay on the Monthly rekap and are '-' here.
+            // - Monthly view: only periods where the site is effectively monthly. Periods after
+            //   the site switched to quarterly are '-' here and appear on the Quarterly rekap.
+            $canShow = ($eff !== 'inactive');
+            if ($canShow && $isQuarterlyCat) {
+                $canShow = in_array($m, [3, 6, 9, 12], true) && $eff === 'quarterly';
+            } elseif ($canShow && !$isQuarterlyCat) {
+                if ($eff === 'quarterly') {
+                    $canShow = false;
+                } else {
+                    $canShow = true;
+                }
+            }
+
+            if ($canShow && $sitecode !== '') {
+                // Direct token match
                 if (isset($recByCodeAndMonth[$upperCode][$m])) {
-                    $val = $recByCodeAndMonth[$upperCode][$m];
+                    $entry = $recByCodeAndMonth[$upperCode][$m];
+                    if ($isQuarterlyCat) {
+                        $val = $entry['q'] ?? $entry['any'] ?? null;
+                    } else {
+                        // On monthly view, ONLY use monthly record ('m')! Do NOT pick up quarterly profiles!
+                        $val = $entry['m'] ?? null;
+                    }
                 } elseif (!empty($recByMonthList[$m])) {
-                    // Substring match in profile (e.g. " - 0ABDKLA001 - ")
+                    // Substring match in profile (e.g. " - 0BANKLA001 - ")
+                    $matchedItem = null;
                     foreach ($recByMonthList[$m] as $item) {
                         if (
                             stripos($item['profile'], " - {$sitecode} - ") !== false ||
@@ -283,11 +432,19 @@ try {
                             stripos($item['profile'], " {$sitecode} ") !== false ||
                             stripos($item['profile'], $sitecode) !== false
                         ) {
-                            $val = $item['pct'];
-                            // Cache for next time
-                            $recByCodeAndMonth[$upperCode][$m] = $val;
-                            break;
+                            if ($isQuarterlyCat && !empty($item['is_q'])) {
+                                $matchedItem = $item;
+                                break;
+                            } elseif (!$isQuarterlyCat && empty($item['is_q'])) {
+                                $matchedItem = $item;
+                                break;
+                            } elseif ($matchedItem === null) {
+                                $matchedItem = $item;
+                            }
                         }
+                    }
+                    if ($matchedItem !== null) {
+                        $val = $matchedItem['pct'];
                     }
                 }
             }
@@ -315,7 +472,7 @@ try {
     $monthAverages = [];
     for ($m = 1; $m <= 12; $m++) {
         $cnt = $monthTotals[$m]['count'];
-        $monthAverages[$m] = $cnt > 0 ? round($monthTotals[$m]['sum'] / $cnt, 2) : null;
+        $monthAverages[$m] = $cnt > 0 ? round($monthTotals[$m]['sum'] / $cnt) : null;
     }
 
     echo json_encode([

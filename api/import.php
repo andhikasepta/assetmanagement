@@ -89,10 +89,10 @@ if (!empty($_POST['file_token'])) {
 if (!$storedPath) {
     if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
         $errorMessages = [
-            UPLOAD_ERR_INI_SIZE   => 'File exceeds server upload limit',
-            UPLOAD_ERR_FORM_SIZE  => 'File exceeds form upload limit',
-            UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded',
-            UPLOAD_ERR_NO_FILE    => 'No file was uploaded',
+            UPLOAD_ERR_INI_SIZE => 'File exceeds server upload limit',
+            UPLOAD_ERR_FORM_SIZE => 'File exceeds form upload limit',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
             UPLOAD_ERR_NO_TMP_DIR => 'Server missing temporary folder',
             UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
         ];
@@ -143,13 +143,20 @@ try {
         $raw = $targetSheet->toArray(null, true, true, true);
         for ($i = 1; $i <= min(5, count($raw)); $i++) {
             $rowText = strtolower(implode(' ', array_map('strval', $raw[$i] ?? [])));
-            if (str_contains($rowText, 'result match')) $bestReconScore += 20;
-            if (str_contains($rowText, 'result physic')) $bestReconScore += 20;
-            if (str_contains($rowText, 'result db')) $bestReconScore += 20;
-            if (str_contains($rowText, 'total')) $bestReconScore += 5;
-            if (str_contains($rowText, 'physical')) $bestReconScore += 5;
-            if (str_contains($rowText, 'nbv')) $bestReconScore += 5;
-            if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $bestReconScore += 2;
+            if (str_contains($rowText, 'result match'))
+                $bestReconScore += 20;
+            if (str_contains($rowText, 'result physic'))
+                $bestReconScore += 20;
+            if (str_contains($rowText, 'result db'))
+                $bestReconScore += 20;
+            if (str_contains($rowText, 'total'))
+                $bestReconScore += 5;
+            if (str_contains($rowText, 'physical'))
+                $bestReconScore += 5;
+            if (str_contains($rowText, 'nbv'))
+                $bestReconScore += 5;
+            if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil'))
+                $bestReconScore += 2;
         }
     } else {
         // 1. Intelligent Worksheet Selection:
@@ -164,13 +171,20 @@ try {
             $score = 0;
             for ($i = 1; $i <= min(5, count($raw)); $i++) {
                 $rowText = strtolower(implode(' ', array_map('strval', $raw[$i] ?? [])));
-                if (str_contains($rowText, 'result match')) $score += 20;
-                if (str_contains($rowText, 'result physic')) $score += 20;
-                if (str_contains($rowText, 'result db')) $score += 20;
-                if (str_contains($rowText, 'total')) $score += 5;
-                if (str_contains($rowText, 'physical')) $score += 5;
-                if (str_contains($rowText, 'nbv')) $score += 5;
-                if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil')) $score += 2;
+                if (str_contains($rowText, 'result match'))
+                    $score += 20;
+                if (str_contains($rowText, 'result physic'))
+                    $score += 20;
+                if (str_contains($rowText, 'result db'))
+                    $score += 20;
+                if (str_contains($rowText, 'total'))
+                    $score += 5;
+                if (str_contains($rowText, 'physical'))
+                    $score += 5;
+                if (str_contains($rowText, 'nbv'))
+                    $score += 5;
+                if (str_contains($rowText, 'profile') || str_contains($rowText, 'profil'))
+                    $score += 2;
             }
             if ($score > $bestReconScore) {
                 $bestReconScore = $score;
@@ -186,7 +200,8 @@ try {
     $rawRows = $targetSheet->toArray(null, true, true, true);
 
     if (count($rawRows) < 2) {
-        if (!empty($storedPath) && file_exists($storedPath)) unlink($storedPath);
+        if (!empty($storedPath) && file_exists($storedPath))
+            unlink($storedPath);
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Excel sheet is empty or has no data rows']);
         exit;
@@ -218,7 +233,7 @@ try {
         // Find where data rows start (skip header rows that contain 'profile', 'periode', 'header', etc.)
         $dataStartIndex = 0;
         for ($i = 0; $i < count($rows); $i++) {
-            $col0 = strtolower(trim((string)($rows[$i][0] ?? '')));
+            $col0 = strtolower(trim((string) ($rows[$i][0] ?? '')));
             if ($col0 !== '' && !in_array($col0, ['profile', 'profil', 'kategori', 'category', 'no', '#', 'header', 'periode', 'total'], true)) {
                 $dataStartIndex = $i;
                 break;
@@ -240,7 +255,7 @@ try {
         for ($i = 0; $i < $dataStartIndex; $i++) {
             $currentMergedVal = '';
             for ($c = 0; $c < $maxCols; $c++) {
-                $val = trim((string)($rows[$i][$c] ?? ''));
+                $val = trim((string) ($rows[$i][$c] ?? ''));
                 if ($val !== '') {
                     $currentMergedVal = $val;
                 }
@@ -265,7 +280,8 @@ try {
                 break;
             }
         }
-        if (!isset($colMap['profile'])) $colMap['profile'] = 0;
+        if (!isset($colMap['profile']))
+            $colMap['profile'] = 0;
 
         // Period Start & End
         foreach ($compositeHeaders as $c => $h) {
@@ -275,33 +291,35 @@ try {
                 $colMap['period_end'] = $c;
             }
         }
-        if (!isset($colMap['period_start'])) $colMap['period_start'] = 1;
-        if (!isset($colMap['period_end'])) $colMap['period_end'] = 2;
+        if (!isset($colMap['period_start']))
+            $colMap['period_start'] = 1;
+        if (!isset($colMap['period_end']))
+            $colMap['period_end'] = 2;
 
         // Metric fields
         $definitions = [
-            'match_physic_qty'    => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
-            'match_physic_pct'    => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && str_contains($h, '%'),
-            'match_nbv_value'     => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
-            'match_nbv_pct'       => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && str_contains($h, '%'),
+            'match_physic_qty' => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'match_physic_pct' => fn($h) => str_contains($h, 'match') && str_contains($h, 'physic') && str_contains($h, '%'),
+            'match_nbv_value' => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'match_nbv_pct' => fn($h) => str_contains($h, 'match') && str_contains($h, 'nbv') && str_contains($h, '%'),
 
-            'physic_physic_qty'   => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
-            'physic_physic_pct'   => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && str_contains($h, '%'),
-            'physic_nbv_value'    => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
-            'physic_nbv_pct'      => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && str_contains($h, '%'),
+            'physic_physic_qty' => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'physic_physic_pct' => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'physic') && str_contains($h, '%'),
+            'physic_nbv_value' => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'physic_nbv_pct' => fn($h) => (str_contains($h, 'result physic') || (str_contains($h, 'physic') && !str_contains($h, 'match') && !str_contains($h, 'db') && !str_contains($h, 'total'))) && str_contains($h, 'nbv') && str_contains($h, '%'),
 
-            'db_physic_qty'       => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
-            'db_physic_pct'       => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && str_contains($h, '%'),
-            'db_nbv_value'        => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
-            'db_nbv_pct'          => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && str_contains($h, '%'),
+            'db_physic_qty' => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && (str_contains($h, 'qty') || str_contains($h, 'jumlah')),
+            'db_physic_pct' => fn($h) => str_contains($h, 'db') && str_contains($h, 'physic') && str_contains($h, '%'),
+            'db_nbv_value' => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && (str_contains($h, 'val') || str_contains($h, 'nilai')),
+            'db_nbv_pct' => fn($h) => str_contains($h, 'db') && str_contains($h, 'nbv') && str_contains($h, '%'),
 
             'total_physic_actual' => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && (str_contains($h, 'act') || str_contains($h, 'realisasi')),
             'total_physic_target' => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && (str_contains($h, 'target') || str_contains($h, 'tgt')),
-            'total_physic_pct'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && str_contains($h, '%'),
+            'total_physic_pct' => fn($h) => str_contains($h, 'total') && str_contains($h, 'physic') && str_contains($h, '%'),
 
-            'total_nbv_actual'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'act') || str_contains($h, 'realisasi')),
-            'total_nbv_target'    => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'target') || str_contains($h, 'tgt')),
-            'total_nbv_pct'       => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && str_contains($h, '%'),
+            'total_nbv_actual' => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'act') || str_contains($h, 'realisasi')),
+            'total_nbv_target' => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && (str_contains($h, 'target') || str_contains($h, 'tgt')),
+            'total_nbv_pct' => fn($h) => str_contains($h, 'total') && str_contains($h, 'nbv') && str_contains($h, '%'),
         ];
 
         foreach ($definitions as $field => $matcher) {
@@ -313,11 +331,8 @@ try {
             }
         }
 
-        // If replace_existing is selected, clear existing reconciliation records
+        // If replace_existing is selected, clear existing reconciliation records for the selected period
         $replaceExisting = !empty($_POST['replace_existing']) && ($_POST['replace_existing'] === '1' || $_POST['replace_existing'] === 'true');
-        if ($replaceExisting) {
-            $db->exec('TRUNCATE TABLE asset_reconciliation RESTART IDENTITY');
-        }
 
         $insRecon = $db->prepare('
             INSERT INTO asset_reconciliation (
@@ -339,14 +354,15 @@ try {
             )
         ');
 
-        $cleanNum = fn($v) => (float) preg_replace('/[^0-9.\-]/', '', (string)$v);
-        $cleanInt = fn($v) => (int) preg_replace('/[^0-9\-]/', '', (string)$v);
-        $cleanDate = function($v, $default) {
-            if ($v === null || trim((string)$v) === '') return $default;
-            $v = trim((string)$v);
-            if (is_numeric($v) && (float)$v > 20000 && (float)$v < 60000) {
-                $excelTime = ((float)$v - 25569) * 86400;
-                return date('Y-m-d', (int)$excelTime);
+        $cleanNum = fn($v) => (float) preg_replace('/[^0-9.\-]/', '', (string) $v);
+        $cleanInt = fn($v) => (int) preg_replace('/[^0-9\-]/', '', (string) $v);
+        $cleanDate = function ($v, $default) {
+            if ($v === null || trim((string) $v) === '')
+                return $default;
+            $v = trim((string) $v);
+            if (is_numeric($v) && (float) $v > 20000 && (float) $v < 60000) {
+                $excelTime = ((float) $v - 25569) * 86400;
+                return date('Y-m-d', (int) $excelTime);
             }
             // Normalize Indonesian month names if present
             $vNormalized = str_ireplace(
@@ -357,9 +373,9 @@ try {
             $ts = strtotime($vNormalized);
             return $ts !== false ? date('Y-m-d', $ts) : $default;
         };
-        $cleanPct = function($v, $actual = null, $target = null) {
-            if ($v !== null && trim((string)$v) !== '') {
-                $str = trim((string)$v);
+        $cleanPct = function ($v, $actual = null, $target = null) {
+            if ($v !== null && trim((string) $v) !== '') {
+                $str = trim((string) $v);
                 if (str_contains($str, ',') && !str_contains($str, '.')) {
                     $str = str_replace(',', '.', $str);
                 }
@@ -372,8 +388,8 @@ try {
 
                 // If Excel cell was read as decimal ratio (e.g. 0.9993 for 99.93% or 1.0 for 100%)
                 // When actual and target are known, calculate exact percentage: (actual / target) * 100
-                if ($actual !== null && $target !== null && (float)$target > 0) {
-                    return round(((float)$actual / (float)$target) * 100, 2);
+                if ($actual !== null && $target !== null && (float) $target > 0) {
+                    return round(((float) $actual / (float) $target) * 100, 2);
                 }
 
                 if ($num > 0 && $num <= 1.0) {
@@ -383,8 +399,8 @@ try {
                 return round($num, 2);
             }
 
-            if ($actual !== null && $target !== null && (float)$target > 0) {
-                return round(((float)$actual / (float)$target) * 100, 2);
+            if ($actual !== null && $target !== null && (float) $target > 0) {
+                return round(((float) $actual / (float) $target) * 100, 2);
             }
 
             return 0.0;
@@ -394,76 +410,122 @@ try {
         $defaultEnd = date('Y-m-t', strtotime($defaultStart));
 
         $db->beginTransaction();
+
+        // If replace_existing is selected, clear only records for the current selected period
+        if ($replaceExisting) {
+            if ($month >= 1 && $month <= 12 && $year >= 2000 && $year <= 2100) {
+                if ($periodId > 0) {
+                    $delStmt = $db->prepare('DELETE FROM asset_reconciliation WHERE (period_month = :month AND period_year = :year) OR period_id = :period_id');
+                    $delStmt->execute([':month' => $month, ':year' => $year, ':period_id' => $periodId]);
+                } else {
+                    $delStmt = $db->prepare('DELETE FROM asset_reconciliation WHERE period_month = :month AND period_year = :year');
+                    $delStmt->execute([':month' => $month, ':year' => $year]);
+                }
+            } elseif ($periodId > 0) {
+                $delStmt = $db->prepare('DELETE FROM asset_reconciliation WHERE period_id = :period_id');
+                $delStmt->execute([':period_id' => $periodId]);
+            }
+        }
+
         $importedCount = 0;
 
         for ($i = $dataStartIndex; $i < count($rows); $i++) {
             $r = $rows[$i];
-            $profile = isset($colMap['profile'], $r[$colMap['profile']]) ? trim((string)$r[$colMap['profile']]) : '';
-            if ($profile === '') continue;
+            $profile = isset($colMap['profile'], $r[$colMap['profile']]) ? trim((string) $r[$colMap['profile']]) : '';
+            if ($profile === '')
+                continue;
 
             $recStartDate = $cleanDate(isset($colMap['period_start']) ? ($r[$colMap['period_start']] ?? '') : '', $defaultStart);
-            $recEndDate   = $cleanDate(isset($colMap['period_end']) ? ($r[$colMap['period_end']] ?? '') : '', $defaultEnd);
+            $recEndDate = $cleanDate(isset($colMap['period_end']) ? ($r[$colMap['period_end']] ?? '') : '', $defaultEnd);
 
             // Determine the record's period month & year
             $rowMonth = $month;
-            $rowYear  = $year;
+            $rowYear = $year;
             if ($rowMonth <= 0 || $rowMonth > 12) {
                 // If not provided in form, infer from period_end date (standard cut-off month)
                 $endTs = strtotime($recEndDate);
                 if ($endTs !== false) {
                     $rowMonth = (int) date('n', $endTs);
-                    $rowYear  = (int) date('Y', $endTs);
+                    $rowYear = (int) date('Y', $endTs);
                 }
             }
 
-            $matchPhysicQty  = isset($colMap['match_physic_qty']) ? $cleanInt($r[$colMap['match_physic_qty']] ?? 0) : 0;
-            $matchNbvValue   = isset($colMap['match_nbv_value']) ? $cleanNum($r[$colMap['match_nbv_value']] ?? 0) : 0;
+            $matchPhysicQty = isset($colMap['match_physic_qty']) ? $cleanInt($r[$colMap['match_physic_qty']] ?? 0) : 0;
+            $matchNbvValue = isset($colMap['match_nbv_value']) ? $cleanNum($r[$colMap['match_nbv_value']] ?? 0) : 0;
             $physicPhysicQty = isset($colMap['physic_physic_qty']) ? $cleanInt($r[$colMap['physic_physic_qty']] ?? 0) : 0;
-            $physicNbvValue  = isset($colMap['physic_nbv_value']) ? $cleanNum($r[$colMap['physic_nbv_value']] ?? 0) : 0;
-            $dbPhysicQty     = isset($colMap['db_physic_qty']) ? $cleanInt($r[$colMap['db_physic_qty']] ?? 0) : 0;
-            $dbNbvValue      = isset($colMap['db_nbv_value']) ? $cleanNum($r[$colMap['db_nbv_value']] ?? 0) : 0;
+            $physicNbvValue = isset($colMap['physic_nbv_value']) ? $cleanNum($r[$colMap['physic_nbv_value']] ?? 0) : 0;
+            $dbPhysicQty = isset($colMap['db_physic_qty']) ? $cleanInt($r[$colMap['db_physic_qty']] ?? 0) : 0;
+            $dbNbvValue = isset($colMap['db_nbv_value']) ? $cleanNum($r[$colMap['db_nbv_value']] ?? 0) : 0;
             $totPhysicActual = isset($colMap['total_physic_actual']) ? $cleanInt($r[$colMap['total_physic_actual']] ?? 0) : 0;
             $totPhysicTarget = isset($colMap['total_physic_target']) ? $cleanInt($r[$colMap['total_physic_target']] ?? 0) : 0;
-            $totNbvActual    = isset($colMap['total_nbv_actual']) ? $cleanNum($r[$colMap['total_nbv_actual']] ?? 0) : 0;
-            $totNbvTarget    = isset($colMap['total_nbv_target']) ? $cleanNum($r[$colMap['total_nbv_target']] ?? 0) : 0;
+            $totNbvActual = isset($colMap['total_nbv_actual']) ? $cleanNum($r[$colMap['total_nbv_actual']] ?? 0) : 0;
+            $totNbvTarget = isset($colMap['total_nbv_target']) ? $cleanNum($r[$colMap['total_nbv_target']] ?? 0) : 0;
 
-            $matchPhysicPct  = $cleanPct(isset($colMap['match_physic_pct']) ? ($r[$colMap['match_physic_pct']] ?? null) : null, $matchPhysicQty, $totPhysicTarget);
-            $matchNbvPct     = $cleanPct(isset($colMap['match_nbv_pct']) ? ($r[$colMap['match_nbv_pct']] ?? null) : null, $matchNbvValue, $totNbvTarget);
+            $matchPhysicPct = $cleanPct(isset($colMap['match_physic_pct']) ? ($r[$colMap['match_physic_pct']] ?? null) : null, $matchPhysicQty, $totPhysicTarget);
+            $matchNbvPct = $cleanPct(isset($colMap['match_nbv_pct']) ? ($r[$colMap['match_nbv_pct']] ?? null) : null, $matchNbvValue, $totNbvTarget);
             $physicPhysicPct = $cleanPct(isset($colMap['physic_physic_pct']) ? ($r[$colMap['physic_physic_pct']] ?? null) : null, $physicPhysicQty, $totPhysicTarget);
-            $physicNbvPct    = $cleanPct(isset($colMap['physic_nbv_pct']) ? ($r[$colMap['physic_nbv_pct']] ?? null) : null, $physicNbvValue, $totNbvTarget);
-            $dbPhysicPct     = $cleanPct(isset($colMap['db_physic_pct']) ? ($r[$colMap['db_physic_pct']] ?? null) : null, $dbPhysicQty, $totPhysicTarget);
-            $dbNbvPct        = $cleanPct(isset($colMap['db_nbv_pct']) ? ($r[$colMap['db_nbv_pct']] ?? null) : null, $dbNbvValue, $totNbvTarget);
-            $totPhysicPct    = $cleanPct(isset($colMap['total_physic_pct']) ? ($r[$colMap['total_physic_pct']] ?? null) : null, $totPhysicActual, $totPhysicTarget);
-            $totNbvPct       = $cleanPct(isset($colMap['total_nbv_pct']) ? ($r[$colMap['total_nbv_pct']] ?? null) : null, $totNbvActual, $totNbvTarget);
+            $physicNbvPct = $cleanPct(isset($colMap['physic_nbv_pct']) ? ($r[$colMap['physic_nbv_pct']] ?? null) : null, $physicNbvValue, $totNbvTarget);
+            $dbPhysicPct = $cleanPct(isset($colMap['db_physic_pct']) ? ($r[$colMap['db_physic_pct']] ?? null) : null, $dbPhysicQty, $totPhysicTarget);
+            $dbNbvPct = $cleanPct(isset($colMap['db_nbv_pct']) ? ($r[$colMap['db_nbv_pct']] ?? null) : null, $dbNbvValue, $totNbvTarget);
+            $totPhysicPct = $cleanPct(isset($colMap['total_physic_pct']) ? ($r[$colMap['total_physic_pct']] ?? null) : null, $totPhysicActual, $totPhysicTarget);
+            $totNbvPct = $cleanPct(isset($colMap['total_nbv_pct']) ? ($r[$colMap['total_nbv_pct']] ?? null) : null, $totNbvActual, $totNbvTarget);
 
             $insRecon->execute([
-                ':profile'             => $profile,
-                ':period_start'        => $recStartDate,
-                ':period_end'          => $recEndDate,
-                ':period_id'           => ($periodId > 0 ? $periodId : null),
-                ':period_month'        => ($rowMonth >= 1 && $rowMonth <= 12 ? $rowMonth : null),
-                ':period_year'         => ($rowYear >= 2000 && $rowYear <= 2100 ? $rowYear : null),
-                ':match_physic_qty'    => $matchPhysicQty,
-                ':match_physic_pct'    => $matchPhysicPct,
-                ':match_nbv_value'     => $matchNbvValue,
-                ':match_nbv_pct'       => $matchNbvPct,
-                ':physic_physic_qty'   => $physicPhysicQty,
-                ':physic_physic_pct'   => $physicPhysicPct,
-                ':physic_nbv_value'    => $physicNbvValue,
-                ':physic_nbv_pct'      => $physicNbvPct,
-                ':db_physic_qty'       => $dbPhysicQty,
-                ':db_physic_pct'       => $dbPhysicPct,
-                ':db_nbv_value'        => $dbNbvValue,
-                ':db_nbv_pct'          => $dbNbvPct,
+                ':profile' => $profile,
+                ':period_start' => $recStartDate,
+                ':period_end' => $recEndDate,
+                ':period_id' => ($periodId > 0 ? $periodId : null),
+                ':period_month' => ($rowMonth >= 1 && $rowMonth <= 12 ? $rowMonth : null),
+                ':period_year' => ($rowYear >= 2000 && $rowYear <= 2100 ? $rowYear : null),
+                ':match_physic_qty' => $matchPhysicQty,
+                ':match_physic_pct' => $matchPhysicPct,
+                ':match_nbv_value' => $matchNbvValue,
+                ':match_nbv_pct' => $matchNbvPct,
+                ':physic_physic_qty' => $physicPhysicQty,
+                ':physic_physic_pct' => $physicPhysicPct,
+                ':physic_nbv_value' => $physicNbvValue,
+                ':physic_nbv_pct' => $physicNbvPct,
+                ':db_physic_qty' => $dbPhysicQty,
+                ':db_physic_pct' => $dbPhysicPct,
+                ':db_nbv_value' => $dbNbvValue,
+                ':db_nbv_pct' => $dbNbvPct,
                 ':total_physic_actual' => $totPhysicActual,
                 ':total_physic_target' => $totPhysicTarget,
-                ':total_physic_pct'    => $totPhysicPct,
-                ':total_nbv_actual'    => $totNbvActual,
-                ':total_nbv_target'    => $totNbvTarget,
-                ':total_nbv_pct'       => $totNbvPct,
+                ':total_physic_pct' => $totPhysicPct,
+                ':total_nbv_actual' => $totNbvActual,
+                ':total_nbv_target' => $totNbvTarget,
+                ':total_nbv_pct' => $totNbvPct,
             ]);
             $importedCount++;
         }
+
+        // Dynamically record quarterly profile detected in imported period to site_group_history
+        if ($selectedMonth && $selectedYear) {
+            $db->exec("
+                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                SELECT DISTINCT sr.sitecode, 'quarterly', {$selectedYear}, {$selectedMonth}, 'Auto-detected Quarterly Profile'
+                FROM site_regional sr
+                JOIN asset_reconciliation ar ON (
+                    ar.profile ILIKE '% - ' || sr.sitecode || ' - %'
+                    OR ar.profile ILIKE '%-' || sr.sitecode || '-%'
+                    OR ar.profile ILIKE '% ' || sr.sitecode || ' %'
+                    OR ar.profile ILIKE '%' || sr.sitecode || '%'
+                )
+                WHERE ar.period_year = {$selectedYear} AND ar.period_month = {$selectedMonth}
+                  AND ar.profile ~* '\\mQ[1-4]\\M'
+                  AND sr.dept != 'PMD'
+                  AND COALESCE(sr.is_active, TRUE) = TRUE
+                  AND NOT EXISTS (
+                      SELECT 1 FROM site_group_history sgh_in 
+                      WHERE sgh_in.sitecode = sr.sitecode 
+                        AND (sgh_in.effective_year < {$selectedYear} OR (sgh_in.effective_year = {$selectedYear} AND sgh_in.effective_month <= {$selectedMonth}))
+                        AND sgh_in.group_type = 'inactive'
+                  )
+                ON CONFLICT (sitecode, effective_year, effective_month)
+                DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
+            ");
+        }
+
         $db->commit();
 
         if (file_exists($storedPath)) {
@@ -472,9 +534,9 @@ try {
 
         echo json_encode([
             'success' => true,
-            'target'  => 'summary',
+            'target' => 'summary',
             'imported_rows' => $importedCount,
-            'message' => "Successfully imported $importedCount records into Stock Opname Data with all columns mapped correctly!"
+            'message' => "Import sukses $importedCount Stock Opname Master Data"
         ]);
         exit;
     }
@@ -484,33 +546,73 @@ try {
     $headerMap = [];
     foreach ($headerRow as $idx => $val) {
         if ($val !== null) {
-            $headerMap[strtolower(trim((string)$val))] = $idx;
+            $headerMap[strtolower(trim((string) $val))] = $idx;
         }
     }
 
     $colMap = [
-        'asset number' => 'asset_number', 'asset_number' => 'asset_number', 'no asset' => 'asset_number',
-        'no. asset' => 'asset_number', 'no aset' => 'asset_number', 'no. aset' => 'asset_number',
-        'nomor asset' => 'asset_number', 'nomor aset' => 'asset_number', 'kode asset' => 'asset_number',
-        'kode aset' => 'asset_number', 'barcode' => 'asset_number', 'tag' => 'asset_number', 'tag number' => 'asset_number',
-        'asset id' => 'asset_number', 'id aset' => 'asset_number',
+        'asset number' => 'asset_number',
+        'asset_number' => 'asset_number',
+        'no asset' => 'asset_number',
+        'no. asset' => 'asset_number',
+        'no aset' => 'asset_number',
+        'no. aset' => 'asset_number',
+        'nomor asset' => 'asset_number',
+        'nomor aset' => 'asset_number',
+        'kode asset' => 'asset_number',
+        'kode aset' => 'asset_number',
+        'barcode' => 'asset_number',
+        'tag' => 'asset_number',
+        'tag number' => 'asset_number',
+        'asset id' => 'asset_number',
+        'id aset' => 'asset_number',
 
-        'asset name' => 'asset_name', 'asset_name' => 'asset_name', 'nama asset' => 'asset_name',
-        'nama aset' => 'asset_name', 'nama barang' => 'asset_name', 'item name' => 'asset_name',
-        'name' => 'asset_name', 'deskripsi aset' => 'asset_name',
+        'asset name' => 'asset_name',
+        'asset_name' => 'asset_name',
+        'nama asset' => 'asset_name',
+        'nama aset' => 'asset_name',
+        'nama barang' => 'asset_name',
+        'item name' => 'asset_name',
+        'name' => 'asset_name',
+        'deskripsi aset' => 'asset_name',
 
-        'category' => 'category', 'kategori' => 'category', 'kelompok aset' => 'category', 'golongan' => 'category',
-        'location' => 'location', 'lokasi' => 'location', 'ruang' => 'location', 'ruangan' => 'location',
-        'gedung' => 'location', 'departemen' => 'location', 'unit' => 'location',
+        'category' => 'category',
+        'kategori' => 'category',
+        'kelompok aset' => 'category',
+        'golongan' => 'category',
+        'location' => 'location',
+        'lokasi' => 'location',
+        'ruang' => 'location',
+        'ruangan' => 'location',
+        'gedung' => 'location',
+        'departemen' => 'location',
+        'unit' => 'location',
 
-        'condition' => 'condition', 'kondisi' => 'condition', 'status' => 'condition', 'keadaan' => 'condition',
-        'acquisition date' => 'acquisition_date', 'acquisition_date' => 'acquisition_date',
-        'tanggal perolehan' => 'acquisition_date', 'tgl perolehan' => 'acquisition_date', 'tgl beli' => 'acquisition_date',
-        'acquisition value' => 'acquisition_value', 'acquisition_value' => 'acquisition_value',
-        'nilai perolehan' => 'acquisition_value', 'harga perolehan' => 'acquisition_value', 'harga' => 'acquisition_value',
-        'book value' => 'book_value', 'book_value' => 'book_value', 'nilai buku' => 'book_value', 'nbv' => 'book_value',
-        'useful life' => 'useful_life', 'useful_life' => 'useful_life', 'masa manfaat' => 'useful_life',
-        'description' => 'description', 'deskripsi' => 'description', 'keterangan' => 'description', 'catatan' => 'description',
+        'condition' => 'condition',
+        'kondisi' => 'condition',
+        'status' => 'condition',
+        'keadaan' => 'condition',
+        'acquisition date' => 'acquisition_date',
+        'acquisition_date' => 'acquisition_date',
+        'tanggal perolehan' => 'acquisition_date',
+        'tgl perolehan' => 'acquisition_date',
+        'tgl beli' => 'acquisition_date',
+        'acquisition value' => 'acquisition_value',
+        'acquisition_value' => 'acquisition_value',
+        'nilai perolehan' => 'acquisition_value',
+        'harga perolehan' => 'acquisition_value',
+        'harga' => 'acquisition_value',
+        'book value' => 'book_value',
+        'book_value' => 'book_value',
+        'nilai buku' => 'book_value',
+        'nbv' => 'book_value',
+        'useful life' => 'useful_life',
+        'useful_life' => 'useful_life',
+        'masa manfaat' => 'useful_life',
+        'description' => 'description',
+        'deskripsi' => 'description',
+        'keterangan' => 'description',
+        'catatan' => 'description',
     ];
 
     $resolved = [];
@@ -520,8 +622,10 @@ try {
         }
     }
 
-    if (!isset($resolved['asset_number'])) $resolved['asset_number'] = 0;
-    if (!isset($resolved['asset_name']))   $resolved['asset_name'] = 1;
+    if (!isset($resolved['asset_number']))
+        $resolved['asset_number'] = 0;
+    if (!isset($resolved['asset_name']))
+        $resolved['asset_name'] = 1;
 
     $insAsset = $db->prepare('
         INSERT INTO master_assets 
@@ -533,31 +637,40 @@ try {
     ');
 
     $db->beginTransaction();
+
+    // If replace_existing is selected, clear only master assets for the current selected period
+    if ($replaceExisting && $periodId > 0) {
+        $delAsset = $db->prepare('DELETE FROM master_assets WHERE period_id = :period_id');
+        $delAsset->execute([':period_id' => $periodId]);
+    }
+
     $importedCount = 0;
 
     foreach ($rows as $r) {
-        $nonEmpty = array_filter($r, fn($v) => $v !== null && trim((string)$v) !== '');
-        if (empty($nonEmpty)) continue;
+        $nonEmpty = array_filter($r, fn($v) => $v !== null && trim((string) $v) !== '');
+        if (empty($nonEmpty))
+            continue;
 
-        $assetNo = isset($resolved['asset_number'], $r[$resolved['asset_number']]) ? trim((string)$r[$resolved['asset_number']]) : '';
-        $assetName = isset($resolved['asset_name'], $r[$resolved['asset_name']]) ? trim((string)$r[$resolved['asset_name']]) : '';
-        if ($assetNo === '' && $assetName === '') continue;
+        $assetNo = isset($resolved['asset_number'], $r[$resolved['asset_number']]) ? trim((string) $r[$resolved['asset_number']]) : '';
+        $assetName = isset($resolved['asset_name'], $r[$resolved['asset_name']]) ? trim((string) $r[$resolved['asset_name']]) : '';
+        if ($assetNo === '' && $assetName === '')
+            continue;
 
-        $acqVal = isset($resolved['acquisition_value'], $r[$resolved['acquisition_value']]) ? (float) preg_replace('/[^0-9.\-]/', '', (string)$r[$resolved['acquisition_value']]) : 0;
-        $bookVal = isset($resolved['book_value'], $r[$resolved['book_value']]) ? (float) preg_replace('/[^0-9.\-]/', '', (string)$r[$resolved['book_value']]) : 0;
+        $acqVal = isset($resolved['acquisition_value'], $r[$resolved['acquisition_value']]) ? (float) preg_replace('/[^0-9.\-]/', '', (string) $r[$resolved['acquisition_value']]) : 0;
+        $bookVal = isset($resolved['book_value'], $r[$resolved['book_value']]) ? (float) preg_replace('/[^0-9.\-]/', '', (string) $r[$resolved['book_value']]) : 0;
 
         $insAsset->execute([
-            ':period_id'         => $periodId,
-            ':asset_number'      => $assetNo ?: '-',
-            ':asset_name'        => $assetName ?: '-',
-            ':category'          => isset($resolved['category'], $r[$resolved['category']]) ? trim((string)$r[$resolved['category']]) : '-',
-            ':location'          => isset($resolved['location'], $r[$resolved['location']]) ? trim((string)$r[$resolved['location']]) : '-',
-            ':condition'         => isset($resolved['condition'], $r[$resolved['condition']]) ? trim((string)$r[$resolved['condition']]) : 'Good',
-            ':acquisition_date'  => null,
+            ':period_id' => $periodId,
+            ':asset_number' => $assetNo ?: '-',
+            ':asset_name' => $assetName ?: '-',
+            ':category' => isset($resolved['category'], $r[$resolved['category']]) ? trim((string) $r[$resolved['category']]) : '-',
+            ':location' => isset($resolved['location'], $r[$resolved['location']]) ? trim((string) $r[$resolved['location']]) : '-',
+            ':condition' => isset($resolved['condition'], $r[$resolved['condition']]) ? trim((string) $r[$resolved['condition']]) : 'Good',
+            ':acquisition_date' => null,
             ':acquisition_value' => $acqVal,
-            ':book_value'        => $bookVal,
-            ':useful_life'       => null,
-            ':description'       => isset($resolved['description'], $r[$resolved['description']]) ? trim((string)$r[$resolved['description']]) : '',
+            ':book_value' => $bookVal,
+            ':useful_life' => null,
+            ':description' => isset($resolved['description'], $r[$resolved['description']]) ? trim((string) $r[$resolved['description']]) : '',
         ]);
         $importedCount++;
     }
@@ -565,7 +678,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'target'  => 'master',
+        'target' => 'master',
         'imported_rows' => $importedCount,
         'message' => "Successfully imported $importedCount assets into Master Data!"
     ]);
