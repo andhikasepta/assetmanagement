@@ -27,7 +27,7 @@ try {
     $db = getDbConnection();
 
     $action = trim($_GET['action'] ?? '');
-    $year = (int)($_GET['year'] ?? 2026);
+    $year = (int) ($_GET['year'] ?? 2026);
     if ($year < 2000 || $year > 2100) {
         $year = 2026;
     }
@@ -89,15 +89,15 @@ try {
         $recByCodeAndMonth = [];
         $recByMonthList = [];
         foreach ($recRows as $r) {
-            $m = (int)$r['period_month'];
+            $m = (int) $r['period_month'];
             $profile = trim($r['profile'] ?? '');
-            $pct = (float)$r['total_physic_pct'];
-            $isQ = (bool)preg_match('/\bQ[1-4]\b/i', $profile);
+            $pct = (float) $r['total_physic_pct'];
+            $isQ = (bool) preg_match('/\bQ[1-4]\b/i', $profile);
 
             $recByMonthList[$m][] = [
                 'profile' => $profile,
-                'pct'     => $pct,
-                'is_q'    => $isQ,
+                'pct' => $pct,
+                'is_q' => $isQ,
             ];
 
             $parts = explode('-', $profile);
@@ -142,7 +142,7 @@ try {
                 } else {
                     if (!isset($subDeptBuckets[$subDept])) {
                         $subDeptBuckets[$subDept] = [
-                            'dept'   => $dept,
+                            'dept' => $dept,
                             'months' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
                         ];
                     }
@@ -151,12 +151,15 @@ try {
 
             for ($m = 1; $m <= 12; $m++) {
                 $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
-                if ($eff === 'inactive' || empty($s['is_active']) || empty($s['is_counted'])) continue;
+                if ($eff === 'inactive' || empty($s['is_active']) || empty($s['is_counted']))
+                    continue;
                 $isPmd = ($dept === 'PMD' || $cat === 'monthly_pmd');
                 if ($soType === 'quarterly') {
-                    if ($isPmd || $eff !== 'quarterly') continue;
+                    if ($isPmd || $eff !== 'quarterly')
+                        continue;
                 } else {
-                    if (!$isPmd && $eff !== 'monthly') continue;
+                    if (!$isPmd && $eff !== 'monthly')
+                        continue;
                 }
 
                 $val = null;
@@ -217,7 +220,7 @@ try {
             }
         }
 
-        $toSeries = function($buckets) use ($soType) {
+        $toSeries = function ($buckets) use ($soType) {
             $res = [];
             if ($soType === 'quarterly') {
                 $quarters = [3, 6, 9, 12];
@@ -244,7 +247,7 @@ try {
         $subDeptSeries = [];
         foreach ($subDeptBuckets as $subKey => $data) {
             $subDeptSeries[$subKey] = [
-                'dept'   => $data['dept'],
+                'dept' => $data['dept'],
                 'values' => $toSeries($data['months']),
             ];
         }
@@ -267,13 +270,13 @@ try {
         }
 
         echo json_encode([
-            'success'            => true,
-            'year'               => $year,
-            'so_type'            => $soType,
-            'months'             => ($soType === 'quarterly') ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-            'dept_trends'        => $deptSeries,
-            'national_trend'     => $nationalSeries,
-            'subdept_trends'     => $subDeptSeries,
+            'success' => true,
+            'year' => $year,
+            'so_type' => $soType,
+            'months' => ($soType === 'quarterly') ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            'dept_trends' => $deptSeries,
+            'national_trend' => $nationalSeries,
+            'subdept_trends' => $subDeptSeries,
             'pmd_subdept_trends' => $pmdSubDeptSeries,
         ]);
         exit;
@@ -358,17 +361,17 @@ try {
     $recByMonthList = [];
 
     foreach ($recRows as $r) {
-        $m = (int)$r['period_month'];
+        $m = (int) $r['period_month'];
         $profile = trim($r['profile'] ?? '');
-        $pct = (float)$r['total_physic_pct'];
-        $isQ = (bool)preg_match('/\bQ[1-4]\b/i', $profile);
+        $pct = (float) $r['total_physic_pct'];
+        $isQ = (bool) preg_match('/\bQ[1-4]\b/i', $profile);
 
         $recByMonthList[$m][] = [
             'profile' => $profile,
-            'pct'     => $pct,
-            'is_q'    => $isQ,
-            'actual'  => (int)$r['total_physic_actual'],
-            'target'  => (int)$r['total_physic_target'],
+            'pct' => $pct,
+            'is_q' => $isQ,
+            'actual' => (int) $r['total_physic_actual'],
+            'target' => (int) $r['total_physic_target'],
         ];
 
         // Extract hyphen-separated tokens
@@ -466,13 +469,13 @@ try {
         }
 
         $rekapData[] = [
-            'id'        => (int)$s['id'],
-            'regional'  => $s['regional'] ?? '',
-            'dept'      => $s['dept'] ?? '',
-            'sub_dept'  => $s['sub_dept'] ?? '',
-            'sitecode'  => $sitecode,
+            'id' => (int) $s['id'],
+            'regional' => $s['regional'] ?? '',
+            'dept' => $s['dept'] ?? '',
+            'sub_dept' => $s['sub_dept'] ?? '',
+            'sitecode' => $sitecode,
             'name_site' => $s['name_site'] ?? '',
-            'months'    => $months,
+            'months' => $months,
         ];
     }
 
@@ -484,12 +487,12 @@ try {
     }
 
     echo json_encode([
-        'success'        => true,
-        'year'           => $year,
-        'category'       => $category,
-        'total_sites'    => count($rekapData),
+        'success' => true,
+        'year' => $year,
+        'category' => $category,
+        'total_sites' => count($rekapData),
         'month_averages' => $monthAverages,
-        'data'           => $rekapData,
+        'data' => $rekapData,
     ]);
 
 } catch (Throwable $e) {

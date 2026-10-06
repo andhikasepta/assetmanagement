@@ -435,7 +435,7 @@ $currentYear = (int) date('Y');
                                         <th class="text-center align-middle" style="width: 125px;">RATING</th>
                                         <th class="text-center align-middle" style="width: 175px;">RANGE (%)</th>
                                         <th class="text-center align-middle" style="width: 90px;">DESIMAL</th>
-                                        <th class="text-center align-middle">MATCH RULE</th>
+                                        <th class="text-center align-middle">Indikator</th>
                                     </tr>
                                 </thead>
                                 <tbody id="kpi-config-tbody">
@@ -1423,9 +1423,9 @@ $currentYear = (int) date('Y');
                                 12 => 'Desember'
                             ];
                             foreach ($monthList as $num => $name): ?>
-                                    <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
-                                        <?= $name ?>
-                                    </option>
+                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                    <?= $name ?>
+                                </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1433,9 +1433,9 @@ $currentYear = (int) date('Y');
                         <label class="form-label" for="import-year">Periode Tahun</label>
                         <select id="import-year" class="form-control">
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
-                                    <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
-                                        <?= $y ?>
-                                    </option>
+                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                    <?= $y ?>
+                                </option>
                             <?php endfor; ?>
                         </select>
                     </div>
@@ -1517,9 +1517,9 @@ $currentYear = (int) date('Y');
                         <select id="bulk-delete-month" class="form-control">
                             <option value="">Semua Bulan pada Tahun Terpilih</option>
                             <?php foreach ($monthList as $num => $name): ?>
-                                    <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
-                                        <?= $name ?>
-                                    </option>
+                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                    <?= $name ?>
+                                </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1527,9 +1527,9 @@ $currentYear = (int) date('Y');
                         <label class="form-label" for="bulk-delete-year">Periode Tahun</label>
                         <select id="bulk-delete-year" class="form-control">
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
-                                    <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
-                                        <?= $y ?>
-                                    </option>
+                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                    <?= $y ?>
+                                </option>
                             <?php endfor; ?>
                         </select>
                     </div>

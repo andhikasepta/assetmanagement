@@ -2840,8 +2840,8 @@ const App = (() => {
             html += `
                 <tr>
                     <td style="text-align: center; font-weight: 600; color: #64748b; padding: 8px 10px;">${idx + 1}</td>
-                    <td style="text-align: center; white-space: nowrap; padding: 8px 10px;">
-                        <span class="badge-sitecode" style="font-weight: 700;">${escapeHtml(m.sitecode)}</span>
+                    <td style="text-align: center; white-space: nowrap; padding: 8px 10px; font-weight: 600; color: #1e293b;">
+                        ${escapeHtml(m.sitecode)}
                     </td>
                     <td style="font-weight: 600; color: #1e293b; padding: 8px 10px; min-width: 170px;">
                         ${escapeHtml(m.name_site || '-')}
@@ -3136,7 +3136,7 @@ const App = (() => {
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
-                    <td class="scorecard-col-sitecode"><span class="badge-sitecode">${escapeHtml(r.sitecode)}</span></td>
+                    <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
                     <td class="scorecard-col-month">${formatPercent(r.m1_pct)}</td>
                     <td class="scorecard-col-month">${formatPercent(r.m2_pct)}</td>
@@ -3187,7 +3187,7 @@ const App = (() => {
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
-                    <td class="scorecard-col-sitecode"><span class="badge-sitecode">${escapeHtml(e.sitecode)}</span></td>
+                    <td class="scorecard-col-sitecode">${escapeHtml(e.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(e.name_site || '-')}">${escapeHtml(e.name_site || '-')}</td>
                     <td class="scorecard-col-month" title="${escapeHtml(e.m1_status || '-')}">${formatPercent(e.m1_pct)}</td>
                     <td class="scorecard-col-month" title="${escapeHtml(e.m2_status || '-')}">${formatPercent(e.m2_pct)}</td>
@@ -4526,7 +4526,7 @@ const App = (() => {
                     <td class="text-left" style="font-weight: 500;">${escapeHtml(row.regional)}</td>
                     <td class="text-left">${escapeHtml(row.dept)}</td>
                     <td class="text-left">${escapeHtml(row.sub_dept)}</td>
-                    <td class="text-center"><span class="badge-sitecode">${escapeHtml(row.sitecode)}</span></td>
+                    <td class="text-center font-monospace">${escapeHtml(row.sitecode)}</td>
                     <td class="text-left" style="font-weight: 500;">${escapeHtml(row.name_site)}</td>
                     ${monthCells}
                 </tr>
