@@ -126,7 +126,7 @@ const App = (() => {
         // Clean legacy localStorage to prevent stale storage hijacking default landing page
         try {
             localStorage.removeItem('active_page');
-        } catch (e) {}
+        } catch (e) { }
 
         // Restore active page: default remains now condition page ('master-data')
         const rawHash = (window.location.hash || '').replace('#', '').trim();
@@ -231,6 +231,7 @@ const App = (() => {
         if (page === 'master-data') {
             loadMasterData();
             loadSiteRegional();
+            loadScorecardKpi();
         } else if (page === 'summary') {
             switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
         }
@@ -745,7 +746,7 @@ const App = (() => {
         if (totalItems === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
                         ${allSRRows.length === 0 ? "Tidak ada data Site Regional." : "Data tidak ditemukan."}
                     </td>
                 </tr>
@@ -772,6 +773,7 @@ const App = (() => {
             const currentGt = row.group_type || 'monthly';
             const histCount = row.history_count || 0;
             const isActive = row.is_active !== false && row.is_active !== 0 && row.is_active !== '0';
+            const isCounted = row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0';
             html += `
                 <tr class="${isChecked ? 'row-selected' : ''}">
                     <td class="text-center col-action-select">
@@ -789,11 +791,19 @@ const App = (() => {
                             title="${isActive ? 'Aktif' : 'Nonaktif'}"
                             style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
                     </td>
+                    <td class="text-center col-action-counted" style="padding: 4px;">
+                        <input type="checkbox" class="sr-counted-checkbox" id="sr-counted-${row.id}"
+                            ${isActive && isCounted ? 'checked' : ''}
+                            ${!isActive ? 'disabled' : ''}
+                            onchange="App.toggleSRCounted(${row.id}, this.checked, this)"
+                            title="${!isActive ? 'Site harus aktif terlebih dahulu' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik')}"
+                            style="cursor: ${!isActive ? 'not-allowed' : 'pointer'}; width: 16px; height: 16px; accent-color: #16a34a; opacity: ${!isActive ? '0.45' : '1'};">
+                    </td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.regional || '')}</td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.dept || '')}</td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.sub_dept || '')}</td>
                     <td class="text-center" style="white-space: nowrap;">
-                        <span class="badge-sitecode">${escapeHtml(row.sitecode || '')}</span>
+                        ${escapeHtml(row.sitecode || '')}
                     </td>
                     <td class="text-left" style="min-width: 180px;">${escapeHtml(row.name_site || '')}</td>
                     <td class="text-center" style="white-space: nowrap;">
@@ -1081,6 +1091,18 @@ const App = (() => {
                 const row = allSRRows.find(r => r.id == id);
                 if (row) row.is_active = isActive;
                 if (checkboxEl) checkboxEl.title = isActive ? 'Aktif' : 'Nonaktif';
+
+                // Update Count checkbox state for this row
+                const countCb = document.getElementById(`sr-counted-${id}`) || checkboxEl?.closest('tr')?.querySelector('.sr-counted-checkbox');
+                if (countCb) {
+                    countCb.disabled = !isActive;
+                    countCb.style.cursor = !isActive ? 'not-allowed' : 'pointer';
+                    countCb.style.opacity = !isActive ? '0.45' : '1';
+                    const isCounted = row ? (row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0') : countCb.checked;
+                    countCb.checked = isActive && isCounted;
+                    countCb.title = !isActive ? 'Site harus aktif terlebih dahulu' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik');
+                }
+
                 showToast('success', 'Status Diperbarui', `Status site diatur menjadi ${isActive ? 'Aktif' : 'Nonaktif'}`);
                 if (typeof loadSummaryData === 'function') loadSummaryData();
                 if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
@@ -1090,6 +1112,36 @@ const App = (() => {
             }
         } catch (err) {
             if (checkboxEl) checkboxEl.checked = !isActive;
+            showToast('error', 'Kesalahan Jaringan', err.message);
+        }
+    }
+
+    async function toggleSRCounted(id, isCounted, checkboxEl) {
+        try {
+            const res = await fetch('api/site_regional.php?action=update_counted', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ id: id, is_counted: isCounted })
+            });
+            const json = await res.json();
+            if (json.success) {
+                const row = allSRRows.find(r => r.id == id);
+                if (row) row.is_counted = isCounted;
+                if (checkboxEl) {
+                    checkboxEl.title = isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik';
+                }
+                showToast('success', 'Status Hitung Diperbarui', `Site ${isCounted ? 'dihitung' : 'tidak dihitung'} dalam ringkasan & grafik`);
+                if (typeof loadSummaryData === 'function') loadSummaryData();
+                if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
+            } else {
+                if (checkboxEl) checkboxEl.checked = !isCounted;
+                showToast('error', 'Gagal Memperbarui', json.message || 'Gagal memperbarui status hitung');
+            }
+        } catch (err) {
+            if (checkboxEl) checkboxEl.checked = !isCounted;
             showToast('error', 'Kesalahan Jaringan', err.message);
         }
     }
@@ -1495,6 +1547,556 @@ const App = (() => {
         }
     }
 
+    // ── Score Card KPI Master Data ───────────────────────────────
+
+    let scorecardKpiData = [];
+    let isEditingScorecardKpi = false;
+    let scorecardExecKpiData = [];
+    let isEditingScorecardExecKpi = false;
+
+    async function loadScorecardKpi() {
+        const tbodyRating = document.getElementById('kpi-config-tbody');
+        const tbodyExec = document.getElementById('kpi-exec-config-tbody');
+        if (!tbodyRating && !tbodyExec) return;
+
+        try {
+            const res = await fetch('api/scorecard_kpi.php');
+            const json = await res.json();
+            if (json.success) {
+                scorecardKpiData = json.rating || json.data || [];
+                scorecardExecKpiData = json.execution || [];
+                renderScorecardKpiTable();
+                renderScorecardExecKpiTable();
+            } else {
+                if (tbodyRating) tbodyRating.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 1.5rem; color: #dc2626;">Gagal memuat konfigurasi KPI: ${escapeHtml(json.message || 'Data tidak tersedia')}</td></tr>`;
+                if (tbodyExec) tbodyExec.innerHTML = `<tr><td colspan="3" class="text-center" style="padding: 1.5rem; color: #dc2626;">Gagal memuat konfigurasi KPI.</td></tr>`;
+            }
+        } catch (err) {
+            if (tbodyRating) tbodyRating.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 1.5rem; color: #dc2626;">Kesalahan server saat memuat KPI.</td></tr>`;
+            if (tbodyExec) tbodyExec.innerHTML = `<tr><td colspan="3" class="text-center" style="padding: 1.5rem; color: #dc2626;">Kesalahan server saat memuat KPI.</td></tr>`;
+        }
+    }
+
+    function renderScorecardKpiTable() {
+        const tbody = document.getElementById('kpi-config-tbody');
+        if (!tbody) return;
+
+        if (!scorecardKpiData || scorecardKpiData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 1.5rem; color: #64748b;">Belum ada data konfigurasi KPI.</td></tr>`;
+            return;
+        }
+
+        const editBtn = document.getElementById('kpi-edit-btn');
+        const resetBtn = document.getElementById('kpi-reset-btn');
+        const saveBtn = document.getElementById('kpi-save-btn');
+
+        if (editBtn) {
+            editBtn.textContent = isEditingScorecardKpi ? 'Batal' : 'Edit Range (%)';
+            editBtn.className = isEditingScorecardKpi ? 'btn btn-secondary' : 'btn btn-primary';
+        }
+        if (resetBtn) resetBtn.style.display = isEditingScorecardKpi ? 'inline-flex' : 'none';
+        if (saveBtn) saveBtn.style.display = isEditingScorecardKpi ? 'inline-flex' : 'none';
+
+        const badgeClassMap = {
+            'very_poor': 'badge-rating-vp',
+            'poor': 'badge-rating-p',
+            'moderate': 'badge-rating-m',
+            'good': 'badge-rating-g',
+            'very_good': 'badge-rating-vg'
+        };
+
+        let html = '';
+
+        scorecardKpiData.forEach(item => {
+            const key = item.rating_key;
+            const badgeClass = badgeClassMap[key] || 'badge-rating-vp';
+            const label = escapeHtml(item.rating_label);
+
+            if (!isEditingScorecardKpi) {
+                // View Mode
+                const formula = escapeHtml(item.formula_text || '-');
+                const threshold = item.threshold_decimal !== null ? item.threshold_decimal.toFixed(2) : '-';
+                const matchRule = escapeHtml(item.match_label || '-');
+
+                html += `
+                    <tr>
+                        <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                            ${label}
+                        </td>
+                        <td class="text-center" style="font-weight: 600; color: #0f172a; font-family: monospace; font-size: 13px;">
+                            ${formula}
+                        </td>
+                        <td class="text-center" style="font-weight: 600; color: #334155;">
+                            ${threshold}
+                        </td>
+                        <td style="color: #334155; font-weight: 500;">
+                            ${matchRule}
+                        </td>
+                    </tr>
+                `;
+            } else {
+                // Edit Mode
+                let formulaInputs = '';
+                let decInput = '';
+
+                if (key === 'very_poor') {
+                    const maxVal = item.max_pct !== null ? item.max_pct : 34;
+                    const decVal = (maxVal / 100).toFixed(2);
+                    formulaInputs = `
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span style="font-weight: 700; color: #64748b;">&lt;</span>
+                            <input type="number" id="kpi-input-max-${key}" class="kpi-num-input" value="${maxVal}" min="0" max="100"
+                                oninput="App.onKpiInputChange('${key}')">
+                            <span style="font-weight: 600; color: #64748b;">%</span>
+                        </div>
+                    `;
+                    decInput = `<input type="number" step="0.01" id="kpi-input-dec-${key}" class="kpi-num-input" value="${decVal}" readonly>`;
+                } else if (key === 'very_good') {
+                    const minVal = item.min_pct !== null ? item.min_pct : 85;
+                    const displayThreshold = minVal > 0 ? (minVal - 1) : 84;
+                    formulaInputs = `
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span style="font-weight: 700; color: #64748b;">&gt;</span>
+                            <input type="number" id="kpi-input-min-${key}" class="kpi-num-input" value="${displayThreshold}" min="0" max="100"
+                                oninput="App.onKpiInputChange('${key}')">
+                            <span style="font-weight: 600; color: #64748b;">%</span>
+                        </div>
+                    `;
+                    decInput = `<span style="color: #94a3b8; font-weight: 600;">-</span>`;
+                } else {
+                    const minVal = item.min_pct !== null ? item.min_pct : 0;
+                    const maxVal = item.max_pct !== null ? item.max_pct : 100;
+                    const decVal = (maxVal / 100).toFixed(2);
+                    formulaInputs = `
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <input type="number" id="kpi-input-min-${key}" class="kpi-num-input" value="${minVal}" min="0" max="100"
+                                oninput="App.onKpiInputChange('${key}')">
+                            <span style="font-weight: 700; color: #64748b;">&lt; x &lt;</span>
+                            <input type="number" id="kpi-input-max-${key}" class="kpi-num-input" value="${maxVal}" min="0" max="100"
+                                oninput="App.onKpiInputChange('${key}')">
+                            <span style="font-weight: 600; color: #64748b;">%</span>
+                        </div>
+                    `;
+                    decInput = `<input type="number" step="0.01" id="kpi-input-dec-${key}" class="kpi-num-input" value="${decVal}" readonly>`;
+                }
+
+                html += `
+                    <tr>
+                        <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                            ${label}
+                        </td>
+                        <td class="text-center">
+                            ${formulaInputs}
+                        </td>
+                        <td class="text-center">
+                            ${decInput}
+                        </td>
+                        <td>
+                            <input type="text" id="kpi-input-match-${key}" class="form-control form-control-sm"
+                                value="${escapeHtml(item.match_label || '')}" style="font-size: 12px; width: 100%;">
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function toggleEditScorecardKpi() {
+        isEditingScorecardKpi = !isEditingScorecardKpi;
+        renderScorecardKpiTable();
+    }
+
+    function onKpiInputChange(key) {
+        const decEl = document.getElementById(`kpi-input-dec-${key}`);
+        const matchEl = document.getElementById(`kpi-input-match-${key}`);
+
+        if (key === 'very_poor') {
+            const maxEl = document.getElementById(`kpi-input-max-${key}`);
+            const maxVal = parseFloat(maxEl ? maxEl.value : 34) || 0;
+            if (decEl) decEl.value = (maxVal / 100).toFixed(2);
+            if (matchEl) matchEl.value = `Very Poor (Match <${maxVal})`;
+
+            // Suggest poor min
+            const poorMinEl = document.getElementById('kpi-input-min-poor');
+            if (poorMinEl && parseFloat(poorMinEl.value) <= maxVal) {
+                poorMinEl.value = maxVal + 1;
+                onKpiInputChange('poor');
+            }
+        } else if (key === 'poor') {
+            const minEl = document.getElementById(`kpi-input-min-${key}`);
+            const maxEl = document.getElementById(`kpi-input-max-${key}`);
+            const minVal = parseFloat(minEl ? minEl.value : 35) || 0;
+            const maxVal = parseFloat(maxEl ? maxEl.value : 62) || 0;
+            if (decEl) decEl.value = (maxVal / 100).toFixed(2);
+            if (matchEl) matchEl.value = `Poor (Match ${minVal} -${maxVal})`;
+
+            // Suggest moderate min
+            const modMinEl = document.getElementById('kpi-input-min-moderate');
+            if (modMinEl && parseFloat(modMinEl.value) <= maxVal) {
+                modMinEl.value = maxVal + 1;
+                onKpiInputChange('moderate');
+            }
+        } else if (key === 'moderate') {
+            const minEl = document.getElementById(`kpi-input-min-${key}`);
+            const maxEl = document.getElementById(`kpi-input-max-${key}`);
+            const minVal = parseFloat(minEl ? minEl.value : 63) || 0;
+            const maxVal = parseFloat(maxEl ? maxEl.value : 71) || 0;
+            if (decEl) decEl.value = (maxVal / 100).toFixed(2);
+            if (matchEl) matchEl.value = `Moderate (Match ${minVal} - ${maxVal})`;
+
+            // Suggest good min
+            const goodMinEl = document.getElementById('kpi-input-min-good');
+            if (goodMinEl && parseFloat(goodMinEl.value) <= maxVal) {
+                goodMinEl.value = maxVal + 1;
+                onKpiInputChange('good');
+            }
+        } else if (key === 'good') {
+            const minEl = document.getElementById(`kpi-input-min-${key}`);
+            const maxEl = document.getElementById(`kpi-input-max-${key}`);
+            const minVal = parseFloat(minEl ? minEl.value : 72) || 0;
+            const maxVal = parseFloat(maxEl ? maxEl.value : 84) || 0;
+            if (decEl) decEl.value = (maxVal / 100).toFixed(2);
+            if (matchEl) matchEl.value = `Good (Match ${minVal} - ${maxVal})`;
+
+            // Suggest very good min
+            const vgMinEl = document.getElementById('kpi-input-min-very_good');
+            if (vgMinEl) {
+                vgMinEl.value = maxVal;
+                onKpiInputChange('very_good');
+            }
+        } else if (key === 'very_good') {
+            const minEl = document.getElementById(`kpi-input-min-${key}`);
+            const minVal = parseFloat(minEl ? minEl.value : 84) || 0;
+            if (matchEl) matchEl.value = `Very Good (Match >${minVal})`;
+        }
+    }
+
+    async function saveScorecardKpi() {
+        const saveBtn = document.getElementById('kpi-save-btn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Menyimpan...';
+        }
+
+        try {
+            const kpis = [];
+
+            // 1. Very Poor
+            const vpMax = parseFloat(document.getElementById('kpi-input-max-very_poor')?.value) || 34;
+            const vpMatch = document.getElementById('kpi-input-match-very_poor')?.value || `Very Poor (Match <${vpMax})`;
+            kpis.push({
+                rating_key: 'very_poor',
+                min_pct: 0,
+                max_pct: vpMax,
+                threshold_decimal: parseFloat((vpMax / 100).toFixed(2)),
+                formula_text: `<${vpMax}`,
+                match_label: vpMatch
+            });
+
+            // 2. Poor
+            const pMin = parseFloat(document.getElementById('kpi-input-min-poor')?.value) || 35;
+            const pMax = parseFloat(document.getElementById('kpi-input-max-poor')?.value) || 62;
+            const pMatch = document.getElementById('kpi-input-match-poor')?.value || `Poor (Match ${pMin} -${pMax})`;
+            kpis.push({
+                rating_key: 'poor',
+                min_pct: pMin,
+                max_pct: pMax,
+                threshold_decimal: parseFloat((pMax / 100).toFixed(2)),
+                formula_text: `${pMin}<x<${pMax}`,
+                match_label: pMatch
+            });
+
+            // 3. Moderate
+            const mMin = parseFloat(document.getElementById('kpi-input-min-moderate')?.value) || 63;
+            const mMax = parseFloat(document.getElementById('kpi-input-max-moderate')?.value) || 71;
+            const mMatch = document.getElementById('kpi-input-match-moderate')?.value || `Moderate (Match ${mMin} - ${mMax})`;
+            kpis.push({
+                rating_key: 'moderate',
+                min_pct: mMin,
+                max_pct: mMax,
+                threshold_decimal: parseFloat((mMax / 100).toFixed(2)),
+                formula_text: `${mMin}<x<${mMax}`,
+                match_label: mMatch
+            });
+
+            // 4. Good
+            const gMin = parseFloat(document.getElementById('kpi-input-min-good')?.value) || 72;
+            const gMax = parseFloat(document.getElementById('kpi-input-max-good')?.value) || 84;
+            const gMatch = document.getElementById('kpi-input-match-good')?.value || `Good (Match ${gMin} - ${gMax})`;
+            kpis.push({
+                rating_key: 'good',
+                min_pct: gMin,
+                max_pct: gMax,
+                threshold_decimal: parseFloat((gMax / 100).toFixed(2)),
+                formula_text: `${gMin}<x<${gMax}`,
+                match_label: gMatch
+            });
+
+            // 5. Very Good
+            const vgMin = parseFloat(document.getElementById('kpi-input-min-very_good')?.value) || 84;
+            const vgMatch = document.getElementById('kpi-input-match-very_good')?.value || `Very Good (Match >${vgMin})`;
+            kpis.push({
+                rating_key: 'very_good',
+                min_pct: vgMin + 1,
+                max_pct: 100,
+                threshold_decimal: null,
+                formula_text: `>${vgMin}`,
+                match_label: vgMatch
+            });
+
+            const res = await fetch('api/scorecard_kpi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'update',
+                    kpis: kpis
+                })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Tersimpan', json.message || 'Konfigurasi KPI Score Card berhasil disimpan.');
+                isEditingScorecardKpi = false;
+                await loadScorecardKpi();
+            } else {
+                showToast('error', 'Gagal Menyimpan', json.message || 'Terjadi kesalahan saat menyimpan.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan Server', 'Gagal terhubung ke server.');
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Simpan Perubahan';
+            }
+        }
+    }
+
+    async function resetScorecardKpi() {
+        if (!confirm('Kembalikan konfigurasi range KPI ke nilai default?')) return;
+
+        const resetBtn = document.getElementById('kpi-reset-btn');
+        if (resetBtn) {
+            resetBtn.disabled = true;
+            resetBtn.textContent = 'Mereset...';
+        }
+
+        try {
+            const res = await fetch('api/scorecard_kpi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ action: 'reset' })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Reset Berhasil', json.message || 'Konfigurasi KPI direset ke default.');
+                isEditingScorecardKpi = false;
+                await loadScorecardKpi();
+            } else {
+                showToast('error', 'Gagal Reset', json.message || 'Gagal mereset konfigurasi.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan Server', 'Gagal terhubung ke server.');
+        } finally {
+            if (resetBtn) {
+                resetBtn.disabled = false;
+                resetBtn.textContent = 'Reset Default';
+            }
+        }
+    }
+
+    // ── SO Execution KPI Master Data ────────────────────────────
+
+    function renderScorecardExecKpiTable() {
+        const tbody = document.getElementById('kpi-exec-config-tbody');
+        if (!tbody) return;
+
+        if (!scorecardExecKpiData || scorecardExecKpiData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center" style="padding: 1.5rem; color: #64748b;">Belum ada data konfigurasi KPI Execution.</td></tr>`;
+            return;
+        }
+
+        const editBtn = document.getElementById('kpi-exec-edit-btn');
+        const resetBtn = document.getElementById('kpi-exec-reset-btn');
+        const saveBtn = document.getElementById('kpi-exec-save-btn');
+
+        if (editBtn) {
+            editBtn.textContent = isEditingScorecardExecKpi ? 'Batal' : 'Edit Range (%)';
+            editBtn.className = isEditingScorecardExecKpi ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm';
+        }
+        if (resetBtn) resetBtn.style.display = isEditingScorecardExecKpi ? 'inline-flex' : 'none';
+        if (saveBtn) saveBtn.style.display = isEditingScorecardExecKpi ? 'inline-flex' : 'none';
+
+        const notExecItem = scorecardExecKpiData.find(i => i.rating_key === 'not_executed') || scorecardExecKpiData[0];
+        const execItem = scorecardExecKpiData.find(i => i.rating_key === 'executed') || scorecardExecKpiData[1];
+        const currentThresh = notExecItem && notExecItem.threshold_decimal !== null ? notExecItem.threshold_decimal : 0.25;
+        const currentThreshFormatted = String(currentThresh).replace('.', ',');
+
+        let html = '';
+
+        if (!isEditingScorecardExecKpi) {
+            html += `
+                <tr>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                        Not Execution
+                    </td>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a; font-family: monospace; font-size: 13px;">
+                        ${escapeHtml(notExecItem?.formula_text || `x< ${currentThreshFormatted}`)}
+                    </td>
+                    <td class="text-center" style="font-weight: 600; color: #334155;">
+                        ${currentThresh.toFixed(2)}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                        Execution
+                    </td>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a; font-family: monospace; font-size: 13px;">
+                        ${escapeHtml(execItem?.formula_text || `x>=${currentThreshFormatted}`)}
+                    </td>
+                    <td class="text-center" style="color: #94a3b8; font-weight: 600;">
+                        -
+                    </td>
+                </tr>
+            `;
+        } else {
+            html += `
+                <tr>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                        Not Execution
+                    </td>
+                    <td class="text-center">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span style="font-weight: 700; color: #64748b;">x &lt;</span>
+                            <span id="kpi-exec-formula-preview-not" style="font-weight: 700; color: #0f172a; font-family: monospace;">${currentThreshFormatted}</span>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <input type="number" step="0.01" min="0" max="1" id="kpi-exec-input-thresh" class="kpi-num-input"
+                                value="${currentThresh}" style="width: 72px;" oninput="App.onKpiExecInputChange(this.value)">
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-center" style="font-weight: 600; color: #0f172a;">
+                        Execution
+                    </td>
+                    <td class="text-center">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span style="font-weight: 700; color: #64748b;">x &gt;=</span>
+                            <span id="kpi-exec-formula-preview-done" style="font-weight: 700; color: #0f172a; font-family: monospace;">${currentThreshFormatted}</span>
+                        </div>
+                    </td>
+                    <td class="text-center" style="color: #94a3b8; font-weight: 600;">
+                        -
+                    </td>
+                </tr>
+            `;
+        }
+
+        tbody.innerHTML = html;
+    }
+
+    function toggleEditScorecardExecKpi() {
+        isEditingScorecardExecKpi = !isEditingScorecardExecKpi;
+        renderScorecardExecKpiTable();
+    }
+
+    function onKpiExecInputChange(val) {
+        const num = parseFloat(val) || 0;
+        const formatted = String(num).replace('.', ',');
+        const prevNot = document.getElementById('kpi-exec-formula-preview-not');
+        const prevDone = document.getElementById('kpi-exec-formula-preview-done');
+        if (prevNot) prevNot.textContent = formatted;
+        if (prevDone) prevDone.textContent = formatted;
+    }
+
+    async function saveScorecardExecKpi() {
+        const saveBtn = document.getElementById('kpi-exec-save-btn');
+        const input = document.getElementById('kpi-exec-input-thresh');
+        const thresh = parseFloat(input ? input.value : 0.25) || 0.25;
+
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Menyimpan...';
+        }
+
+        try {
+            const res = await fetch('api/scorecard_kpi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    action: 'update_execution',
+                    threshold_decimal: thresh
+                })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Tersimpan', json.message || 'Konfigurasi KPI Execution berhasil disimpan.');
+                isEditingScorecardExecKpi = false;
+                await loadScorecardKpi();
+            } else {
+                showToast('error', 'Gagal Menyimpan', json.message || 'Terjadi kesalahan saat menyimpan.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan Server', 'Gagal terhubung ke server.');
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Simpan';
+            }
+        }
+    }
+
+    async function resetScorecardExecKpi() {
+        if (!confirm('Kembalikan konfigurasi KPI Execution ke nilai default (0.25)?')) return;
+
+        const resetBtn = document.getElementById('kpi-exec-reset-btn');
+        if (resetBtn) {
+            resetBtn.disabled = true;
+            resetBtn.textContent = 'Mereset...';
+        }
+
+        try {
+            const res = await fetch('api/scorecard_kpi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ action: 'reset_execution' })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Reset Berhasil', json.message || 'Konfigurasi KPI Execution direset ke default.');
+                isEditingScorecardExecKpi = false;
+                await loadScorecardKpi();
+            } else {
+                showToast('error', 'Gagal Reset', json.message || 'Gagal mereset konfigurasi.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan Server', 'Gagal terhubung ke server.');
+        } finally {
+            if (resetBtn) {
+                resetBtn.disabled = false;
+                resetBtn.textContent = 'Reset Default';
+            }
+        }
+    }
 
     // ── Color Helpers for Percentage ───────────────────────────
 
@@ -1590,7 +2192,7 @@ const App = (() => {
 
         try {
             sessionStorage.setItem('summary_so_type', summarySOType);
-        } catch (e) {}
+        } catch (e) { }
 
         const btnMonthly = document.getElementById('btn-so-type-monthly');
         const btnQuarterly = document.getElementById('btn-so-type-quarterly');
@@ -1665,7 +2267,7 @@ const App = (() => {
         try {
             sessionStorage.setItem('summary_so_type', summarySOType);
             sessionStorage.setItem('summary_category', summaryCategory);
-        } catch (e) {}
+        } catch (e) { }
 
         // 1. Sync button states for Monthly Category tabs
         const btnOutlet = document.getElementById('btn-summary-cat-outlet');
@@ -1793,6 +2395,7 @@ const App = (() => {
 
         const yearSelect = document.getElementById('summary-filter-year');
         loadTrendCharts(yearSelect ? yearSelect.value : 2026);
+        loadScoreCardSummary();
     }
 
     function updateHasilSOCardUI() {
@@ -1803,7 +2406,7 @@ const App = (() => {
         const subDeptSelect = document.getElementById('subdept-result-filter');
 
         if (summaryCategory === 'pmd') {
-            if (titleEl) titleEl.textContent = 'Chart Hasil SO PMD';
+            if (titleEl) titleEl.textContent = 'Report SO PMD';
             if (subtitleEl) subtitleEl.textContent = 'Pencapaian dan Hasil Stock Opname PMD';
             if (deptFilterContainer) deptFilterContainer.style.display = 'none';
 
@@ -1816,8 +2419,8 @@ const App = (() => {
             }
         } else {
             if (titleEl) titleEl.textContent = (summarySOType === 'quarterly')
-                ? 'Chart Hasil SO Outlet Regional (Quarterly)'
-                : 'Chart Hasil SO Outlet Regional';
+                ? 'Report SO Outlet Regional (Quarterly)'
+                : 'Report SO Outlet Regional';
             if (subtitleEl) subtitleEl.textContent = (summarySOType === 'quarterly')
                 ? 'Pencapaian dan Hasil Stock Opname Outlet Regional Quarterly'
                 : 'Pencapaian dan Hasil Stock Opname Outlet Regional';
@@ -1928,7 +2531,7 @@ const App = (() => {
         try {
             if (month) sessionStorage.setItem('summary_filter_month', month);
             if (year) sessionStorage.setItem('summary_filter_year', year);
-        } catch (e) {}
+        } catch (e) { }
 
         // Update achievement card helper
         const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false) => {
@@ -2022,7 +2625,7 @@ const App = (() => {
             // Load Trend Line Graphics (DEPT, Sub DEPT, PMD Sub DEPT)
             loadTrendCharts(year);
 
-            // Load Chart Hasil SO Outlet Regional / PMD
+            // Load Report SO Outlet Regional / PMD
             loadSubDeptResults();
 
             // Reload Rekapitulasi for the selected year
@@ -2030,6 +2633,9 @@ const App = (() => {
 
             // Load Site Movement History & Comparison Logs
             loadSiteMovements(year, month);
+
+            // Update Score Card Summary period & headers (rolling 3 months back)
+            updateScoreCardPeriod(year, month);
 
         } catch (err) {
             console.error('Error loading summary totals:', err);
@@ -2153,8 +2759,13 @@ const App = (() => {
                 statInactiveDiff.innerHTML = renderDiffBadge(summary.inactive_diff, true);
             }
 
-            // 3. Render Table
-            renderMovementsTable();
+            // 3. Render Table (respect active search filter if user already typed a query)
+            const searchInput = document.getElementById('sm-search-input');
+            if (searchInput && searchInput.value.trim() !== '') {
+                filterMovementsTable();
+            } else {
+                renderMovementsTable();
+            }
 
         } catch (err) {
             console.error('Error loading site movements:', err);
@@ -2178,9 +2789,12 @@ const App = (() => {
         const curYear = document.getElementById('summary-filter-year')?.value || 2026;
         const monthSelect = document.getElementById('summary-filter-month');
         const monthText = (monthSelect && monthSelect.value) ? monthSelect.options[monthSelect.selectedIndex].text : 'Tahun Ini';
+        const hasSearch = Boolean(document.getElementById('sm-search-input')?.value?.trim());
 
         if (infoEl) {
-            infoEl.textContent = `Menampilkan ${filteredMovementsData.length} dari ${allMovementsData.length} perubahan`;
+            infoEl.textContent = hasSearch
+                ? `Menampilkan ${filteredMovementsData.length} dari ${allMovementsData.length} perubahan (difilter)`
+                : `Menampilkan ${filteredMovementsData.length} dari ${allMovementsData.length} perubahan`;
         }
 
         if (filteredMovementsData.length === 0) {
@@ -2188,9 +2802,11 @@ const App = (() => {
                 <tr>
                     <td colspan="7" style="text-align: center; padding: 2.25rem 1rem; color: #64748b;">
                         <div style="font-weight: 700; color: #334155; font-size: 13.5px;">
-                            ${allMovementsData.length === 0 ? `No data ${escapeHtml(monthText)} ${curYear}` : 'No data.'}
+                            ${hasSearch
+                    ? 'Tidak ada data log yang cocok dengan pencarian.'
+                    : (allMovementsData.length === 0 ? `No data ${escapeHtml(monthText)} ${curYear}` : 'No data.')}
                         </div>
-                        ${allMovementsData.length === 0 && monthSelect && monthSelect.value ? `
+                        ${!hasSearch && allMovementsData.length === 0 && monthSelect && monthSelect.value ? `
                             <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.viewAllYearMovements()" style="margin-top: 12px; font-size: 12px; padding: 4px 12px;">
                                 Lihat Seluruh Log Tahun ${curYear}
                             </button>
@@ -2260,13 +2876,31 @@ const App = (() => {
             filteredMovementsData = [...allMovementsData];
         } else {
             filteredMovementsData = allMovementsData.filter(m => {
-                return (m.sitecode && m.sitecode.toLowerCase().includes(query)) ||
-                    (m.name_site && m.name_site.toLowerCase().includes(query)) ||
-                    (m.regional && m.regional.toLowerCase().includes(query)) ||
-                    (m.dept && m.dept.toLowerCase().includes(query)) ||
-                    (m.sub_dept && m.sub_dept.toLowerCase().includes(query)) ||
-                    (m.notes && m.notes.toLowerCase().includes(query)) ||
-                    (m.effective_period && m.effective_period.toLowerCase().includes(query));
+                const sc = String(m.sitecode ?? '').toLowerCase();
+                const ns = String(m.name_site ?? '').toLowerCase();
+                const reg = String(m.regional ?? '').toLowerCase();
+                const dept = String(m.dept ?? '').toLowerCase();
+                const subDept = String(m.sub_dept ?? '').toLowerCase();
+                const info = String(m.info ?? '').toLowerCase();
+                const notes = String(m.notes ?? '').toLowerCase();
+                const desc = String(m.description ?? '').toLowerCase();
+                const period = String(m.effective_period ?? '').toLowerCase();
+                const prev = String(m.prev_status ?? '').toLowerCase();
+                const curr = String(m.curr_status ?? '').toLowerCase();
+                const movType = String(m.movement_type ?? '').toLowerCase();
+
+                return sc.includes(query) ||
+                    ns.includes(query) ||
+                    reg.includes(query) ||
+                    dept.includes(query) ||
+                    subDept.includes(query) ||
+                    info.includes(query) ||
+                    notes.includes(query) ||
+                    desc.includes(query) ||
+                    period.includes(query) ||
+                    prev.includes(query) ||
+                    curr.includes(query) ||
+                    movType.includes(query);
             });
         }
         renderMovementsTable();
@@ -2317,7 +2951,531 @@ const App = (() => {
         }
     }
 
-    // ── Chart Hasil SO Outlet Regional ──────────────────────────
+    // ── Score Card Summary (Rating & SO Execution - Rolling 3 Months) ──
+
+    let scorecardRatingData = [];
+    let scorecardExecutionData = [];
+    let currentRatingFilter = 'all';
+    let currentExecutionFilter = 'all';
+
+    function getThreeMonthsBack(year, month) {
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const shortNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+        let m = parseInt(month, 10);
+        let y = parseInt(year, 10) || 2026;
+        if (isNaN(m) || m < 1 || m > 12) {
+            m = 9; // Default to September if all months or unset
+        }
+
+        if (summarySOType === 'quarterly') {
+            let curQ = Math.ceil(m / 3);
+            if (curQ < 1) curQ = 1;
+            if (curQ > 4) curQ = 4;
+
+            const quarters = [];
+            for (let i = 2; i >= 0; i--) {
+                let tq = curQ - i;
+                let ty = y;
+                while (tq <= 0) {
+                    tq += 4;
+                    ty -= 1;
+                }
+                quarters.push({
+                    month: tq * 3,
+                    year: ty,
+                    label: `Q${tq}`
+                });
+            }
+            return quarters;
+        }
+
+        const months = [];
+        for (let i = 2; i >= 0; i--) {
+            let targetM = m - i;
+            let targetY = y;
+            while (targetM <= 0) {
+                targetM += 12;
+                targetY -= 1;
+            }
+            months.push({
+                month: targetM,
+                year: targetY,
+                fullName: `${monthNames[targetM]} ${targetY}`,
+                shortName: `${shortNames[targetM]} ${targetY}`,
+                label: shortNames[targetM].toUpperCase()
+            });
+        }
+        return months;
+    }
+
+    async function loadScoreCardSummary(year, month) {
+        const y = year || document.getElementById('summary-filter-year')?.value || 2026;
+        const m = month || document.getElementById('summary-filter-month')?.value || 9;
+        const category = summaryCategory || 'pmd';
+        const soType = summarySOType || 'monthly';
+
+        const threeMonths = getThreeMonthsBack(y, m);
+
+        const badgeEl = document.getElementById('scorecard-period-badge');
+        if (badgeEl && threeMonths.length === 3) {
+            const first = threeMonths[0];
+            const last = threeMonths[2];
+            if (first.year === last.year) {
+                badgeEl.textContent = `${first.label} - ${last.label} ${last.year}`;
+            } else {
+                badgeEl.textContent = `${first.label} ${first.year} - ${last.label} ${last.year}`;
+            }
+        }
+
+        // Update headers for Rating & Execution tables immediately
+        if (threeMonths.length === 3) {
+            ['sc-rating-th', 'sc-exec-th'].forEach(prefix => {
+                const th1 = document.getElementById(`${prefix}-m1`);
+                const th2 = document.getElementById(`${prefix}-m2`);
+                const th3 = document.getElementById(`${prefix}-m3`);
+                if (th1) th1.textContent = threeMonths[0].label;
+                if (th2) th2.textContent = threeMonths[1].label;
+                if (th3) th3.textContent = threeMonths[2].label;
+            });
+        }
+
+        try {
+            const res = await fetch(`api/scorecard_summary.php?year=${encodeURIComponent(y)}&month=${encodeURIComponent(m)}&category=${encodeURIComponent(category)}&so_type=${encodeURIComponent(soType)}`);
+            const json = await res.json();
+
+            if (json.success) {
+                scorecardRatingData = json.rating || [];
+                scorecardExecutionData = json.execution || [];
+
+                if (json.period && json.period.m1 && json.period.m2 && json.period.m3) {
+                    ['sc-rating-th', 'sc-exec-th'].forEach(prefix => {
+                        const th1 = document.getElementById(`${prefix}-m1`);
+                        const th2 = document.getElementById(`${prefix}-m2`);
+                        const th3 = document.getElementById(`${prefix}-m3`);
+                        if (th1) th1.textContent = json.period.m1.label;
+                        if (th2) th2.textContent = json.period.m2.label;
+                        if (th3) th3.textContent = json.period.m3.label;
+                    });
+                }
+
+                renderScoreCardRating();
+                renderScoreCardExecution();
+                renderScoreCardRatingPieChart(json.rating_counts);
+                renderScoreCardExecPieChart(json.execution_counts);
+            } else {
+                console.warn('Scorecard summary failed:', json.message);
+                scorecardRatingData = [];
+                scorecardExecutionData = [];
+                renderScoreCardRating();
+                renderScoreCardExecution();
+                renderScoreCardRatingPieChart(null);
+                renderScoreCardExecPieChart(null);
+            }
+        } catch (err) {
+            console.error('Error fetching scorecard summary:', err);
+            scorecardRatingData = [];
+            scorecardExecutionData = [];
+            renderScoreCardRating();
+            renderScoreCardExecution();
+            renderScoreCardRatingPieChart(null);
+            renderScoreCardExecPieChart(null);
+        }
+    }
+
+    function updateScoreCardPeriod(year, month) {
+        return loadScoreCardSummary(year, month);
+    }
+
+    function onScorecardRatingFilterChange(filterValue) {
+        currentRatingFilter = filterValue || 'all';
+        renderScoreCardRating();
+    }
+
+    function onScorecardExecutionFilterChange(filterValue) {
+        currentExecutionFilter = filterValue || 'all';
+        renderScoreCardExecution();
+    }
+
+    function renderScoreCardRating() {
+        const tbody = document.getElementById('scorecard-rating-tbody');
+        if (!tbody) return;
+
+        // Kept empty for now: "now empty the cards, i have to think the formula first and mapping"
+        if (scorecardRatingData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                        <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                            No data
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let filtered = scorecardRatingData;
+        if (currentRatingFilter !== 'all') {
+            filtered = scorecardRatingData.filter(r => (r.rating || '').toLowerCase().replace(/\s+/g, '_') === currentRatingFilter);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                        Tidak ada data yang sesuai dengan filter rating.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((r, idx) => {
+            html += `
+                <tr>
+                    <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
+                    <td class="scorecard-col-sitecode"><span class="badge-sitecode">${escapeHtml(r.sitecode)}</span></td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
+                    <td class="scorecard-col-month">${formatPercent(r.m1_pct)}</td>
+                    <td class="scorecard-col-month">${formatPercent(r.m2_pct)}</td>
+                    <td class="scorecard-col-month">${formatPercent(r.m3_pct)}</td>
+                    <td class="scorecard-col-status">${renderRatingBadge(r.rating)}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function renderScoreCardExecution() {
+        const tbody = document.getElementById('scorecard-exec-tbody');
+        if (!tbody) return;
+
+        // Kept empty for now: "now empty the cards, i have to think the formula first and mapping"
+        if (scorecardExecutionData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                        <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                            No data
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let filtered = scorecardExecutionData;
+        if (currentExecutionFilter !== 'all') {
+            filtered = scorecardExecutionData.filter(e => (e.execution_status || '').toLowerCase().replace(/\s+/g, '_') === currentExecutionFilter);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                        Tidak ada data yang sesuai dengan filter status.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((e, idx) => {
+            html += `
+                <tr>
+                    <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
+                    <td class="scorecard-col-sitecode"><span class="badge-sitecode">${escapeHtml(e.sitecode)}</span></td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(e.name_site || '-')}">${escapeHtml(e.name_site || '-')}</td>
+                    <td class="scorecard-col-month" title="${escapeHtml(e.m1_status || '-')}">${formatPercent(e.m1_pct)}</td>
+                    <td class="scorecard-col-month" title="${escapeHtml(e.m2_status || '-')}">${formatPercent(e.m2_pct)}</td>
+                    <td class="scorecard-col-month" title="${escapeHtml(e.m3_status || '-')}">${formatPercent(e.m3_pct)}</td>
+                    <td class="scorecard-col-status">${renderExecutionBadge(e.execution_status)}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function renderRatingBadge(rating) {
+        const r = String(rating || '').toLowerCase();
+        if (r === 'very good' || r === 'very_good') return '<span class="badge-rating-very-good">Very Good</span>';
+        if (r === 'good') return '<span class="badge-rating-good">Good</span>';
+        if (r === 'moderate') return '<span class="badge-rating-moderate">Moderate</span>';
+        if (r === 'poor') return '<span class="badge-rating-poor">Poor</span>';
+        if (r === 'very poor' || r === 'very_poor') return '<span class="badge-rating-very-poor">Very Poor</span>';
+        return `<span class="badge-rating-moderate">${escapeHtml(rating || '-')}</span>`;
+    }
+
+    function renderExecutionBadge(status) {
+        const s = String(status || '').toLowerCase();
+        if (s === 'executed') return '<span class="badge-exec-done">Executed</span>';
+        if (s === 'not executed' || s === 'not_executed') return '<span class="badge-exec-not-done">Not Executed</span>';
+        return `<span class="badge-exec-done">${escapeHtml(status || '-')}</span>`;
+    }
+
+    // ── Score Card Summary Pie Charts ───────────────────────────
+
+    let scorecardRatingPieChart = null;
+    let scorecardExecPieChart = null;
+
+    function getOrCreateScorecardTooltip() {
+        let tooltipEl = document.getElementById('scorecard-floating-tooltip');
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.id = 'scorecard-floating-tooltip';
+            tooltipEl.className = 'scorecard-floating-tooltip';
+            document.body.appendChild(tooltipEl);
+        }
+        return tooltipEl;
+    }
+
+    function externalScorecardTooltip(context) {
+        const { chart, tooltip } = context;
+        const tooltipEl = getOrCreateScorecardTooltip();
+
+        if (!tooltip || tooltip.opacity === 0) {
+            tooltipEl.style.opacity = '0';
+            tooltipEl.style.visibility = 'hidden';
+            return;
+        }
+
+        if (tooltip.body) {
+            const bodyLines = tooltip.body.map(b => b.lines).flat();
+            let html = '';
+            bodyLines.forEach((line, i) => {
+                const colors = tooltip.labelColors && tooltip.labelColors[i] ? tooltip.labelColors[i] : null;
+                const bg = (colors && colors.backgroundColor && colors.backgroundColor !== '#e2e8f0')
+                    ? colors.backgroundColor
+                    : '#38bdf8';
+                const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background-color:${bg};margin-right:7px;vertical-align:middle;box-shadow:0 0 3px rgba(0,0,0,0.35);"></span>`;
+                html += `<div style="display:flex;align-items:center;line-height:1.4;">${dot}<span style="font-weight:600;letter-spacing:0.2px;">${line.trim()}</span></div>`;
+            });
+            tooltipEl.innerHTML = html;
+        }
+
+        const rect = chart.canvas.getBoundingClientRect();
+        const scrollX = window.pageXOffset || window.scrollX || 0;
+        const scrollY = window.pageYOffset || window.scrollY || 0;
+        const left = rect.left + scrollX + tooltip.caretX;
+        const top = rect.top + scrollY + tooltip.caretY;
+
+        tooltipEl.style.left = left + 'px';
+        tooltipEl.style.top = top + 'px';
+        tooltipEl.style.opacity = '1';
+        tooltipEl.style.visibility = 'visible';
+    }
+
+    function bindScorecardCanvasMouseLeave(canvas) {
+        if (!canvas || canvas._scMouseLeaveBound) return;
+        canvas.addEventListener('mouseleave', () => {
+            const el = document.getElementById('scorecard-floating-tooltip');
+            if (el) {
+                el.style.opacity = '0';
+                el.style.visibility = 'hidden';
+            }
+        }, { passive: true });
+        canvas._scMouseLeaveBound = true;
+    }
+
+    function renderScoreCardRatingPieChart(counts = null) {
+        const canvas = document.getElementById('chart-scorecard-rating-pie');
+        if (!canvas) return;
+
+        bindScorecardCanvasMouseLeave(canvas);
+
+        if (scorecardRatingPieChart) {
+            scorecardRatingPieChart.destroy();
+            scorecardRatingPieChart = null;
+        }
+
+        const labels = ['Very Good', 'Good', 'Moderate', 'Poor', 'Very Poor'];
+        const colors = ['#047857', '#0284c7', '#d97706', '#ea580c', '#b91c1c'];
+        const data = counts ? [
+            counts.very_good || 0,
+            counts.good || 0,
+            counts.moderate || 0,
+            counts.poor || 0,
+            counts.very_poor || 0
+        ] : [0, 0, 0, 0, 0];
+
+        const total = data.reduce((a, b) => a + b, 0);
+
+        const elVg = document.getElementById('sc-stat-vg');
+        const elG = document.getElementById('sc-stat-g');
+        const elM = document.getElementById('sc-stat-m');
+        const elP = document.getElementById('sc-stat-p');
+        const elVp = document.getElementById('sc-stat-vp');
+
+        if (elVg) elVg.textContent = total > 0 ? `${data[0]} (${Math.round((data[0] / total) * 100)}%)` : '0 (0%)';
+        if (elG) elG.textContent = total > 0 ? `${data[1]} (${Math.round((data[1] / total) * 100)}%)` : '0 (0%)';
+        if (elM) elM.textContent = total > 0 ? `${data[2]} (${Math.round((data[2] / total) * 100)}%)` : '0 (0%)';
+        if (elP) elP.textContent = total > 0 ? `${data[3]} (${Math.round((data[3] / total) * 100)}%)` : '0 (0%)';
+        if (elVp) elVp.textContent = total > 0 ? `${data[4]} (${Math.round((data[4] / total) * 100)}%)` : '0 (0%)';
+
+        const ctx = canvas.getContext('2d');
+        if (total === 0) {
+            scorecardRatingPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Belum Ada Data'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: false,
+                            external: externalScorecardTooltip,
+                            callbacks: {
+                                title: () => '',
+                                label: () => 'No data'
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+            return;
+        }
+
+        scorecardRatingPieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: '#ffffff',
+                    borderWidth: 1.5,
+                    hoverOffset: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: false,
+                        external: externalScorecardTooltip,
+                        callbacks: {
+                            title: () => '',
+                            label: (context) => {
+                                const val = context.parsed;
+                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                return `${context.label}: ${val} site (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    function renderScoreCardExecPieChart(counts = null) {
+        const canvas = document.getElementById('chart-scorecard-exec-pie');
+        if (!canvas) return;
+
+        bindScorecardCanvasMouseLeave(canvas);
+
+        if (scorecardExecPieChart) {
+            scorecardExecPieChart.destroy();
+            scorecardExecPieChart = null;
+        }
+
+        const labels = ['Executed', 'Not Executed'];
+        const colors = ['#047857', '#b91c1c'];
+        const data = counts ? [
+            counts.executed || 0,
+            counts.not_executed || 0
+        ] : [0, 0];
+
+        const total = data.reduce((a, b) => a + b, 0);
+
+        const elExec = document.getElementById('sc-stat-exec');
+        const elNotExec = document.getElementById('sc-stat-not-exec');
+
+        if (elExec) elExec.textContent = total > 0 ? `${data[0]} (${Math.round((data[0] / total) * 100)}%)` : '0 (0%)';
+        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} (${Math.round((data[1] / total) * 100)}%)` : '0 (0%)';
+
+        const ctx = canvas.getContext('2d');
+        if (total === 0) {
+            scorecardExecPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Belum Ada Data'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: false,
+                            external: externalScorecardTooltip,
+                            callbacks: {
+                                title: () => '',
+                                label: () => 'Belum ada data eksekusi'
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+            return;
+        }
+
+        scorecardExecPieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: '#ffffff',
+                    borderWidth: 1.5,
+                    hoverOffset: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: false,
+                        external: externalScorecardTooltip,
+                        callbacks: {
+                            title: () => '',
+                            label: (context) => {
+                                const val = context.parsed;
+                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                return `${context.label}: ${val} site (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // ── Report SO Outlet Regional ──────────────────────────
 
     const DEPT_SUBDEPTS_MAP = {
         'CRO': ['CJDO', 'EKO', 'WJO', 'WKO'],
@@ -2723,7 +3881,7 @@ const App = (() => {
                             boxWidth: 12,
                             padding: 10,
                             font: {
-                                family: "'Poppins', sans-serif",
+                                family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
                                 size: 11,
                                 weight: '500'
                             }
@@ -2787,7 +3945,7 @@ const App = (() => {
             return;
         }
 
-        Chart.defaults.font.family = "'Poppins', sans-serif";
+        Chart.defaults.font.family = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
         const deptCanvas = document.getElementById('chart-trend-dept');
         const subDeptCanvas = document.getElementById('chart-trend-subdept');
@@ -3131,7 +4289,7 @@ const App = (() => {
 
         try {
             sessionStorage.setItem('summary_category', level);
-        } catch (e) {}
+        } catch (e) { }
 
         document.querySelectorAll('.rekap-tab-l2').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-rekap-l2') === level);
@@ -3873,6 +5031,7 @@ const App = (() => {
         updateSRInfo,
         updateSRGroupType,
         toggleSRActive,
+        toggleSRCounted,
         openSRHistoryModal,
         closeSRHistoryModal,
         loadSRHistory,
@@ -3903,6 +5062,27 @@ const App = (() => {
         toggleMovementDetails,
         viewAllYearMovements,
         openMovementsFromSR,
+        // Score Card Summary exports
+        loadScoreCardSummary,
+        updateScoreCardPeriod,
+        onScorecardRatingFilterChange,
+        onScorecardExecutionFilterChange,
+        renderScoreCardRating,
+        renderScoreCardExecution,
+        renderScoreCardRatingPieChart,
+        renderScoreCardExecPieChart,
+        // Score Card KPI Master Data exports
+        loadScorecardKpi,
+        renderScorecardKpiTable,
+        toggleEditScorecardKpi,
+        onKpiInputChange,
+        saveScorecardKpi,
+        resetScorecardKpi,
+        renderScorecardExecKpiTable,
+        toggleEditScorecardExecKpi,
+        onKpiExecInputChange,
+        saveScorecardExecKpi,
+        resetScorecardExecKpi,
     };
 })();
 

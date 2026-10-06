@@ -34,11 +34,11 @@ $currentYear = (int) date('Y');
     <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
     <title>Asset Management</title>
 
-    <!-- Google Fonts: Poppins -->
+    <!-- Google Fonts: Inter (Enterprise Corporate Typography) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,400..700&display=swap"
         rel="stylesheet">
 
     <!-- Clean Corporate App CSS -->
@@ -81,7 +81,7 @@ $currentYear = (int) date('Y');
                         <h2 class="card-title">Stock Opname Master Data</h2>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <button class="btn btn-secondary" onclick="App.loadMasterData()">
+                        <button class="btn btn-refresh" onclick="App.loadMasterData()">
                             Refresh
                         </button>
                         <button class="btn btn-danger" onclick="App.openBulkDeleteModal()"
@@ -144,7 +144,7 @@ $currentYear = (int) date('Y');
                         </select>
                     </div>
                     <div class="table-toolbar-right">
-                        <input type="text" id="master-search-input" class="table-search-input" placeholder="Cari..."
+                        <input type="text" id="master-search-input" class="table-search-input" placeholder="Search..."
                             autocomplete="off" value="" oninput="App.handleSearch(this.value)">
                     </div>
                 </div>
@@ -277,11 +277,11 @@ $currentYear = (int) date('Y');
             <div class="card" id="card-site-regional" style="margin-top: 2rem;">
                 <div class="card-header">
                     <div>
-                        <h2 class="card-title">Site Regional</h2>
-                        <p class="card-subtitle">Regional Site master data</p>
+                        <h2 class="card-title">Site Master Data</h2>
+                        <p class="card-subtitle">All Site master data</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <button class="btn btn-secondary" onclick="App.loadSiteRegional()">
+                        <button class="btn btn-refresh" onclick="App.loadSiteRegional()">
                             Refresh
                         </button>
                         <button class="btn btn-danger" id="sr-bulk-delete-btn" style="display: none;"
@@ -309,7 +309,7 @@ $currentYear = (int) date('Y');
                         <span>baris per halaman</span>
                     </div>
                     <div class="table-toolbar-right">
-                        <input type="text" id="sr-search-input" class="table-search-input" placeholder="Cari..."
+                        <input type="text" id="sr-search-input" class="table-search-input" placeholder="Search..."
                             autocomplete="off" value="" oninput="App.handleSRSearch(this.value)">
                     </div>
                 </div>
@@ -320,7 +320,7 @@ $currentYear = (int) date('Y');
                         <table class="reconciliation-table" id="sr-table">
                             <thead>
                                 <tr>
-                                    <th colspan="3" class="text-center align-middle col-action-group">ACTION</th>
+                                    <th colspan="4" class="text-center align-middle col-action-group">ACTION</th>
                                     <th rowspan="2" class="text-center align-middle sortable"
                                         onclick="App.toggleSRSort('regional')">
                                         REGIONAL <span class="sort-indicator" data-sr-col="regional">⇅</span>
@@ -366,11 +366,16 @@ $currentYear = (int) date('Y');
                                         title="Active status">
                                         ACT
                                     </th>
+                                    <th class="text-center align-middle col-action-counted"
+                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
+                                        title="Dihitung dalam Ringkasan / Count in summary">
+                                        COUNT
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="sr-table-body">
                                 <tr>
-                                    <td colspan="10" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
                                         Memuat data...
                                     </td>
                                 </tr>
@@ -384,6 +389,120 @@ $currentYear = (int) date('Y');
                     <div id="sr-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
                     <div class="pagination-controls" id="sr-pagination-controls"></div>
                 </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- SECTION: Score Card KPI Master Data (Rating & Execution)    -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <div class="scorecard-kpi-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 1.25rem; margin-top: 2rem; margin-bottom: 2rem; align-items: start;">
+
+                <!-- ── Left Card: Rating KPI Master Data ─────────────────── -->
+                <div class="card" id="card-scorecard-rating-kpi"
+                    style="margin: 0; display: flex; flex-direction: column;">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 0.6rem; padding: 0.75rem 1rem;">
+                        <div>
+                            <h2 class="card-title" style="font-size: 14.5px;">Rating KPI Master Data</h2>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                            <button class="btn btn-refresh btn-sm" id="kpi-rating-refresh-btn"
+                                onclick="App.loadScorecardKpi()" title="Muat ulang data KPI"
+                                style="font-size: 11.5px; padding: 3px 8px;">
+                                Refresh
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="kpi-edit-btn"
+                                onclick="App.toggleEditScorecardKpi()" style="font-size: 11.5px; padding: 3px 8px;">
+                                Edit Range (%)
+                            </button>
+                            <button class="btn btn-warning btn-sm" id="kpi-reset-btn"
+                                style="display: none; font-size: 11.5px; padding: 3px 8px;"
+                                onclick="App.resetScorecardKpi()">
+                                Reset Default
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="kpi-save-btn"
+                                style="display: none; font-size: 11.5px; padding: 3px 8px;"
+                                onclick="App.saveScorecardKpi()">
+                                Simpan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body" style="padding: 0; flex: 1;">
+                        <div class="table-responsive">
+                            <table class="reconciliation-table kpi-config-table" id="kpi-config-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center align-middle" style="width: 125px;">RATING</th>
+                                        <th class="text-center align-middle" style="width: 175px;">RANGE (%)</th>
+                                        <th class="text-center align-middle" style="width: 90px;">DESIMAL</th>
+                                        <th class="text-center align-middle">MATCH RULE</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="kpi-config-tbody">
+                                    <tr>
+                                        <td colspan="4" class="text-center" style="padding: 2.2rem; color: #64748b;">
+                                            Memuat konfigurasi KPI...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Right Card: SO Execution KPI Master Data ──────────── -->
+                <div class="card" id="card-scorecard-exec-kpi"
+                    style="margin: 0; display: flex; flex-direction: column;">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 0.6rem; padding: 0.75rem 1rem;">
+                        <div>
+                            <h2 class="card-title" style="font-size: 14.5px;">SO Execution KPI Master Data</h2>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                            <button class="btn btn-refresh btn-sm" id="kpi-exec-refresh-btn"
+                                onclick="App.loadScorecardKpi()" title="Muat ulang data KPI"
+                                style="font-size: 11.5px; padding: 3px 8px;">
+                                Refresh
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="kpi-exec-edit-btn"
+                                onclick="App.toggleEditScorecardExecKpi()" style="font-size: 11.5px; padding: 3px 8px;">
+                                Edit Range (%)
+                            </button>
+                            <button class="btn btn-warning btn-sm" id="kpi-exec-reset-btn"
+                                style="display: none; font-size: 11.5px; padding: 3px 8px;"
+                                onclick="App.resetScorecardExecKpi()">
+                                Reset Default
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="kpi-exec-save-btn"
+                                style="display: none; font-size: 11.5px; padding: 3px 8px;"
+                                onclick="App.saveScorecardExecKpi()">
+                                Simpan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body" style="padding: 0; flex: 1;">
+                        <div class="table-responsive">
+                            <table class="reconciliation-table kpi-config-table" id="kpi-exec-config-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center align-middle" style="width: 140px;">STATUS</th>
+                                        <th class="text-center align-middle" style="width: 175px;">FORMULA</th>
+                                        <th class="text-center align-middle">THRESHOLD</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="kpi-exec-config-tbody">
+                                    <tr>
+                                        <td colspan="3" class="text-center" style="padding: 2.2rem; color: #64748b;">
+                                            Memuat konfigurasi KPI...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
         </section>
 
@@ -616,8 +735,9 @@ $currentYear = (int) date('Y');
                     <div id="sm-table-container" style="padding: 1.25rem;">
                         <div
                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                            <input type="text" id="sm-search-input" class="form-control" placeholder="Cari  ..."
-                                oninput="App.filterMovementsTable()"
+                            <input type="search" id="sm-search-input" class="form-control" placeholder="Search..."
+                                oninput="App.filterMovementsTable()" onkeyup="App.filterMovementsTable()"
+                                onsearch="App.filterMovementsTable()"
                                 style="max-width: 320px; font-size: 12px; padding: 0.35rem 0.75rem;">
                             <div style="font-size: 12px; color: #64748b;" id="sm-table-info">
                                 Menampilkan log pergerakan
@@ -737,6 +857,199 @@ $currentYear = (int) date('Y');
                 </div>
             </div>
 
+            <!-- ── Card: Score Card Summary (Rating & SO Execution - Rolling 3 Months) ── -->
+            <div class="card" id="card-scorecard-summary" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <h2 class="card-title" style="margin: 0;">Score Card Summary</h2>
+                            <span id="scorecard-period-badge" class="badge"
+                                style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
+                                Juli - September 2026
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body" style="padding: 0;">
+                    <div class="scorecard-grid">
+                        <!-- Sub-Card 1: Rating -->
+                        <div class="scorecard-subcard" id="scorecard-rating-card">
+                            <div class="scorecard-subcard-header">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Rating
+                                        Summary</h3>
+                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Evaluasi performa
+                                        SO Sites</p>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <label for="scorecard-rating-filter"
+                                        style="font-size: 10.5px; font-weight: 600; color: #64748b; margin: 0;">Rating:</label>
+                                    <select id="scorecard-rating-filter" class="form-control form-control-sm"
+                                        style="font-size: 11.5px; padding: 2px 6px; width: auto; min-width: 115px; height: 26px;"
+                                        onchange="App.onScorecardRatingFilterChange(this.value)">
+                                        <option value="all" selected>Semua Rating</option>
+                                        <option value="very_poor">Very Poor</option>
+                                        <option value="poor">Poor</option>
+                                        <option value="moderate">Moderate</option>
+                                        <option value="good">Good</option>
+                                        <option value="very_good">Very Good</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="scorecard-subcard-body">
+                                <!-- Top: Chart Section -->
+                                <div class="scorecard-top-chart-section scorecard-bottom-chart-section"
+                                    style="margin-top: 0; margin-bottom: 0.85rem;">
+                                    <div class="scorecard-bottom-chart-box">
+                                        <canvas id="chart-scorecard-rating-pie"></canvas>
+                                    </div>
+                                    <div class="scorecard-bottom-stats" id="scorecard-rating-pie-stats">
+                                        <div
+                                            style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">
+                                            Distribusi Rating:</div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #047857;"></span>Very Good</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-vg">0 (0%)</span>
+                                        </div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #0284c7;"></span>Good</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-g">0 (0%)</span>
+                                        </div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #d97706;"></span>Moderate</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-m">0 (0%)</span>
+                                        </div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #ea580c;"></span>Poor</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-p">0 (0%)</span>
+                                        </div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #b91c1c;"></span>Very Poor</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-vp">0 (0%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Bottom: Table -->
+                                <div class="scorecard-table-wrapper">
+                                    <div class="table-responsive"
+                                        style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                        <table class="reconciliation-table scorecard-table">
+                                            <thead>
+                                                <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                    <th class="scorecard-col-no">NO</th>
+                                                    <th class="scorecard-col-sitecode">SITE CODE</th>
+                                                    <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                    <th id="sc-rating-th-m1" class="scorecard-col-month">JUL</th>
+                                                    <th id="sc-rating-th-m2" class="scorecard-col-month">AGU</th>
+                                                    <th id="sc-rating-th-m3" class="scorecard-col-month">SEP</th>
+                                                    <th class="scorecard-col-status">RATING</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="scorecard-rating-tbody">
+                                                <tr>
+                                                    <td colspan="7" class="text-center"
+                                                        style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                                                        <div
+                                                            style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                                                            No data
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-Card 2: SO Execution -->
+                        <div class="scorecard-subcard" id="scorecard-exec-card">
+                            <div class="scorecard-subcard-header">
+                                <div>
+                                    <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">SO
+                                        Execution Summary</h3>
+                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Status eksekusi SO
+                                        Sites</p>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <label for="scorecard-execution-filter"
+                                        style="font-size: 10.5px; font-weight: 600; color: #64748b; margin: 0;">Status:</label>
+                                    <select id="scorecard-execution-filter" class="form-control form-control-sm"
+                                        style="font-size: 11.5px; padding: 2px 6px; width: auto; min-width: 120px; height: 26px;"
+                                        onchange="App.onScorecardExecutionFilterChange(this.value)">
+                                        <option value="all" selected>Semua Status</option>
+                                        <option value="executed">Executed</option>
+                                        <option value="not_executed">Not Executed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="scorecard-subcard-body">
+                                <!-- Top: Chart Section -->
+                                <div class="scorecard-top-chart-section scorecard-bottom-chart-section"
+                                    style="margin-top: 0; margin-bottom: 0.85rem;">
+                                    <div class="scorecard-bottom-chart-box">
+                                        <canvas id="chart-scorecard-exec-pie"></canvas>
+                                    </div>
+                                    <div class="scorecard-bottom-stats" id="scorecard-exec-pie-stats">
+                                        <div
+                                            style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">
+                                            Status Eksekusi:</div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #047857;"></span>Executed</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-exec">0 (0%)</span>
+                                        </div>
+                                        <div class="scorecard-pie-stat-row">
+                                            <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                                    style="background: #b91c1c;"></span>Not Executed</span>
+                                            <span class="scorecard-pie-stat-val" id="sc-stat-not-exec">0 (0%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Bottom: Table -->
+                                <div class="scorecard-table-wrapper">
+                                    <div class="table-responsive"
+                                        style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                        <table class="reconciliation-table scorecard-table">
+                                            <thead>
+                                                <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                    <th class="scorecard-col-no">NO</th>
+                                                    <th class="scorecard-col-sitecode">SITE CODE</th>
+                                                    <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                    <th id="sc-exec-th-m1" class="scorecard-col-month">JUL</th>
+                                                    <th id="sc-exec-th-m2" class="scorecard-col-month">AGU</th>
+                                                    <th id="sc-exec-th-m3" class="scorecard-col-month">SEP</th>
+                                                    <th class="scorecard-col-status">STATUS</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="scorecard-exec-tbody">
+                                                <tr>
+                                                    <td colspan="7" class="text-center"
+                                                        style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                                                        <div
+                                                            style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                                                            No data
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── Trend Line Graphics (DEPT on top; Sub DEPT / PMD Sub DEPT below) ── -->
             <div class="trend-charts-container" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                 <!-- Card 1: Trend Line DEPT (Full Width on top) -->
@@ -810,12 +1123,12 @@ $currentYear = (int) date('Y');
                 </div>
             </div>
 
-            <!-- ── Card: Chart Hasil SO Outlet Regional / PMD ─────────── -->
+            <!-- ── Card: Report SO Outlet Regional / PMD ─────────── -->
             <div class="card" id="card-hasil-so-subdept" style="margin-top: 1rem;">
                 <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
                         <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                            <h2 class="card-title" id="hasil-so-title" style="margin: 0;">Chart Hasil SO PMD
+                            <h2 class="card-title" id="hasil-so-title" style="margin: 0;">Report SO PMD
                             </h2>
                             <span id="subdept-period-badge" class="badge"
                                 style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
@@ -987,7 +1300,7 @@ $currentYear = (int) date('Y');
                         <span>baris per halaman</span>
                     </div>
                     <div class="table-toolbar-right">
-                        <input type="text" id="rekap-search-input" class="table-search-input" placeholder="Cari..."
+                        <input type="text" id="rekap-search-input" class="table-search-input" placeholder="Search..."
                             autocomplete="off" oninput="App.handleRekapSearch(this.value)">
                     </div>
                 </div>
@@ -1110,9 +1423,9 @@ $currentYear = (int) date('Y');
                                 12 => 'Desember'
                             ];
                             foreach ($monthList as $num => $name): ?>
-                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
-                                    <?= $name ?>
-                                </option>
+                                    <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                        <?= $name ?>
+                                    </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1120,9 +1433,9 @@ $currentYear = (int) date('Y');
                         <label class="form-label" for="import-year">Periode Tahun</label>
                         <select id="import-year" class="form-control">
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
-                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
-                                    <?= $y ?>
-                                </option>
+                                    <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                        <?= $y ?>
+                                    </option>
                             <?php endfor; ?>
                         </select>
                     </div>
@@ -1204,9 +1517,9 @@ $currentYear = (int) date('Y');
                         <select id="bulk-delete-month" class="form-control">
                             <option value="">Semua Bulan pada Tahun Terpilih</option>
                             <?php foreach ($monthList as $num => $name): ?>
-                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
-                                    <?= $name ?>
-                                </option>
+                                    <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                        <?= $name ?>
+                                    </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1214,9 +1527,9 @@ $currentYear = (int) date('Y');
                         <label class="form-label" for="bulk-delete-year">Periode Tahun</label>
                         <select id="bulk-delete-year" class="form-control">
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
-                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
-                                    <?= $y ?>
-                                </option>
+                                    <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                        <?= $y ?>
+                                    </option>
                             <?php endfor; ?>
                         </select>
                     </div>

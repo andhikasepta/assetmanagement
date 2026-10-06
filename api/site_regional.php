@@ -43,6 +43,7 @@ try {
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS info VARCHAR(50) DEFAULT 'Outlet';
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS group_type VARCHAR(20) DEFAULT 'monthly';
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_counted BOOLEAN DEFAULT TRUE;
 
         CREATE TABLE IF NOT EXISTS site_group_history (
             id SERIAL PRIMARY KEY,
@@ -230,20 +231,20 @@ try {
                         $note = ($hr && !empty($hr['notes'])) ? $hr['notes'] : $description;
 
                         $allMovements[] = [
-                            'sitecode' => $sc,
-                            'name_site' => $siteInfo['name_site'] ?? '',
-                            'regional' => $siteInfo['regional'] ?? '',
-                            'dept' => $siteInfo['dept'] ?? '',
-                            'sub_dept' => $siteInfo['sub_dept'] ?? '',
-                            'info' => $siteInfo['info'] ?? 'Outlet',
-                            'effective_month' => $m,
-                            'effective_year' => $year,
+                            'sitecode' => (string)($siteInfo['sitecode'] ?? $sc),
+                            'name_site' => (string)($siteInfo['name_site'] ?? ''),
+                            'regional' => (string)($siteInfo['regional'] ?? ''),
+                            'dept' => (string)($siteInfo['dept'] ?? ''),
+                            'sub_dept' => (string)($siteInfo['sub_dept'] ?? ''),
+                            'info' => (string)($siteInfo['info'] ?? 'Outlet'),
+                            'effective_month' => (int)$m,
+                            'effective_year' => (int)$year,
                             'effective_period' => ($monthNames[$m] ?? $m) . ' ' . $year,
-                            'prev_status' => $prevType,
-                            'curr_status' => $currType,
-                            'movement_type' => $movementType,
-                            'description' => $description,
-                            'notes' => $note,
+                            'prev_status' => (string)$prevType,
+                            'curr_status' => (string)$currType,
+                            'movement_type' => (string)$movementType,
+                            'description' => (string)$description,
+                            'notes' => (string)$note,
                             'created_at' => $hr['created_at'] ?? null,
                         ];
                     }
@@ -342,6 +343,7 @@ try {
                     'monthly'
                 ) as group_type,
                 COALESCE(sr.is_active, TRUE) as is_active,
+                COALESCE(sr.is_counted, TRUE) as is_counted,
                 (SELECT COUNT(*) FROM site_group_history sgh WHERE sgh.sitecode = sr.sitecode) as history_count
             FROM site_regional sr
             $whereSql
@@ -497,6 +499,18 @@ try {
             $stmt->execute([':act' => $isActive ? 1 : 0, ':id' => $id]);
 
             echo json_encode(['success' => true, 'message' => 'Status updated successfully', 'is_active' => $isActive]);
+            exit;
+        }
+
+        // 2c. Update Counted status (whether counted in summary & graphs)
+        if ($action === 'update_counted') {
+            $id = (int) ($jsonPayload['id'] ?? $_POST['id'] ?? 0);
+            $isCounted = filter_var($jsonPayload['is_counted'] ?? $_POST['is_counted'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+            $stmt = $db->prepare("UPDATE site_regional SET is_counted = :counted, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+            $stmt->execute([':counted' => $isCounted ? 1 : 0, ':id' => $id]);
+
+            echo json_encode(['success' => true, 'message' => 'Status hitung berhasil diperbarui', 'is_counted' => $isCounted]);
             exit;
         }
 

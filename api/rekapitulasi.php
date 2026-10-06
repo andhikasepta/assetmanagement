@@ -37,7 +37,8 @@ try {
 
         // Fetch all sites
         $siteStmt = $db->query("
-            SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
+            SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+                   COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
             FROM site_regional
             ORDER BY dept ASC, sub_dept ASC, sitecode ASC
         ");
@@ -150,6 +151,7 @@ try {
 
             for ($m = 1; $m <= 12; $m++) {
                 $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
+                if ($eff === 'inactive' || empty($s['is_active']) || empty($s['is_counted'])) continue;
                 $isPmd = ($dept === 'PMD' || $cat === 'monthly_pmd');
                 if ($soType === 'quarterly') {
                     if ($isPmd || $eff !== 'quarterly') continue;
@@ -280,20 +282,26 @@ try {
     $category = trim($_GET['category'] ?? 'pmd');
 
     // 1. Fetch Site Regional records for this category
+    $whereParts = [];
     if ($category === 'pmd' || $category === 'monthly_pmd') {
-        $whereSql = "WHERE dept = 'PMD'";
+        $whereParts[] = "dept = 'PMD'";
     } elseif ($category === 'quarterly_subarep') {
-        $whereSql = "WHERE dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL) AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL) AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } elseif ($category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
-        $whereSql = "WHERE dept != 'PMD' AND info IN ('Under Warehouse', 'HUB') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "dept != 'PMD' AND info IN ('Under Warehouse', 'HUB') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } elseif ($category === 'quarterly' || $category === 'quarterly_outlet') {
-        $whereSql = "WHERE dept != 'PMD' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "dept != 'PMD' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } else {
-        $whereSql = "WHERE dept != 'PMD'";
+        $whereParts[] = "dept != 'PMD'";
     }
 
+    $whereParts[] = "COALESCE(is_active, TRUE) = TRUE";
+    $whereParts[] = "COALESCE(is_counted, TRUE) = TRUE";
+    $whereSql = "WHERE " . implode(' AND ', $whereParts);
+
     $siteStmt = $db->query("
-        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
+        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+               COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
         FROM site_regional
         $whereSql
         ORDER BY regional ASC, dept ASC, sub_dept ASC, sitecode ASC, id ASC

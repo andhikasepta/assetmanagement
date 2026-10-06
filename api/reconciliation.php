@@ -26,9 +26,9 @@ try {
             : "'monthly_outlet', 'monthly_pmd'";
 
         // Helper function to get effective group types for a given period
-        $getEffectiveTypes = function(PDO $db, ?int $y, ?int $m): array {
-            $year = $y ?: (int)date('Y');
-            $month = $m ?: (int)date('n');
+        $getEffectiveTypes = function (PDO $db, ?int $y, ?int $m): array {
+            $year = $y ?: (int) date('Y');
+            $month = $m ?: (int) date('n');
 
             $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
             $map = [];
@@ -104,15 +104,15 @@ try {
 
             // Dynamic site filtering based on effective group type for the period
             $effectiveMap = $getEffectiveTypes($db, $y, $m);
-            $allSites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(is_active, TRUE) as is_active FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+            $allSites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
 
             $sites = [];
             foreach ($allSites as $s) {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
                 $effType = $effectiveMap[$sc] ?? 'monthly';
 
-                // If site is inactive in this period, do not include in expected sites (do not lookup for that inactive)
-                if ($effType === 'inactive') {
+                // If site is inactive or not counted, do not include in summary calculations
+                if ($effType === 'inactive' || empty($s['is_active']) || empty($s['is_counted'])) {
                     continue;
                 }
 
@@ -301,7 +301,7 @@ try {
             exit;
         }
 
-        // Sub department results for "Chart Hasil SO Outlet Regional" table
+        // Sub department results for "Report SO Outlet Regional" table
         if ($action === 'subdept_results') {
             $dept = trim($_GET['dept'] ?? '');
             $subDept = trim($_GET['sub_dept'] ?? '');
@@ -331,7 +331,8 @@ try {
             $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
             $siteStmt = $db->prepare("
-                SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
+                SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+                       COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
                 FROM site_regional
                 $whereSql
                 ORDER BY dept ASC, sub_dept ASC, sitecode ASC
@@ -344,13 +345,20 @@ try {
             $sites = [];
             foreach ($rawSites as $s) {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
+                $eff = $effectiveMap[$sc] ?? 'monthly';
+
+                // Skip inactive or uncounted sites
+                if ($eff === 'inactive' || empty($s['is_active']) || empty($s['is_counted'])) {
+                    continue;
+                }
+
                 $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
                 if ($soType === 'quarterly') {
-                    if (!$isPmd && ($effectiveMap[$sc] ?? 'monthly') === 'quarterly') {
+                    if (!$isPmd && $eff === 'quarterly') {
                         $sites[] = $s;
                     }
                 } else {
-                    if ($isPmd || ($effectiveMap[$sc] ?? 'monthly') === 'monthly') {
+                    if ($isPmd || $eff === 'monthly') {
                         $sites[] = $s;
                     }
                 }
@@ -432,12 +440,12 @@ try {
                     }
                 }
 
-                $matchQty = $matchedRec ? (int)$matchedRec['match_physic_qty'] : 0;
-                $physicQty = $matchedRec ? (int)$matchedRec['physic_physic_qty'] : 0;
-                $dbQty = $matchedRec ? (int)$matchedRec['db_physic_qty'] : 0;
-                $actual = $matchedRec ? (int)$matchedRec['total_physic_actual'] : 0;
-                $target = $matchedRec ? (int)$matchedRec['total_physic_target'] : 0;
-                $pct = $matchedRec ? (float)$matchedRec['total_physic_pct'] : null;
+                $matchQty = $matchedRec ? (int) $matchedRec['match_physic_qty'] : 0;
+                $physicQty = $matchedRec ? (int) $matchedRec['physic_physic_qty'] : 0;
+                $dbQty = $matchedRec ? (int) $matchedRec['db_physic_qty'] : 0;
+                $actual = $matchedRec ? (int) $matchedRec['total_physic_actual'] : 0;
+                $target = $matchedRec ? (int) $matchedRec['total_physic_target'] : 0;
+                $pct = $matchedRec ? (float) $matchedRec['total_physic_pct'] : null;
 
                 $hasData = ($matchedRec !== null);
                 if ($hasData && $pct !== null) {
@@ -480,19 +488,19 @@ try {
                 }
 
                 $results[] = [
-                    'sitecode'            => $sitecode,
-                    'name_site'           => $s['name_site'] ?? '',
-                    'dept'                => $s['dept'] ?? '',
-                    'sub_dept'            => $s['sub_dept'] ?? '',
-                    'match_physic_qty'    => $matchQty,
-                    'physic_physic_qty'   => $physicQty,
-                    'db_physic_qty'       => $dbQty,
+                    'sitecode' => $sitecode,
+                    'name_site' => $s['name_site'] ?? '',
+                    'dept' => $s['dept'] ?? '',
+                    'sub_dept' => $s['sub_dept'] ?? '',
+                    'match_physic_qty' => $matchQty,
+                    'physic_physic_qty' => $physicQty,
+                    'db_physic_qty' => $dbQty,
                     'total_physic_actual' => $actual,
                     'total_physic_target' => $target,
-                    'total_physic_pct'    => $pct !== null ? round($pct) : null,
-                    'status'              => $statusText,
-                    'status_class'        => $statusClass,
-                    'has_data'            => $hasData,
+                    'total_physic_pct' => $pct !== null ? round($pct) : null,
+                    'status' => $statusText,
+                    'status_class' => $statusClass,
+                    'has_data' => $hasData,
                 ];
             }
 
@@ -524,20 +532,20 @@ try {
             }
 
             echo json_encode([
-                'success'             => true,
-                'dept'                => $dept,
-                'sub_dept'            => $subDept,
-                'month'               => $month,
-                'year'                => $year,
-                'total_sites'         => count($results),
-                'count_with_data'     => $countWithData,
-                'total_match_qty'     => $totalMatchQty,
-                'total_physic_qty'    => $totalPhysicQty,
-                'total_db_qty'        => $totalDbQty,
-                'avg_pct'             => $avgPct,
-                'overall_status'      => $overallStatus,
+                'success' => true,
+                'dept' => $dept,
+                'sub_dept' => $subDept,
+                'month' => $month,
+                'year' => $year,
+                'total_sites' => count($results),
+                'count_with_data' => $countWithData,
+                'total_match_qty' => $totalMatchQty,
+                'total_physic_qty' => $totalPhysicQty,
+                'total_db_qty' => $totalDbQty,
+                'avg_pct' => $avgPct,
+                'overall_status' => $overallStatus,
                 'overall_status_text' => $overallStatusText,
-                'data'                => $results,
+                'data' => $results,
             ]);
             exit;
         }
