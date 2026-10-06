@@ -123,25 +123,73 @@ const App = (() => {
         setupDragAndDrop();
         setupSRDragAndDrop();
 
-        // Restore active page from URL hash or localStorage, default to 'master-data'
-        const hashPage = window.location.hash.replace('#', '').trim();
-        const savedPage = localStorage.getItem('active_page');
-        const allowedPages = ['master-data', 'summary'];
+        // Clean legacy localStorage to prevent stale storage hijacking default landing page
+        try {
+            localStorage.removeItem('active_page');
+        } catch (e) {}
 
-        let initialPage = 'master-data';
+        // Restore active page: default remains now condition page ('master-data')
+        const rawHash = (window.location.hash || '').replace('#', '').trim();
+        const hashPage = rawHash.split('?')[0].split('/')[0];
+        const sessionPage = sessionStorage.getItem('active_page');
+        const isReload = Boolean(
+            (window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]?.type === 'reload')
+            || (window.performance && performance.navigation && performance.navigation.type === 1)
+        );
+
+        const allowedPages = ['summary', 'master-data'];
+        let initialPage = 'summary'; // Default is Summary > Monthly > PMD when url opened first time
+
         if (allowedPages.includes(hashPage)) {
             initialPage = hashPage;
-        } else if (savedPage && allowedPages.includes(savedPage)) {
-            initialPage = savedPage;
+        } else if (isReload && sessionPage && allowedPages.includes(sessionPage)) {
+            initialPage = sessionPage;
+        }
+
+        // Restore active SO Type & Category from sessionStorage (or URL query params in hash)
+        const savedSOType = sessionStorage.getItem('summary_so_type');
+        const savedCategory = sessionStorage.getItem('summary_category');
+
+        if (savedSOType === 'quarterly') {
+            summarySOType = 'quarterly';
+            if (savedCategory === 'outlet_subarep' || savedCategory === 'warehouse_hub') {
+                summaryCategory = savedCategory;
+            } else {
+                summaryCategory = 'outlet_subarep';
+            }
+        } else if (savedSOType === 'monthly') {
+            summarySOType = 'monthly';
+            if (savedCategory === 'pmd' || savedCategory === 'outlet') {
+                summaryCategory = savedCategory;
+            } else {
+                summaryCategory = 'pmd';
+            }
+        } else {
+            // Default condition: monthly PMD
+            summarySOType = 'monthly';
+            summaryCategory = 'pmd';
+        }
+
+        // Parse optional query params in hash if provided (e.g. #summary?so_type=quarterly&cat=warehouse_hub)
+        if (rawHash.includes('?')) {
+            const queryStr = rawHash.split('?')[1];
+            const params = new URLSearchParams(queryStr);
+            const qType = params.get('type') || params.get('so_type');
+            const qCat = params.get('cat') || params.get('category');
+            if (qType === 'quarterly' || qType === 'monthly') summarySOType = qType;
+            if (qCat) summaryCategory = qCat;
         }
 
         navigateTo(initialPage, true);
 
         // Listen for popstate / hashchange when user uses browser Back/Forward
         window.addEventListener('hashchange', () => {
-            const currentHash = window.location.hash.replace('#', '').trim();
+            const raw = (window.location.hash || '').replace('#', '').trim();
+            const currentHash = raw.split('?')[0].split('/')[0];
             if (allowedPages.includes(currentHash)) {
                 navigateTo(currentHash, false);
+            } else if (!currentHash) {
+                navigateTo('summary', false);
             }
         });
     }
@@ -154,9 +202,9 @@ const App = (() => {
             page = 'master-data';
         }
 
-        // Persist page in localStorage
+        // Persist page in sessionStorage for tab session / reload
         try {
-            localStorage.setItem('active_page', page);
+            sessionStorage.setItem('active_page', page);
         } catch (e) {
             // Ignore storage quota or security errors
         }
@@ -184,8 +232,7 @@ const App = (() => {
             loadMasterData();
             loadSiteRegional();
         } else if (page === 'summary') {
-            switchSummaryCategory(summaryCategory || 'pmd');
-            loadSummaryData();
+            switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
         }
     }
 
@@ -1538,16 +1585,20 @@ const App = (() => {
         }
     }
 
-    function switchSOType(type) {
-        summarySOType = type;
+    function switchSOType(type, targetCategory = null) {
+        summarySOType = (type === 'quarterly') ? 'quarterly' : 'monthly';
+
+        try {
+            sessionStorage.setItem('summary_so_type', summarySOType);
+        } catch (e) {}
 
         const btnMonthly = document.getElementById('btn-so-type-monthly');
         const btnQuarterly = document.getElementById('btn-so-type-quarterly');
         const statusText = document.getElementById('summary-so-type-status');
 
         if (btnMonthly && btnQuarterly) {
-            btnMonthly.classList.toggle('active', type === 'monthly');
-            btnQuarterly.classList.toggle('active', type === 'quarterly');
+            btnMonthly.classList.toggle('active', summarySOType === 'monthly');
+            btnQuarterly.classList.toggle('active', summarySOType === 'quarterly');
         }
 
         // Update BULAN dropdown based on SO Type (Monthly = 12 months, Quarterly = per 3 months)
@@ -1556,12 +1607,12 @@ const App = (() => {
         // Toggle Rekapitulasi sub-tabs (Outlet Regional / PMD only apply to Monthly)
         const rekapSubTabs = document.getElementById('rekap-tabs-level2');
         if (rekapSubTabs) {
-            rekapSubTabs.style.display = (type === 'monthly') ? 'flex' : 'none';
+            rekapSubTabs.style.display = (summarySOType === 'monthly') ? 'flex' : 'none';
         }
 
         const rekapSubtitle = document.querySelector('#card-rekapitulasi .card-subtitle');
         if (rekapSubtitle) {
-            rekapSubtitle.textContent = type === 'monthly'
+            rekapSubtitle.textContent = summarySOType === 'monthly'
                 ? 'Monthly Stock Opname'
                 : 'Quarterly Stock Opname';
         }
@@ -1569,7 +1620,7 @@ const App = (() => {
         // Update Trend Chart Subtitles
         const curYear = document.getElementById('summary-filter-year')?.value || 2026;
         document.querySelectorAll('.trend-chart-subtitle').forEach(el => {
-            el.textContent = (type === 'monthly')
+            el.textContent = (summarySOType === 'monthly')
                 ? `Monthly Physical % (Jan - Dec ${curYear})`
                 : `Quarterly Physical % (Q1 - Q4 ${curYear})`;
         });
@@ -1583,22 +1634,38 @@ const App = (() => {
         if (catSlider) catSlider.style.display = 'inline-flex';
         if (controlsDivider) controlsDivider.style.display = 'inline-block';
 
-        if (type === 'quarterly') {
+        let nextCat = targetCategory;
+        if (summarySOType === 'quarterly') {
             if (catSliderMonthly) catSliderMonthly.style.display = 'none';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'inline-flex';
-            switchSummaryCategory('outlet_subarep');
+            if (!nextCat || (nextCat !== 'outlet_subarep' && nextCat !== 'warehouse_hub')) {
+                nextCat = 'outlet_subarep';
+            }
         } else {
             if (catSliderMonthly) catSliderMonthly.style.display = 'inline-flex';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'none';
-            switchSummaryCategory('pmd');
+            if (!nextCat || (nextCat !== 'pmd' && nextCat !== 'outlet')) {
+                nextCat = 'pmd';
+            }
         }
 
+        switchSummaryCategory(nextCat);
         loadSummaryData();
         loadRekapitulasi();
     }
 
     function switchSummaryCategory(cat) {
+        if (cat === 'outlet_subarep' || cat === 'warehouse_hub') {
+            summarySOType = 'quarterly';
+        } else if (cat === 'pmd' || cat === 'outlet') {
+            summarySOType = 'monthly';
+        }
         summaryCategory = cat;
+
+        try {
+            sessionStorage.setItem('summary_so_type', summarySOType);
+            sessionStorage.setItem('summary_category', summaryCategory);
+        } catch (e) {}
 
         // 1. Sync button states for Monthly Category tabs
         const btnOutlet = document.getElementById('btn-summary-cat-outlet');
@@ -1812,33 +1879,56 @@ const App = (() => {
             summaryInitialized = true;
         }
 
-        // On first initial page load, if not initialized yet, fetch the latest period first
+        // On first initial page load, if not initialized yet, restore from session or fetch the latest period first
         if (!summaryInitialized) {
-            try {
-                const initRes = await fetch('api/reconciliation.php?action=summary&so_type=' + summarySOType);
-                const initJson = await initRes.json();
-                if (initJson.success && initJson.latest_period && initJson.latest_period.period_month && initJson.latest_period.period_year) {
-                    const lp = initJson.latest_period;
-                    if (monthSelect) monthSelect.value = lp.period_month.toString();
-                    if (yearSelect) {
-                        const yStr = lp.period_year.toString();
-                        if (!Array.from(yearSelect.options).some(opt => opt.value === yStr)) {
-                            const opt = document.createElement('option');
-                            opt.value = yStr;
-                            opt.textContent = yStr;
-                            yearSelect.appendChild(opt);
-                        }
-                        yearSelect.value = yStr;
-                    }
+            const savedMonth = sessionStorage.getItem('summary_filter_month');
+            const savedYear = sessionStorage.getItem('summary_filter_year');
+
+            if (savedMonth && savedYear && monthSelect && yearSelect) {
+                if (Array.from(monthSelect.options).some(opt => opt.value === savedMonth)) {
+                    monthSelect.value = savedMonth;
                 }
-            } catch (initErr) {
-                console.warn('Could not determine latest period, fallback to current dropdown:', initErr);
+                if (!Array.from(yearSelect.options).some(opt => opt.value === savedYear)) {
+                    const opt = document.createElement('option');
+                    opt.value = savedYear;
+                    opt.textContent = savedYear;
+                    yearSelect.appendChild(opt);
+                }
+                yearSelect.value = savedYear;
+                summaryInitialized = true;
+            } else {
+                try {
+                    const initRes = await fetch('api/reconciliation.php?action=summary&so_type=' + summarySOType);
+                    const initJson = await initRes.json();
+                    if (initJson.success && initJson.latest_period && initJson.latest_period.period_month && initJson.latest_period.period_year) {
+                        const lp = initJson.latest_period;
+                        if (monthSelect) monthSelect.value = lp.period_month.toString();
+                        if (yearSelect) {
+                            const yStr = lp.period_year.toString();
+                            if (!Array.from(yearSelect.options).some(opt => opt.value === yStr)) {
+                                const opt = document.createElement('option');
+                                opt.value = yStr;
+                                opt.textContent = yStr;
+                                yearSelect.appendChild(opt);
+                            }
+                            yearSelect.value = yStr;
+                        }
+                    }
+                } catch (initErr) {
+                    console.warn('Could not determine latest period, fallback to current dropdown:', initErr);
+                }
+                summaryInitialized = true;
             }
-            summaryInitialized = true;
         }
 
         const month = monthSelect ? monthSelect.value : '';
         const year = yearSelect ? yearSelect.value : '';
+
+        // Save selected filter month & year to sessionStorage for reload persistence
+        try {
+            if (month) sessionStorage.setItem('summary_filter_month', month);
+            if (year) sessionStorage.setItem('summary_filter_year', year);
+        } catch (e) {}
 
         // Update achievement card helper
         const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false) => {
@@ -3038,6 +3128,11 @@ const App = (() => {
     function switchRekapLevel2(level) {
         rekapLevel2 = level;
         summaryCategory = level;
+
+        try {
+            sessionStorage.setItem('summary_category', level);
+        } catch (e) {}
+
         document.querySelectorAll('.rekap-tab-l2').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-rekap-l2') === level);
         });

@@ -58,11 +58,11 @@ $currentYear = (int) date('Y');
 
         <!-- Only Two Menus: Master Data & Summary -->
         <nav class="navbar-menu">
-            <button class="nav-link active" data-page="master-data" id="tab-master-data"
+            <button class="nav-link" data-page="master-data" id="tab-master-data"
                 onclick="App.navigateTo('master-data')">
                 Master Data
             </button>
-            <button class="nav-link" data-page="summary" id="tab-summary" onclick="App.navigateTo('summary')">
+            <button class="nav-link active" data-page="summary" id="tab-summary" onclick="App.navigateTo('summary')">
                 Summary
             </button>
         </nav>
@@ -74,7 +74,7 @@ $currentYear = (int) date('Y');
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- PAGE 1: Stock Opname Master Data (21-Column with Pagination) -->
         <!-- ═══════════════════════════════════════════════════════════ -->
-        <section id="page-master-data" class="page-section active">
+        <section id="page-master-data" class="page-section">
             <div class="card">
                 <div class="card-header">
                     <div>
@@ -390,16 +390,18 @@ $currentYear = (int) date('Y');
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- PAGE 2: Stock Opname Summary (KPI Overview & Roll-Up)        -->
         <!-- ═══════════════════════════════════════════════════════════ -->
-        <section id="page-summary" class="page-section">
+        <section id="page-summary" class="page-section active">
             <!-- ── Unified Dashboard Controls: SO Type, Category & Periode ────── -->
-            <div class="card" style="margin-bottom: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div class="card"
+                style="margin-bottom: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
                 <div class="card-header"
                     style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; padding: 0.75rem 1.25rem;">
                     <!-- Left: SO Type & Category Selectors -->
                     <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
                         <!-- SO Type Toggle -->
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">SO TYPE:</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">SO
+                                TYPE:</span>
                             <div class="summary-type-slider-wrapper">
                                 <button type="button" class="summary-type-slider-btn active" id="btn-so-type-monthly"
                                     onclick="App.switchSOType('monthly')">
@@ -413,11 +415,14 @@ $currentYear = (int) date('Y');
                         </div>
 
                         <!-- Divider -->
-                        <div id="summary-controls-divider" style="width: 1px; height: 24px; background: #e2e8f0; display: inline-block;"></div>
+                        <div id="summary-controls-divider"
+                            style="width: 1px; height: 24px; background: #e2e8f0; display: inline-block;"></div>
 
                         <!-- Category Toggle -->
-                        <div id="summary-cat-slider-card" style="display: inline-flex; align-items: center; gap: 0.6rem; margin: 0; padding: 0; background: transparent; border: none; box-shadow: none;">
-                            <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">CATEGORY:</span>
+                        <div id="summary-cat-slider-card"
+                            style="display: inline-flex; align-items: center; gap: 0.6rem; margin: 0; padding: 0; background: transparent; border: none; box-shadow: none;">
+                            <span
+                                style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">CATEGORY:</span>
                             <!-- Monthly Categories -->
                             <div class="summary-type-slider-wrapper" id="cat-slider-monthly">
                                 <button type="button" class="summary-type-slider-btn active" id="btn-summary-cat-pmd"
@@ -431,8 +436,8 @@ $currentYear = (int) date('Y');
                             </div>
                             <!-- Quarterly Categories -->
                             <div class="summary-type-slider-wrapper" id="cat-slider-quarterly" style="display: none;">
-                                <button type="button" class="summary-type-slider-btn active" id="btn-summary-cat-subarep"
-                                    onclick="App.switchSummaryCategory('outlet_subarep')">
+                                <button type="button" class="summary-type-slider-btn active"
+                                    id="btn-summary-cat-subarep" onclick="App.switchSummaryCategory('outlet_subarep')">
                                     <span>Outlet Subarep</span>
                                 </button>
                                 <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-warehouse"
@@ -452,7 +457,8 @@ $currentYear = (int) date('Y');
                             <label for="summary-filter-month"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">BULAN</label>
                             <select id="summary-filter-month" class="form-control"
-                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;" onchange="App.loadSummaryData()">
+                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;"
+                                onchange="App.loadSummaryData()">
                                 <option value="">Semua Bulan</option>
                                 <option value="1">Januari</option>
                                 <option value="2">Februari</option>
@@ -472,7 +478,8 @@ $currentYear = (int) date('Y');
                             <label for="summary-filter-year"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">TAHUN</label>
                             <select id="summary-filter-year" class="form-control"
-                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;" onchange="App.loadSummaryData()">
+                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;"
+                                onchange="App.loadSummaryData()">
                                 <option value="2026" selected>2026</option>
                                 <option value="2027">2027</option>
                                 <option value="2028">2028</option>
@@ -624,8 +631,9 @@ $currentYear = (int) date('Y');
                                         <th style="padding: 8px 10px; width: 45px; text-align: center;">NO</th>
                                         <th style="padding: 8px 10px; width: 120px; text-align: center;">SITE CODE</th>
                                         <th style="padding: 8px 10px;">NAMA SITE</th>
-                                        <th style="padding: 8px 10px;">REGIONAL / DEPT</th>
-                                        <th style="padding: 8px 10px; text-align: center; min-width: 175px;">LOG HISTORY</th>
+                                        <th style="padding: 8px 10px;">REGIONAL / SUB DEPT</th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 175px;">LOG HISTORY
+                                        </th>
                                         <th style="padding: 8px 10px; text-align: center; width: 120px;">PERIODE EFEKTIF
                                         </th>
                                         <th style="padding: 8px 10px;">KETERANGAN</th>
