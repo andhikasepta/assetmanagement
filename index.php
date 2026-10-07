@@ -812,7 +812,7 @@ $currentYear = (int) date('Y');
 
                 <!-- Outlet Regional Cards (Hidden by default) -->
                 <div class="kpi-card kpi-card-split" id="kpi-card-national" style="display: none;">
-                    <div class="kpi-title">Summary Outlet Regional Achievement</div>
+                    <div class="kpi-title" id="kpi-national-title">Summary Outlet Regional Achievement</div>
                     <div class="kpi-card-main">
                         <div class="kpi-split-value" id="kpi-national-achievement">0%</div>
                         <div class="kpi-split-trend" id="kpi-national-trend"></div>
@@ -857,30 +857,174 @@ $currentYear = (int) date('Y');
                 </div>
             </div>
 
-            <!-- ── Card: Score Card Summary (Rating & SO Execution - Rolling 3 Months) ── -->
+            <!-- ── Card: Score Card Summary ── -->
             <div class="card" id="card-scorecard-summary" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                 <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
-                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                            <h2 class="card-title" style="margin: 0;">Score Card Summary</h2>
-                            <span id="scorecard-period-badge" class="badge"
-                                style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
-                                Juli - September 2026
-                            </span>
-                        </div>
+                        <h2 class="card-title" style="margin: 0;">Score Card Summary</h2>
                     </div>
                 </div>
 
                 <div class="card-body" style="padding: 0;">
+                    <!-- Top Sub-Card: National Stock Opname Rating (3 Months Backdate in 3 Separate Tables) -->
+                    <div style="padding: 1rem 1.25rem 0 1.25rem;">
+                        <div class="scorecard-subcard" id="scorecard-national-card">
+                            <div class="scorecard-subcard-header">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <h3 style="margin: 0; font-size: 13.5px; font-weight: 700; color: #0f172a;">
+                                            National Stock Opname Rating
+                                        </h3>
+                                        <span id="scorecard-national-period-badge" class="badge"
+                                            style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 2.5px 8px; border-radius: 6px; letter-spacing: 0.2px;">
+                                            Juli - September 2026
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <label for="national-rating-filter"
+                                        style="font-size: 11px; font-weight: 600; color: #64748b; margin: 0;">Rating:</label>
+                                    <select id="national-rating-filter" class="form-control form-control-sm"
+                                        style="font-size: 11.5px; padding: 2px 8px; width: auto; min-width: 125px; height: 28px;"
+                                        onchange="App.onNationalRatingFilterChange(this.value)">
+                                        <option value="all">Semua Rating</option>
+                                        <option value="very_poor" selected>Very Poor</option>
+                                        <option value="poor">Poor</option>
+                                        <option value="moderate">Moderate</option>
+                                        <option value="good">Good</option>
+                                        <option value="very_good">Very Good</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="scorecard-subcard-body" style="padding: 0.85rem 1rem;">
+                                <!-- 3 Tables Grid for m1, m2, m3 -->
+                                <div class="national-rating-grid">
+                                    <!-- Table 1: Month 1 -->
+                                    <div class="national-rating-col"
+                                        style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
+                                        <div
+                                            style="padding: 0.5rem 0.75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                            <span id="national-col-title-m1"
+                                                style="font-size: 11.5px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">BULAN
+                                                1</span>
+                                            <span id="national-col-count-m1" class="badge"
+                                                style="background: #e2e8f0; color: #475569; font-size: 10px; padding: 2px 6px;">0
+                                                Sites</span>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                                            <table class="reconciliation-table scorecard-table">
+                                                <thead>
+                                                    <tr
+                                                        style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        <th class="scorecard-col-no">NO</th>
+                                                        <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                        <th class="scorecard-col-sitecode">SITE CODE</th>
+                                                        <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                        <th class="scorecard-col-month">%</th>
+                                                        <th class="scorecard-col-status">RATING</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="national-rating-tbody-m1">
+                                                    <tr>
+                                                        <td colspan="6" class="text-center"
+                                                            style="padding: 1.5rem; color: #94a3b8;">No data</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Table 2: Month 2 -->
+                                    <div class="national-rating-col"
+                                        style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
+                                        <div
+                                            style="padding: 0.5rem 0.75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                            <span id="national-col-title-m2"
+                                                style="font-size: 11.5px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">BULAN
+                                                2</span>
+                                            <span id="national-col-count-m2" class="badge"
+                                                style="background: #e2e8f0; color: #475569; font-size: 10px; padding: 2px 6px;">0
+                                                Sites</span>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                                            <table class="reconciliation-table scorecard-table">
+                                                <thead>
+                                                    <tr
+                                                        style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        <th class="scorecard-col-no">NO</th>
+                                                        <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                        <th class="scorecard-col-sitecode">SITE CODE</th>
+                                                        <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                        <th class="scorecard-col-month">%</th>
+                                                        <th class="scorecard-col-status">RATING</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="national-rating-tbody-m2">
+                                                    <tr>
+                                                        <td colspan="6" class="text-center"
+                                                            style="padding: 1.5rem; color: #94a3b8;">No data</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Table 3: Month 3 -->
+                                    <div class="national-rating-col"
+                                        style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
+                                        <div
+                                            style="padding: 0.5rem 0.75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                            <span id="national-col-title-m3"
+                                                style="font-size: 11.5px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">BULAN
+                                                3</span>
+                                            <span id="national-col-count-m3" class="badge"
+                                                style="background: #e2e8f0; color: #475569; font-size: 10px; padding: 2px 6px;">0
+                                                Sites</span>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                                            <table class="reconciliation-table scorecard-table">
+                                                <thead>
+                                                    <tr
+                                                        style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        <th class="scorecard-col-no">NO</th>
+                                                        <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                        <th class="scorecard-col-sitecode">SITE CODE</th>
+                                                        <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                        <th class="scorecard-col-month">%</th>
+                                                        <th class="scorecard-col-status">RATING</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="national-rating-tbody-m3">
+                                                    <tr>
+                                                        <td colspan="6" class="text-center"
+                                                            style="padding: 1.5rem; color: #94a3b8;">No data</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Grid: Rating Summary & SO Execution Summary (Selected Period) -->
                     <div class="scorecard-grid">
                         <!-- Sub-Card 1: Rating -->
                         <div class="scorecard-subcard" id="scorecard-rating-card">
                             <div class="scorecard-subcard-header">
                                 <div>
-                                    <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Rating
-                                        Summary</h3>
-                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Evaluasi performa
-                                        SO Sites</p>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Rating
+                                            Summary</h3>
+                                        <span id="scorecard-rating-period-badge" class="badge"
+                                            style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 2.5px 7px; border-radius: 6px;">
+                                            September 2026
+                                        </span>
+                                    </div>
+                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;"
+                                        id="scorecard-rating-subtitle">Evaluasi performa
+                                        SO Sites periode terpilih</p>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.35rem;">
                                     <label for="scorecard-rating-filter"
@@ -944,17 +1088,17 @@ $currentYear = (int) date('Y');
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     <th class="scorecard-col-no">NO</th>
+                                                    <th class="scorecard-col-subdept">SUB DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
                                                     <th class="scorecard-col-namesite">NAMA SITE</th>
-                                                    <th id="sc-rating-th-m1" class="scorecard-col-month">JUL</th>
-                                                    <th id="sc-rating-th-m2" class="scorecard-col-month">AGU</th>
-                                                    <th id="sc-rating-th-m3" class="scorecard-col-month">SEP</th>
+                                                    <th id="sc-rating-th-selected" class="scorecard-col-month">FISIK %
+                                                    </th>
                                                     <th class="scorecard-col-status">RATING</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="scorecard-rating-tbody">
                                                 <tr>
-                                                    <td colspan="7" class="text-center"
+                                                    <td colspan="6" class="text-center"
                                                         style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                                                         <div
                                                             style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
@@ -973,10 +1117,17 @@ $currentYear = (int) date('Y');
                         <div class="scorecard-subcard" id="scorecard-exec-card">
                             <div class="scorecard-subcard-header">
                                 <div>
-                                    <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">SO
-                                        Execution Summary</h3>
-                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Status eksekusi SO
-                                        Sites</p>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">SO
+                                            Execution Summary</h3>
+                                        <span id="scorecard-exec-period-badge" class="badge"
+                                            style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 2.5px 7px; border-radius: 6px;">
+                                            September 2026
+                                        </span>
+                                    </div>
+                                    <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;"
+                                        id="scorecard-exec-subtitle">Status eksekusi SO
+                                        Sites periode terpilih</p>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.35rem;">
                                     <label for="scorecard-execution-filter"
@@ -1022,17 +1173,17 @@ $currentYear = (int) date('Y');
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     <th class="scorecard-col-no">NO</th>
+                                                    <th class="scorecard-col-subdept">SUB DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
                                                     <th class="scorecard-col-namesite">NAMA SITE</th>
-                                                    <th id="sc-exec-th-m1" class="scorecard-col-month">JUL</th>
-                                                    <th id="sc-exec-th-m2" class="scorecard-col-month">AGU</th>
-                                                    <th id="sc-exec-th-m3" class="scorecard-col-month">SEP</th>
+                                                    <th id="sc-exec-th-selected" class="scorecard-col-month">FISIK %
+                                                    </th>
                                                     <th class="scorecard-col-status">STATUS</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="scorecard-exec-tbody">
                                                 <tr>
-                                                    <td colspan="7" class="text-center"
+                                                    <td colspan="6" class="text-center"
                                                         style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                                                         <div
                                                             style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
@@ -1092,7 +1243,7 @@ $currentYear = (int) date('Y');
                                 style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
                         </div>
                         <div class="card-body" style="padding: 1rem; position: relative;">
-                            <div style="position: relative; height: 260px; width: 100%;">
+                            <div style="position: relative; height: 320px; width: 100%;">
                                 <canvas id="chart-trend-pmd"></canvas>
                             </div>
                         </div>
@@ -1115,7 +1266,7 @@ $currentYear = (int) date('Y');
                                 Regional</span>
                         </div>
                         <div class="card-body" style="padding: 1rem; position: relative;">
-                            <div style="position: relative; height: 260px; width: 100%;">
+                            <div style="position: relative; height: 420px; width: 100%;">
                                 <canvas id="chart-trend-subdept"></canvas>
                             </div>
                         </div>
@@ -1229,7 +1380,7 @@ $currentYear = (int) date('Y');
                                         </tr>
                                     </tbody>
                                     <tfoot id="subdept-results-tfoot"
-                                        style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                                        style="position: sticky; bottom: 0; z-index: 5; background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
                                     </tfoot>
                                 </table>
                             </div>
@@ -1716,7 +1867,7 @@ $currentYear = (int) date('Y');
 
     <!-- Scripts -->
     <script src="assets/js/chart.umd.min.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 
 </body>
 

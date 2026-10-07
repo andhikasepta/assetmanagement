@@ -1354,6 +1354,28 @@ th.sortable.desc .sort-indicator {
     border-bottom: 1px solid #f1f5f9;
 }
 
+.so-subdept-table tfoot {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background-color: #f8fafc;
+}
+
+.so-subdept-table tfoot tr {
+    position: sticky;
+    bottom: 0;
+}
+
+.so-subdept-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    background-color: #f8fafc !important;
+    border-top: 2px solid #cbd5e1 !important;
+    border-bottom: none !important;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);
+    z-index: 5;
+}
+
 .so-progress-container {
     display: flex;
     flex-direction: column;
@@ -1653,6 +1675,18 @@ th.sortable.desc .sort-indicator {
 }
 
 /* ── Score Card Summary Styles (Rolling 3 Months - Chart at Bottom) ──────── */
+.national-rating-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+    .national-rating-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .scorecard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
@@ -1738,6 +1772,16 @@ th.sortable.desc .sort-indicator {
 .scorecard-col-namesite {
     width: 120px !important;
     max-width: 160px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.scorecard-col-subdept {
+    width: 75px !important;
+    min-width: 65px !important;
+    max-width: 95px !important;
+    text-align: center;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;

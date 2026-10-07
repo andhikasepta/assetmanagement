@@ -21,6 +21,7 @@ try {
         $month = isset($_GET['month']) && $_GET['month'] !== '' ? (int) $_GET['month'] : null;
         $year = isset($_GET['year']) && $_GET['year'] !== '' ? (int) $_GET['year'] : null;
         $soType = trim($_GET['so_type'] ?? 'monthly');
+        $category = trim($_GET['category'] ?? '');
         $srCategories = ($soType === 'quarterly')
             ? "'quarterly', 'quarterly_outlet'"
             : "'monthly_outlet', 'monthly_pmd'";
@@ -63,7 +64,7 @@ try {
         };
 
         // Helper function to calculate regional & national achievements
-        $getAchievements = function (PDO $db, ?int $m = null, ?int $y = null, string $srCats = "", string $type = 'monthly') use ($getEffectiveTypes) {
+        $getAchievements = function (PDO $db, ?int $m = null, ?int $y = null, string $srCats = "", string $type = 'monthly', string $category = '') use ($getEffectiveTypes) {
             $whereParts = [];
             $params = [];
             if ($y) {
@@ -117,9 +118,21 @@ try {
                 }
 
                 $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                $info = trim($s['info'] ?? '');
+
                 if ($type === 'quarterly') {
                     if (!$isPmd && $effType === 'quarterly') {
-                        $sites[] = $s;
+                        if ($category === 'outlet_subarep') {
+                            if (in_array($info, ['Subarep', 'Outlet']) || $info === '') {
+                                $sites[] = $s;
+                            }
+                        } elseif ($category === 'warehouse_hub') {
+                            if (in_array($info, ['Under Warehouse', 'HUB'])) {
+                                $sites[] = $s;
+                            }
+                        } else {
+                            $sites[] = $s;
+                        }
                     }
                 } else {
                     if ($isPmd || $effType === 'monthly') {
@@ -272,7 +285,7 @@ try {
         $totalsStmt->execute($filterParams);
         $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC);
 
-        $achievements = $getAchievements($db, $month, $year, $srCategories, $soType);
+        $achievements = $getAchievements($db, $month, $year, $srCategories, $soType, $category);
 
         // Query the latest uploaded period in asset_reconciliation
         $latestWhere = ($soType === 'quarterly')

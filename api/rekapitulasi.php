@@ -295,7 +295,33 @@ try {
     } elseif ($category === 'quarterly' || $category === 'quarterly_outlet') {
         $whereParts[] = "dept != 'PMD' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } else {
-        $whereParts[] = "dept != 'PMD'";
+        $whereParts[] = "dept != 'PMD' AND (
+            EXISTS (
+                SELECT 1 FROM asset_reconciliation ar 
+                WHERE ar.period_year = {$year}
+                  AND (
+                      ar.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                      OR ar.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                      OR ar.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                      OR ar.profile ILIKE '%' || site_regional.sitecode || '%'
+                  )
+                  AND ar.profile !~* '\\mQ[1-4]\\M'
+            )
+            OR (
+                group_type != 'quarterly'
+                AND NOT EXISTS (
+                    SELECT 1 FROM asset_reconciliation ar_q 
+                    WHERE ar_q.period_year = {$year}
+                      AND (
+                          ar_q.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                          OR ar_q.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                          OR ar_q.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                          OR ar_q.profile ILIKE '%' || site_regional.sitecode || '%'
+                      )
+                      AND ar_q.profile ~* '\\mQ[1-4]\\M'
+                )
+            )
+        )";
     }
 
     $whereParts[] = "COALESCE(is_active, TRUE) = TRUE";
@@ -465,6 +491,32 @@ try {
             if ($val !== null) {
                 $monthTotals[$m]['sum'] += $val;
                 $monthTotals[$m]['count']++;
+            }
+        }
+
+        // For monthly view: if a site has no monthly values at all and only quarterly profiles, skip it
+        if (!$isQuarterlyCat) {
+            $hasAnyMonthly = false;
+            foreach ($months as $mVal) {
+                if ($mVal !== null) {
+                    $hasAnyMonthly = true;
+                    break;
+                }
+            }
+            if (!$hasAnyMonthly) {
+                $hasQuarterlyOnly = false;
+                if (!empty($recByCodeAndMonth[$upperCode])) {
+                    $hasQuarterlyOnly = true;
+                    foreach ($recByCodeAndMonth[$upperCode] as $mEntry) {
+                        if (isset($mEntry['m'])) {
+                            $hasQuarterlyOnly = false;
+                            break;
+                        }
+                    }
+                }
+                if ($hasQuarterlyOnly || ($s['group_type'] ?? '') === 'quarterly') {
+                    continue;
+                }
             }
         }
 

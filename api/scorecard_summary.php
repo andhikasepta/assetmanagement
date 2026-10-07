@@ -310,6 +310,7 @@ try {
     foreach ($sites as $s) {
         $sc = trim($s['sitecode'] ?? '');
         $name = trim($s['name_site'] ?? '-');
+        $subDept = trim($s['sub_dept'] ?? '-');
 
         $p1 = $getSitePct($sc, $m1Info['year'], $m1Info['month']);
         $p2 = $getSitePct($sc, $m2Info['year'], $m2Info['month']);
@@ -325,10 +326,15 @@ try {
         $ratingList[] = [
             'sitecode'  => $sc,
             'name_site' => $name,
+            'sub_dept'  => $subDept,
+            'pct'       => $p3 !== null ? round($p3, 2) : null,
+            'rating'    => $rating,
             'm1_pct'    => $p1 !== null ? round($p1, 2) : null,
+            'm1_rating' => $evalRating($p1),
             'm2_pct'    => $p2 !== null ? round($p2, 2) : null,
+            'm2_rating' => $evalRating($p2),
             'm3_pct'    => $p3 !== null ? round($p3, 2) : null,
-            'rating'    => $rating
+            'm3_rating' => $rating,
         ];
 
         // Evaluate Execution using latest month (m3)
@@ -341,13 +347,15 @@ try {
         $execList[] = [
             'sitecode'         => $sc,
             'name_site'        => $name,
+            'sub_dept'         => $subDept,
+            'pct'              => $p3 !== null ? round($p3, 2) : null,
+            'execution_status' => $execStatus,
             'm1_pct'           => $p1 !== null ? round($p1, 2) : null,
             'm2_pct'           => $p2 !== null ? round($p2, 2) : null,
             'm3_pct'           => $p3 !== null ? round($p3, 2) : null,
             'm1_status'        => $evalExec($p1),
             'm2_status'        => $evalExec($p2),
             'm3_status'        => $evalExec($p3),
-            'execution_status' => $execStatus
         ];
     }
 

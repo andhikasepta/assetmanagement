@@ -524,6 +524,35 @@ try {
                 ON CONFLICT (sitecode, effective_year, effective_month)
                 DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
             ");
+
+            // Sync site_regional group_type to 'quarterly' for sites that only have quarterly profiles (no monthly profiles)
+            $db->exec("
+                UPDATE site_regional
+                SET group_type = 'quarterly',
+                    category = CASE WHEN category = 'monthly_outlet' THEN 'quarterly' ELSE category END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE dept != 'PMD'
+                  AND EXISTS (
+                      SELECT 1 FROM asset_reconciliation ar
+                      WHERE (
+                          ar.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                          OR ar.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                          OR ar.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                          OR ar.profile ILIKE '%' || site_regional.sitecode || '%'
+                      )
+                      AND ar.profile ~* '\\mQ[1-4]\\M'
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM asset_reconciliation ar_m
+                      WHERE (
+                          ar_m.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                          OR ar_m.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                          OR ar_m.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                          OR ar_m.profile ILIKE '%' || site_regional.sitecode || '%'
+                      )
+                      AND ar_m.profile !~* '\\mQ[1-4]\\M'
+                  )
+            ");
         }
 
         $db->commit();

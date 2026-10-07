@@ -2241,26 +2241,28 @@ const App = (() => {
             if (catSliderMonthly) catSliderMonthly.style.display = 'none';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'inline-flex';
             if (!nextCat || (nextCat !== 'outlet_subarep' && nextCat !== 'warehouse_hub')) {
-                nextCat = 'outlet_subarep';
+                const savedQCat = sessionStorage.getItem('summary_category_quarterly');
+                nextCat = (savedQCat === 'warehouse_hub') ? 'warehouse_hub' : 'outlet_subarep';
             }
         } else {
             if (catSliderMonthly) catSliderMonthly.style.display = 'inline-flex';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'none';
             if (!nextCat || (nextCat !== 'pmd' && nextCat !== 'outlet')) {
-                nextCat = 'pmd';
+                const savedMCat = sessionStorage.getItem('summary_category_monthly');
+                nextCat = (savedMCat === 'outlet') ? 'outlet' : 'pmd';
             }
         }
 
         switchSummaryCategory(nextCat);
-        loadSummaryData();
-        loadRekapitulasi();
     }
 
     function switchSummaryCategory(cat) {
         if (cat === 'outlet_subarep' || cat === 'warehouse_hub') {
             summarySOType = 'quarterly';
+            try { sessionStorage.setItem('summary_category_quarterly', cat); } catch (e) { }
         } else if (cat === 'pmd' || cat === 'outlet') {
             summarySOType = 'monthly';
+            try { sessionStorage.setItem('summary_category_monthly', cat); } catch (e) { }
         }
         summaryCategory = cat;
 
@@ -2322,6 +2324,18 @@ const App = (() => {
         }
 
         const showOutletKpis = (cat === 'outlet' || cat === 'outlet_subarep' || cat === 'warehouse_hub');
+
+        // Update National / Category KPI card title
+        const natTitleEl = document.getElementById('kpi-national-title');
+        if (natTitleEl) {
+            if (cat === 'outlet_subarep') {
+                natTitleEl.textContent = 'Summary Outlet Subarep Achievement';
+            } else if (cat === 'warehouse_hub') {
+                natTitleEl.textContent = 'Summary Warehouse HUB Achievement';
+            } else {
+                natTitleEl.textContent = 'Summary Outlet Regional Achievement';
+            }
+        }
 
         outletKpiCards.forEach(id => {
             const el = document.getElementById(id);
@@ -2396,6 +2410,7 @@ const App = (() => {
         const yearSelect = document.getElementById('summary-filter-year');
         loadTrendCharts(yearSelect ? yearSelect.value : 2026);
         loadScoreCardSummary();
+        loadSummaryData();
     }
 
     function updateHasilSOCardUI() {
@@ -2591,7 +2606,11 @@ const App = (() => {
         };
 
         try {
-            const params = new URLSearchParams({ action: 'summary', so_type: summarySOType });
+            const params = new URLSearchParams({
+                action: 'summary',
+                so_type: summarySOType,
+                category: summaryCategory
+            });
             if (month) params.append('month', month);
             if (year) params.append('year', year);
 
@@ -2614,7 +2633,22 @@ const App = (() => {
             const dno = ach.dno || {};
             const dso = ach.dso || {};
 
-            updateAchCard('kpi-national-achievement', 'kpi-national-subtext', 'kpi-national-trend', 'kpi-national-status', nat, 'Avg Outlet Regional', false);
+            let natTitle = 'Summary Outlet Regional Achievement';
+            let natDefaultLabel = 'Avg Outlet Regional';
+            if (summarySOType === 'quarterly') {
+                if (summaryCategory === 'outlet_subarep') {
+                    natTitle = 'Summary Outlet Subarep Achievement';
+                    natDefaultLabel = 'Avg Outlet Subarep';
+                } else if (summaryCategory === 'warehouse_hub') {
+                    natTitle = 'Summary Warehouse HUB Achievement';
+                    natDefaultLabel = 'Avg Warehouse HUB';
+                }
+            }
+
+            const natTitleEl = document.getElementById('kpi-national-title');
+            if (natTitleEl) natTitleEl.textContent = natTitle;
+
+            updateAchCard('kpi-national-achievement', 'kpi-national-subtext', 'kpi-national-trend', 'kpi-national-status', nat, natDefaultLabel, false);
             updateAchCard('kpi-cro-achievement', 'kpi-cro-subtext', 'kpi-cro-trend', 'kpi-cro-status', cro, 'Avg DEPT CRO', false);
             updateAchCard('kpi-ero-achievement', 'kpi-ero-subtext', 'kpi-ero-trend', 'kpi-ero-status', ero, 'Avg DEPT ERO', false);
             updateAchCard('kpi-wro-achievement', 'kpi-wro-subtext', 'kpi-wro-trend', 'kpi-wro-status', wro, 'Avg DEPT WRO', false);
@@ -2955,8 +2989,10 @@ const App = (() => {
 
     let scorecardRatingData = [];
     let scorecardExecutionData = [];
+    let scorecardPeriod = null;
     let currentRatingFilter = 'all';
     let currentExecutionFilter = 'all';
+    let currentNationalRatingFilter = 'very_poor';
 
     function getThreeMonthsBack(year, month) {
         const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -2984,7 +3020,8 @@ const App = (() => {
                 quarters.push({
                     month: tq * 3,
                     year: ty,
-                    label: `Q${tq}`
+                    label: `Q${tq}`,
+                    fullName: `Q${tq} ${ty}`
                 });
             }
             return quarters;
@@ -3003,7 +3040,8 @@ const App = (() => {
                 year: targetY,
                 fullName: `${monthNames[targetM]} ${targetY}`,
                 shortName: `${shortNames[targetM]} ${targetY}`,
-                label: shortNames[targetM].toUpperCase()
+                label: shortNames[targetM].toUpperCase(),
+                monthName: monthNames[targetM]
             });
         }
         return months;
@@ -3017,27 +3055,74 @@ const App = (() => {
 
         const threeMonths = getThreeMonthsBack(y, m);
 
-        const badgeEl = document.getElementById('scorecard-period-badge');
-        if (badgeEl && threeMonths.length === 3) {
+        // 1. National Stock Opname Rating 3-Month Period Badge
+        const natBadgeEl = document.getElementById('scorecard-national-period-badge') || document.getElementById('scorecard-period-badge');
+        if (natBadgeEl && threeMonths.length === 3) {
             const first = threeMonths[0];
             const last = threeMonths[2];
+            const fName = first.monthName || first.label;
+            const lName = last.monthName || last.label;
             if (first.year === last.year) {
-                badgeEl.textContent = `${first.label} - ${last.label} ${last.year}`;
+                natBadgeEl.textContent = `${fName} - ${lName} ${last.year}`;
             } else {
-                badgeEl.textContent = `${first.label} ${first.year} - ${last.label} ${last.year}`;
+                natBadgeEl.textContent = `${fName} ${first.year} - ${lName} ${last.year}`;
             }
         }
 
-        // Update headers for Rating & Execution tables immediately
+        const natSubtitle = document.getElementById('national-rating-subtitle');
+        if (natSubtitle && threeMonths.length === 3) {
+            natSubtitle.textContent = `Performa rating 3 periode berturut-turut (${threeMonths[0].label} - ${threeMonths[2].label})`;
+        }
+
+        // Sync National Rating filter from dropdown (defaults to 'very_poor' on initial load)
+        const natFilterEl = document.getElementById('national-rating-filter');
+        if (natFilterEl && natFilterEl.value) {
+            currentNationalRatingFilter = natFilterEl.value;
+        } else if (natFilterEl) {
+            natFilterEl.value = currentNationalRatingFilter;
+        }
+
+        // 2. Current / Selected Month Period Badges for Rating Summary and SO Execution Summary
+        const currentPeriodLabel = (threeMonths.length === 3)
+            ? (threeMonths[2].fullName || `${threeMonths[2].label} ${threeMonths[2].year}`)
+            : `${m}/${y}`;
+
+        const ratingBadgeEl = document.getElementById('scorecard-rating-period-badge');
+        if (ratingBadgeEl) {
+            ratingBadgeEl.textContent = currentPeriodLabel;
+        }
+
+        const execBadgeEl = document.getElementById('scorecard-exec-period-badge');
+        if (execBadgeEl) {
+            execBadgeEl.textContent = currentPeriodLabel;
+        }
+
+        const scRatingSubtitle = document.getElementById('scorecard-rating-subtitle');
+        if (scRatingSubtitle) {
+            scRatingSubtitle.textContent = `Evaluasi performa SO Sites`;
+        }
+        const scExecSubtitle = document.getElementById('scorecard-exec-subtitle');
+        if (scExecSubtitle) {
+            scExecSubtitle.textContent = `Status eksekusi SO Sites`;
+        }
+
+        const thRatingSel = document.getElementById('sc-rating-th-selected');
+        if (thRatingSel && threeMonths.length === 3) {
+            thRatingSel.textContent = `${threeMonths[2].label} (%)`;
+        }
+        const thExecSel = document.getElementById('sc-exec-th-selected');
+        if (thExecSel && threeMonths.length === 3) {
+            thExecSel.textContent = `${threeMonths[2].label} (%)`;
+        }
+
+        // Set initial header titles for National 3 columns
         if (threeMonths.length === 3) {
-            ['sc-rating-th', 'sc-exec-th'].forEach(prefix => {
-                const th1 = document.getElementById(`${prefix}-m1`);
-                const th2 = document.getElementById(`${prefix}-m2`);
-                const th3 = document.getElementById(`${prefix}-m3`);
-                if (th1) th1.textContent = threeMonths[0].label;
-                if (th2) th2.textContent = threeMonths[1].label;
-                if (th3) th3.textContent = threeMonths[2].label;
-            });
+            const title1 = document.getElementById('national-col-title-m1');
+            const title2 = document.getElementById('national-col-title-m2');
+            const title3 = document.getElementById('national-col-title-m3');
+            if (title1) title1.textContent = `${threeMonths[0].label} ${threeMonths[0].year}`;
+            if (title2) title2.textContent = `${threeMonths[1].label} ${threeMonths[1].year}`;
+            if (title3) title3.textContent = `${threeMonths[2].label} ${threeMonths[2].year}`;
         }
 
         try {
@@ -3047,18 +3132,23 @@ const App = (() => {
             if (json.success) {
                 scorecardRatingData = json.rating || [];
                 scorecardExecutionData = json.execution || [];
+                scorecardPeriod = json.period || null;
 
                 if (json.period && json.period.m1 && json.period.m2 && json.period.m3) {
-                    ['sc-rating-th', 'sc-exec-th'].forEach(prefix => {
-                        const th1 = document.getElementById(`${prefix}-m1`);
-                        const th2 = document.getElementById(`${prefix}-m2`);
-                        const th3 = document.getElementById(`${prefix}-m3`);
-                        if (th1) th1.textContent = json.period.m1.label;
-                        if (th2) th2.textContent = json.period.m2.label;
-                        if (th3) th3.textContent = json.period.m3.label;
-                    });
+                    const title1 = document.getElementById('national-col-title-m1');
+                    const title2 = document.getElementById('national-col-title-m2');
+                    const title3 = document.getElementById('national-col-title-m3');
+                    if (title1) title1.textContent = `${json.period.m1.label} ${json.period.m1.year}`;
+                    if (title2) title2.textContent = `${json.period.m2.label} ${json.period.m2.year}`;
+                    if (title3) title3.textContent = `${json.period.m3.label} ${json.period.m3.year}`;
+
+                    const thRatingSel = document.getElementById('sc-rating-th-selected');
+                    if (thRatingSel) thRatingSel.textContent = `${json.period.m3.label} (%)`;
+                    const thExecSel = document.getElementById('sc-exec-th-selected');
+                    if (thExecSel) thExecSel.textContent = `${json.period.m3.label} (%)`;
                 }
 
+                renderNationalScoreCardRating();
                 renderScoreCardRating();
                 renderScoreCardExecution();
                 renderScoreCardRatingPieChart(json.rating_counts);
@@ -3067,6 +3157,8 @@ const App = (() => {
                 console.warn('Scorecard summary failed:', json.message);
                 scorecardRatingData = [];
                 scorecardExecutionData = [];
+                scorecardPeriod = null;
+                renderNationalScoreCardRating();
                 renderScoreCardRating();
                 renderScoreCardExecution();
                 renderScoreCardRatingPieChart(null);
@@ -3076,6 +3168,8 @@ const App = (() => {
             console.error('Error fetching scorecard summary:', err);
             scorecardRatingData = [];
             scorecardExecutionData = [];
+            scorecardPeriod = null;
+            renderNationalScoreCardRating();
             renderScoreCardRating();
             renderScoreCardExecution();
             renderScoreCardRatingPieChart(null);
@@ -3085,6 +3179,84 @@ const App = (() => {
 
     function updateScoreCardPeriod(year, month) {
         return loadScoreCardSummary(year, month);
+    }
+
+    function onNationalRatingFilterChange(filterValue) {
+        currentNationalRatingFilter = filterValue || 'all';
+        renderNationalScoreCardRating();
+    }
+
+    function renderNationalScoreCardRating() {
+        const tbody1 = document.getElementById('national-rating-tbody-m1');
+        const tbody2 = document.getElementById('national-rating-tbody-m2');
+        const tbody3 = document.getElementById('national-rating-tbody-m3');
+        if (!tbody1 || !tbody2 || !tbody3) return;
+
+        if (scorecardRatingData.length === 0) {
+            const emptyHtml = `
+                <tr>
+                    <td colspan="6" class="text-center" style="padding: 1.5rem 0.5rem; color: #94a3b8;">
+                        <div style="font-size: 12px; font-weight: 600; color: #64748b;">No data</div>
+                    </td>
+                </tr>
+            `;
+            tbody1.innerHTML = emptyHtml;
+            tbody2.innerHTML = emptyHtml;
+            tbody3.innerHTML = emptyHtml;
+            const c1 = document.getElementById('national-col-count-m1');
+            const c2 = document.getElementById('national-col-count-m2');
+            const c3 = document.getElementById('national-col-count-m3');
+            if (c1) c1.textContent = '0 Sites';
+            if (c2) c2.textContent = '0 Sites';
+            if (c3) c3.textContent = '0 Sites';
+            return;
+        }
+
+        const renderTableMonth = (tbody, countEl, monthKey, ratingKey) => {
+            let filtered = scorecardRatingData;
+            if (currentNationalRatingFilter !== 'all') {
+                filtered = scorecardRatingData.filter(r => {
+                    const rVal = (r[ratingKey] || '').toLowerCase().replace(/\s+/g, '_');
+                    return rVal === currentNationalRatingFilter;
+                });
+            }
+
+            if (countEl) {
+                countEl.textContent = `${filtered.length} Sites`;
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 11px;">
+                            Tidak ada data untuk rating ini
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach((r, idx) => {
+                const pctVal = r[monthKey];
+                const ratingBadge = renderRatingBadge(r[ratingKey]);
+                html += `
+                    <tr>
+                        <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
+                        <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(r.sub_dept || '-')}">${escapeHtml(r.sub_dept || '-')}</td>
+                        <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
+                        <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
+                        <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
+                        <td class="scorecard-col-status">${ratingBadge}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        };
+
+        renderTableMonth(tbody1, document.getElementById('national-col-count-m1'), 'm1_pct', 'm1_rating');
+        renderTableMonth(tbody2, document.getElementById('national-col-count-m2'), 'm2_pct', 'm2_rating');
+        renderTableMonth(tbody3, document.getElementById('national-col-count-m3'), 'm3_pct', 'm3_rating');
     }
 
     function onScorecardRatingFilterChange(filterValue) {
@@ -3101,11 +3273,10 @@ const App = (() => {
         const tbody = document.getElementById('scorecard-rating-tbody');
         if (!tbody) return;
 
-        // Kept empty for now: "now empty the cards, i have to think the formula first and mapping"
         if (scorecardRatingData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
                             No data
                         </div>
@@ -3123,7 +3294,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="6" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
                         Tidak ada data yang sesuai dengan filter rating.
                     </td>
                 </tr>
@@ -3133,14 +3304,14 @@ const App = (() => {
 
         let html = '';
         filtered.forEach((r, idx) => {
+            const pctVal = r.pct !== undefined && r.pct !== null ? r.pct : r.m3_pct;
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(r.sub_dept || '-')}">${escapeHtml(r.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
-                    <td class="scorecard-col-month">${formatPercent(r.m1_pct)}</td>
-                    <td class="scorecard-col-month">${formatPercent(r.m2_pct)}</td>
-                    <td class="scorecard-col-month">${formatPercent(r.m3_pct)}</td>
+                    <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
                     <td class="scorecard-col-status">${renderRatingBadge(r.rating)}</td>
                 </tr>
             `;
@@ -3152,11 +3323,10 @@ const App = (() => {
         const tbody = document.getElementById('scorecard-exec-tbody');
         if (!tbody) return;
 
-        // Kept empty for now: "now empty the cards, i have to think the formula first and mapping"
         if (scorecardExecutionData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
                             No data
                         </div>
@@ -3174,7 +3344,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="6" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
                         Tidak ada data yang sesuai dengan filter status.
                     </td>
                 </tr>
@@ -3184,14 +3354,14 @@ const App = (() => {
 
         let html = '';
         filtered.forEach((e, idx) => {
+            const pctVal = e.pct !== undefined && e.pct !== null ? e.pct : e.m3_pct;
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(e.sub_dept || '-')}">${escapeHtml(e.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(e.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(e.name_site || '-')}">${escapeHtml(e.name_site || '-')}</td>
-                    <td class="scorecard-col-month" title="${escapeHtml(e.m1_status || '-')}">${formatPercent(e.m1_pct)}</td>
-                    <td class="scorecard-col-month" title="${escapeHtml(e.m2_status || '-')}">${formatPercent(e.m2_pct)}</td>
-                    <td class="scorecard-col-month" title="${escapeHtml(e.m3_status || '-')}">${formatPercent(e.m3_pct)}</td>
+                    <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
                     <td class="scorecard-col-status">${renderExecutionBadge(e.execution_status)}</td>
                 </tr>
             `;
@@ -3781,17 +3951,17 @@ const App = (() => {
                 ` : `<span class="so-status-badge status-none">Belum Ada Data</span>`;
 
                 tfoot.innerHTML = `
-                    <tr style="background: #f8fafc; border-top: 2px solid #cbd5e1;">
-                        <td colspan="2" style="padding: 0.85rem 1rem; color: #1e293b;">
+                    <tr style="background: #f8fafc; position: sticky; bottom: 0; z-index: 5;">
+                        <td colspan="2" style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; padding: 0.85rem 1rem; color: #1e293b; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
                             Total (${json.total_sites} Sites)
                         </td>
-                        <td style="text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px;">${totalMatch}</td>
-                        <td style="text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px;">${totalPhysic}</td>
-                        <td style="text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px;">${totalDb}</td>
-                        <td style="text-align: center; padding: 0.85rem 1rem; font-size: 13.5px; color: ${overallColor}; font-weight: 800;">
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalMatch}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalPhysic}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalDb}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; font-size: 13.5px; color: ${overallColor}; font-weight: 800; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
                             ${json.count_with_data > 0 ? avgDisplay : '-'}
                         </td>
-                        <td style="padding: 0.85rem 1rem;">${overallStatusHtml}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; padding: 0.85rem 1rem; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${overallStatusHtml}</td>
                     </tr>
                 `;
             }
@@ -3984,51 +4154,112 @@ const App = (() => {
                 return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             };
 
-            // Custom Legend onClick for Line Charts: Highlight line without moving or shifting legend positions
+            // Helper to apply highlight state to a chart
+            const applyChartHighlight = (chart, targetIndex) => {
+                chart._highlightedIndex = targetIndex;
+                chart.data.datasets.forEach((ds, idx) => {
+                    const origColor = ds._origBorderColor || ds.borderColor;
+                    const meta = chart.getDatasetMeta ? chart.getDatasetMeta(idx) : null;
+
+                    if (targetIndex === null || targetIndex === undefined) {
+                        // Restored state: all datasets visible with normal points
+                        ds.borderColor = origColor;
+                        ds.backgroundColor = origColor;
+                        ds.borderWidth = ds._origBorderWidth || 2;
+                        ds.pointRadius = ds._origPointRadius || 2;
+                        ds.radius = ds._origPointRadius || 2;
+                        ds.pointHoverRadius = ds._origPointHoverRadius || 5;
+                        ds.hoverRadius = ds._origPointHoverRadius || 5;
+                        ds.pointHitRadius = 5;
+                        ds.pointBackgroundColor = origColor;
+                        ds.pointBorderColor = origColor;
+                        ds.pointBorderWidth = 1;
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = ds._origPointRadius || 2;
+                                pt.options.hoverRadius = ds._origPointHoverRadius || 5;
+                                pt.options.hitRadius = 5;
+                                pt.options.borderWidth = 1;
+                                pt.options.backgroundColor = origColor;
+                                pt.options.borderColor = origColor;
+                            });
+                        }
+                    } else if (idx === targetIndex) {
+                        // Highlighted dataset: focused line with its dots still appearing!
+                        const focusRadius = ds._origPointRadius ? Math.max(ds._origPointRadius, 4) : 4;
+                        const focusHoverRadius = ds._origPointHoverRadius ? Math.max(ds._origPointHoverRadius, 6) : 6;
+                        ds.borderColor = origColor;
+                        ds.backgroundColor = origColor;
+                        ds.borderWidth = 3.6;
+                        ds.pointRadius = focusRadius;
+                        ds.radius = focusRadius;
+                        ds.pointHoverRadius = focusHoverRadius;
+                        ds.hoverRadius = focusHoverRadius;
+                        ds.pointHitRadius = 8;
+                        ds.pointBackgroundColor = origColor;
+                        ds.pointBorderColor = '#ffffff';
+                        ds.pointBorderWidth = 1.5;
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = focusRadius;
+                                pt.options.hoverRadius = focusHoverRadius;
+                                pt.options.hitRadius = 8;
+                                pt.options.borderWidth = 1.5;
+                                pt.options.backgroundColor = origColor;
+                                pt.options.borderColor = '#ffffff';
+                            });
+                        }
+                    } else {
+                        // Other datasets: invisible grey line, dots completely invisible!
+                        const dimColor = hexToRgba(origColor, 0.12);
+                        ds.borderColor = dimColor;
+                        ds.backgroundColor = dimColor;
+                        ds.borderWidth = 1;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 0;
+                        ds.hoverRadius = 0;
+                        ds.pointHitRadius = 0;
+                        ds.pointBorderWidth = 0;
+                        ds.pointBackgroundColor = 'transparent';
+                        ds.pointBorderColor = 'transparent';
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 0;
+                                pt.options.hitRadius = 0;
+                                pt.options.borderWidth = 0;
+                                pt.options.backgroundColor = 'transparent';
+                                pt.options.borderColor = 'transparent';
+                            });
+                        }
+                    }
+                });
+                chart.update('none'); // Instant rendering without stutter
+            };
+
+            // Custom Legend onClick for Line Charts: Pin/unpin line highlight
             const onLegendClick = (e, legendItem, legend) => {
                 const chart = legend.chart;
                 const clickedIndex = legendItem.datasetIndex;
-                const currentHighlighted = chart._highlightedIndex !== undefined ? chart._highlightedIndex : null;
 
-                if (currentHighlighted === clickedIndex) {
-                    // Clicking the active line resets back to all lines visible equally
-                    chart._highlightedIndex = null;
-                    chart.data.datasets.forEach((ds) => {
-                        ds.borderColor = ds._origBorderColor || ds.borderColor;
-                        ds.backgroundColor = ds._origBackgroundColor || ds.backgroundColor;
-                        ds.borderWidth = ds._origBorderWidth || 2.5;
-                        ds.pointRadius = ds._origPointRadius || 3.5;
-                        ds.pointHoverRadius = ds._origPointHoverRadius || 6;
-                    });
+                if (chart._pinnedIndex === clickedIndex) {
+                    chart._pinnedIndex = null;
+                    applyChartHighlight(chart, null);
                 } else {
-                    // Highlight the clicked line, dim the others for comparison (order remains unchanged!)
-                    chart._highlightedIndex = clickedIndex;
-                    chart.data.datasets.forEach((ds, idx) => {
-                        const isTarget = (idx === clickedIndex);
-                        const origColor = ds._origBorderColor || ds.borderColor;
-
-                        if (isTarget) {
-                            ds.borderColor = origColor;
-                            ds.backgroundColor = origColor;
-                            ds.borderWidth = 3.6;
-                            ds.pointRadius = 5;
-                            ds.pointHoverRadius = 7;
-                        } else {
-                            const dimColor = hexToRgba(origColor, 0.16);
-                            ds.borderColor = dimColor;
-                            ds.backgroundColor = dimColor;
-                            ds.borderWidth = 1.4;
-                            ds.pointRadius = 0;
-                            ds.pointHoverRadius = 3;
-                        }
-                    });
+                    chart._pinnedIndex = clickedIndex;
+                    applyChartHighlight(chart, clickedIndex);
                 }
-
-                chart.update();
             };
 
-            // Common Chart Options Builder
-            const createChartConfig = (datasets) => ({
+            // Common Chart Options Builder with Dashed Target Line
+            const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85)) => ({
                 type: 'line',
                 data: {
                     labels: months,
@@ -4037,19 +4268,38 @@ const App = (() => {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            top: 14,
+                            right: 8
+                        }
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false,
                     },
                     plugins: {
+                        trendTargetLine: {
+                            value: targetVal
+                        },
                         legend: {
                             position: 'bottom',
                             onClick: onLegendClick,
                             onHover: (e, legendItem, legend) => {
                                 legend.chart.canvas.style.cursor = 'pointer';
+                                const chart = legend.chart;
+                                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                                    if (chart._highlightedIndex !== legendItem.datasetIndex) {
+                                        applyChartHighlight(chart, legendItem.datasetIndex);
+                                    }
+                                }
                             },
                             onLeave: (e, legendItem, legend) => {
                                 legend.chart.canvas.style.cursor = 'default';
+                                const chart = legend.chart;
+                                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                                    applyChartHighlight(chart, null);
+                                }
                             },
                             labels: {
                                 boxWidth: 9,
@@ -4097,6 +4347,17 @@ const App = (() => {
                             padding: 10,
                             boxPadding: 4,
                             usePointStyle: true,
+                            footerColor: '#fca5a5',
+                            footerFont: { size: 10, weight: '600' },
+                            footerMarginTop: 6,
+                            filter: function (tooltipItem) {
+                                const chart = tooltipItem.chart;
+                                const highlighted = chart ? chart._highlightedIndex : null;
+                                if (highlighted !== null && highlighted !== undefined) {
+                                    return tooltipItem.datasetIndex === highlighted;
+                                }
+                                return true;
+                            },
                             itemSort: function (a, b) {
                                 const chart = a.chart;
                                 const highlighted = chart ? chart._highlightedIndex : null;
@@ -4121,6 +4382,9 @@ const App = (() => {
                                         label = '● ' + label + ' (Focused)';
                                     }
                                     return label;
+                                },
+                                footer: function () {
+                                    return `Target: ${targetVal}%`;
                                 }
                             }
                         }
@@ -4135,7 +4399,7 @@ const App = (() => {
                         },
                         y: {
                             min: 0,
-                            suggestedMax: 100,
+                            suggestedMax: targetVal >= 95 ? 105 : 100,
                             ticks: {
                                 stepSize: 25,
                                 color: '#64748b',
@@ -4147,7 +4411,81 @@ const App = (() => {
                             }
                         }
                     }
-                }
+                },
+                plugins: [{
+                    id: 'trendTargetLinePlugin',
+                    afterDraw(chart) {
+                        const target = chart.config.options?.plugins?.trendTargetLine?.value;
+                        if (target === undefined || target === null) return;
+
+                        const { ctx, chartArea, scales: { x, y } } = chart;
+                        if (!chartArea || !x || !y) return;
+
+                        const yPixel = y.getPixelForValue(target);
+                        if (isNaN(yPixel)) return;
+
+                        ctx.save();
+
+                        // 1. Draw dashed line across the chart width
+                        ctx.beginPath();
+                        ctx.setLineDash([5, 4]);
+                        ctx.strokeStyle = '#dc2626';
+                        ctx.lineWidth = 1.5;
+                        ctx.moveTo(chartArea.left, yPixel);
+                        ctx.lineTo(chartArea.right, yPixel);
+                        ctx.stroke();
+
+                        // 2. Target Label Badge on the right
+                        const text = `Target ${target}%`;
+                        ctx.font = '600 10px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+                        const textMetrics = ctx.measureText(text);
+                        const textWidth = textMetrics.width;
+                        const padX = 6;
+                        const badgeHeight = 17;
+                        const badgeWidth = textWidth + padX * 2;
+                        const badgeX = chartArea.right - badgeWidth - 2;
+
+                        let badgeY = yPixel - badgeHeight / 2;
+                        if (badgeY < chartArea.top - 2) {
+                            badgeY = chartArea.top - 2;
+                        } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
+                            badgeY = chartArea.bottom - badgeHeight;
+                        }
+
+                        // Soft pill background (white with crisp red border)
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.strokeStyle = '#dc2626';
+                        ctx.lineWidth = 1;
+
+                        const r = 3;
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, r);
+                        } else {
+                            ctx.moveTo(badgeX + r, badgeY);
+                            ctx.lineTo(badgeX + badgeWidth - r, badgeY);
+                            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY, badgeX + badgeWidth, badgeY + r);
+                            ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight - r);
+                            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY + badgeHeight, badgeX + badgeWidth - r, badgeY + badgeHeight);
+                            ctx.lineTo(badgeX + r, badgeY + badgeHeight);
+                            ctx.quadraticCurveTo(badgeX, badgeY + badgeHeight, badgeX, badgeY + badgeHeight - r);
+                            ctx.lineTo(badgeX, badgeY + r);
+                            ctx.quadraticCurveTo(badgeX, badgeY, badgeX + r, badgeY);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Badge text
+                        ctx.fillStyle = '#dc2626';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.5);
+
+                        ctx.restore();
+                    }
+                }]
             });
 
             // 1. Render Card 1: DEPT Trends
@@ -4178,7 +4516,7 @@ const App = (() => {
             }
 
             if (chartTrendDept) chartTrendDept.destroy();
-            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets));
+            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, isPmd ? 98 : 85));
 
             if (!isPmd) {
                 // 2. Render Card 2: Sub DEPT Trends (Outlet Regional)
@@ -4208,10 +4546,10 @@ const App = (() => {
                         _origBorderColor: color,
                         _origBackgroundColor: color,
                         _origBorderWidth: 2,
-                        _origPointRadius: 3,
+                        _origPointRadius: 2,
                         _origPointHoverRadius: 5,
                         borderWidth: 2,
-                        pointRadius: 3,
+                        pointRadius: 2,
                         pointHoverRadius: 5,
                         tension: 0.3,
                         spanGaps: true
@@ -4219,7 +4557,7 @@ const App = (() => {
                 });
 
                 if (chartTrendSubDept) chartTrendSubDept.destroy();
-                chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets));
+                chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 85));
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else {
                 // 3. Render Card 3: PMD Sub DEPT Trends
@@ -4250,7 +4588,7 @@ const App = (() => {
                 }
 
                 if (chartTrendPmd) chartTrendPmd.destroy();
-                chartTrendPmd = new Chart(pmdCanvas.getContext('2d'), createChartConfig(pmdDatasets));
+                chartTrendPmd = new Chart(pmdCanvas.getContext('2d'), createChartConfig(pmdDatasets, 98));
                 if (chartTrendSubDept) { chartTrendSubDept.destroy(); chartTrendSubDept = null; }
             }
 
@@ -5065,8 +5403,10 @@ const App = (() => {
         // Score Card Summary exports
         loadScoreCardSummary,
         updateScoreCardPeriod,
+        onNationalRatingFilterChange,
         onScorecardRatingFilterChange,
         onScorecardExecutionFilterChange,
+        renderNationalScoreCardRating,
         renderScoreCardRating,
         renderScoreCardExecution,
         renderScoreCardRatingPieChart,
