@@ -137,13 +137,14 @@ const App = (() => {
             || (window.performance && performance.navigation && performance.navigation.type === 1)
         );
 
-        const allowedPages = ['summary', 'master-data'];
-        let initialPage = 'summary'; // Default is Summary > Monthly > PMD when url opened first time
+        let initialPage = 'summary';
 
-        if (allowedPages.includes(hashPage)) {
-            initialPage = hashPage;
-        } else if (isReload && sessionPage && allowedPages.includes(sessionPage)) {
-            initialPage = sessionPage;
+        if (window.AUTH_USER) {
+            // When admin session: strictly Master Data page only
+            initialPage = 'master-data';
+        } else {
+            // When guest session: strictly Summary page only
+            initialPage = 'summary';
         }
 
         // Restore active SO Type & Category from sessionStorage (or URL query params in hash)
@@ -186,10 +187,14 @@ const App = (() => {
         window.addEventListener('hashchange', () => {
             const raw = (window.location.hash || '').replace('#', '').trim();
             const currentHash = raw.split('?')[0].split('/')[0];
-            if (allowedPages.includes(currentHash)) {
-                navigateTo(currentHash, false);
-            } else if (!currentHash) {
-                navigateTo('summary', false);
+            if (window.AUTH_USER) {
+                navigateTo('master-data', false);
+            } else {
+                if (currentHash === 'master-data') {
+                    window.location.href = 'login.php?redirect=master-data';
+                } else {
+                    navigateTo('summary', false);
+                }
             }
         });
     }
@@ -197,9 +202,16 @@ const App = (() => {
     // ── Navigation (Master Data vs Summary) ─────────────────────
 
     function navigateTo(page, updateHash = true) {
-        const allowedPages = ['master-data', 'summary'];
-        if (!allowedPages.includes(page)) {
+        if (window.AUTH_USER) {
+            // Logged-in admin only has Master Data page
             page = 'master-data';
+        } else {
+            // Guest only has Summary page; Master Data redirects to login
+            if (page === 'master-data') {
+                window.location.href = 'login.php?redirect=master-data';
+                return;
+            }
+            page = 'summary';
         }
 
         // Persist page in sessionStorage for tab session / reload
@@ -232,10 +244,118 @@ const App = (() => {
             loadMasterData();
             loadSiteRegional();
             loadScorecardKpi();
+            loadMasterCatatan();
         } else if (page === 'summary') {
             switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
         }
     }
+
+    // ── Quick Access Sidebar & Smooth Scroll Navigation ────────
+    const QUICK_ACCESS_ITEMS = [
+        { id: 'card-executive-summary', title: 'Executive Summary' },
+        { id: 'card-executive-catatan', title: 'Catatan Dan Evaluasi' },
+        { id: 'card-scorecard-summary', title: 'Score Card Summary' },
+        { id: 'card-trend-dept-wrapper', title: 'Trend Chart' },
+        { id: 'card-hasil-so-subdept', title: 'Report SO' },
+        { id: 'card-rekapitulasi', title: 'Rekapitulasi' },
+        { id: 'card-site-movements', title: 'History & Log' }
+    ];
+
+    function toggleQuickAccess() {
+        const drawer = document.getElementById('quick-access-drawer');
+        if (drawer && drawer.classList.contains('open')) {
+            closeQuickAccess();
+        } else {
+            openQuickAccess();
+        }
+    }
+
+    function openQuickAccess() {
+        renderQuickAccessList();
+        const drawer = document.getElementById('quick-access-drawer');
+        const backdrop = document.getElementById('quick-access-backdrop');
+        if (drawer) drawer.classList.add('open');
+        if (backdrop) backdrop.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeQuickAccess() {
+        const drawer = document.getElementById('quick-access-drawer');
+        const backdrop = document.getElementById('quick-access-backdrop');
+        if (drawer) drawer.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function renderQuickAccessList() {
+        const container = document.getElementById('quick-access-nav-list');
+        if (!container) return;
+
+        let html = '';
+        QUICK_ACCESS_ITEMS.forEach(item => {
+            html += `
+                <a class="quick-access-item" href="#${item.id}" onclick="event.preventDefault(); App.scrollToCard('${item.id}');">
+                    <span>${escapeHtml(item.title)}</span>
+                </a>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function scrollToCard(cardId) {
+        closeQuickAccess();
+
+        // Ensure we are on summary page where these cards reside
+        const currentPage = document.getElementById('page-summary')?.classList.contains('active')
+            ? 'summary'
+            : 'master-data';
+        if (currentPage !== 'summary') {
+            navigateTo('summary');
+        }
+
+        setTimeout(() => {
+            const el = document.getElementById(cardId);
+            if (!el) return;
+
+            // Scroll with offset for sticky navbar (height: 56px + margin)
+            const yOffset = -72;
+            const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+        }, 120);
+    }
+
+    function handleQuickAccessLogin(e) {
+        if (e) e.preventDefault();
+        window.location.href = 'login.php';
+    }
+
+    function toggleUserDropdown(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const container = document.getElementById('user-dropdown-container');
+        if (container) {
+            container.classList.toggle('active');
+        }
+    }
+
+    function closeUserDropdown() {
+        const container = document.getElementById('user-dropdown-container');
+        if (container) {
+            container.classList.remove('active');
+        }
+    }
+
+    // Global click listener to close user dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('user-dropdown-container');
+        if (dropdown && dropdown.classList.contains('active')) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        }
+    });
 
     // ── Page 1: Stock Opname Master Data with Pagination ────────
 
@@ -2310,17 +2430,17 @@ const App = (() => {
             catStatus.innerHTML = `(<strong style="color: ${color};">${label}</strong> Target ${threshold})`;
         }
 
-        // Toggle KPI cards
+        // Toggle KPI cards & groups
         const isQuarterly = (summarySOType === 'quarterly');
         const outletKpiCards = isQuarterly
-            ? ['kpi-card-national', 'kpi-card-wro', 'kpi-card-ero']
-            : ['kpi-card-national', 'kpi-card-wro', 'kpi-card-cro', 'kpi-card-ero'];
+            ? ['kpi-card-national', 'kpi-group-wro', 'kpi-group-ero']
+            : ['kpi-card-national', 'kpi-group-wro', 'kpi-group-cro', 'kpi-group-ero'];
         const pmdKpiCards = ['kpi-card-pmd', 'kpi-card-dno', 'kpi-card-dso'];
 
-        // In quarterly summary, ensure CRO card is completely hidden
-        const croCard = document.getElementById('kpi-card-cro');
-        if (croCard && isQuarterly) {
-            croCard.style.display = 'none';
+        // In quarterly summary, ensure CRO group is completely hidden
+        const croGroup = document.getElementById('kpi-group-cro');
+        if (croGroup && isQuarterly) {
+            croGroup.style.display = 'none';
         }
 
         const showOutletKpis = (cat === 'outlet' || cat === 'outlet_subarep' || cat === 'warehouse_hub');
@@ -2346,6 +2466,12 @@ const App = (() => {
             const el = document.getElementById(id);
             if (el) el.style.display = (cat === 'pmd') ? 'flex' : 'none';
         });
+
+        // Ensure Catatan Executive Summary card is always displayed across all categories
+        const execCatatanCard = document.getElementById('card-executive-catatan');
+        if (execCatatanCard) {
+            execCatatanCard.style.display = 'block';
+        }
 
         // Toggle Trend chart cards
         const pmdTrendCard = document.getElementById('card-trend-pmd-wrapper');
@@ -2417,17 +2543,21 @@ const App = (() => {
         const titleEl = document.getElementById('hasil-so-title');
         const subtitleEl = document.getElementById('hasil-so-subtitle');
         const deptFilterContainer = document.getElementById('dept-result-filter-container');
+        const statusFilterContainer = document.getElementById('status-result-filter-container');
         const deptSelect = document.getElementById('dept-result-filter');
         const subDeptSelect = document.getElementById('subdept-result-filter');
+        const statusSelect = document.getElementById('status-result-filter');
 
         if (summaryCategory === 'pmd') {
             if (titleEl) titleEl.textContent = 'Report SO PMD';
             if (subtitleEl) subtitleEl.textContent = 'Pencapaian dan Hasil Stock Opname PMD';
             if (deptFilterContainer) deptFilterContainer.style.display = 'none';
+            if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
+            if (statusSelect) statusSelect.value = 'all';
 
             if (subDeptSelect) {
                 subDeptSelect.innerHTML = `
-                    <option value="all" selected>Semua Sub Dept (PMD)</option>
+                    <option value="all" selected>Semua Sub Dept</option>
                     <option value="DNO">DNO</option>
                     <option value="DSO">DSO</option>
                 `;
@@ -2440,38 +2570,44 @@ const App = (() => {
                 ? 'Pencapaian dan Hasil Stock Opname Outlet Regional Quarterly'
                 : 'Pencapaian dan Hasil Stock Opname Outlet Regional';
             if (deptFilterContainer) deptFilterContainer.style.display = 'flex';
+            if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
 
             if (deptSelect) {
                 if (summarySOType === 'quarterly') {
                     deptSelect.innerHTML = `
-                        <option value="all" selected>Semua DEPT (Outlet Regional)</option>
+                        <option value="all" selected>Semua DEPT</option>
                         <option value="ERO">ERO</option>
                         <option value="WRO">WRO</option>
                     `;
                     deptSelect.value = 'all';
                 } else {
-                    const defaultDept = 'CRO';
                     deptSelect.innerHTML = `
-                        <option value="all">Semua DEPT (Outlet Regional)</option>
-                        <option value="CRO" selected>CRO</option>
+                        <option value="all" selected>Semua DEPT</option>
+                        <option value="CRO">CRO</option>
                         <option value="ERO">ERO</option>
                         <option value="WRO">WRO</option>
                     `;
-                    deptSelect.value = defaultDept;
+                    deptSelect.value = 'all';
                 }
             }
 
             if (subDeptSelect) {
-                if (summarySOType === 'quarterly') {
-                    subDeptSelect.innerHTML = '<option value="all" selected>Semua Sub Dept</option>';
-                } else {
-                    const list = DEPT_SUBDEPTS_MAP['CRO'] || [];
-                    let html = '<option value="all">Semua Sub Dept (CRO)</option>';
-                    list.forEach((code, idx) => {
-                        html += `<option value="${code}" ${idx === 0 ? 'selected' : ''}>${code}</option>`;
+                let html = '<option value="all" selected>Semua Sub Dept</option>';
+                const allowedDepts = (summarySOType === 'quarterly' ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO']);
+                allowedDepts.forEach(deptKey => {
+                    const list = DEPT_SUBDEPTS_MAP[deptKey] || [];
+                    html += `<optgroup label="${deptKey}">`;
+                    list.forEach(code => {
+                        html += `<option value="${code}">${code}</option>`;
                     });
-                    subDeptSelect.innerHTML = html;
-                }
+                    html += `</optgroup>`;
+                });
+                subDeptSelect.innerHTML = html;
+                subDeptSelect.value = 'all';
+            }
+
+            if (statusSelect) {
+                statusSelect.value = 'all';
             }
         }
     }
@@ -2656,6 +2792,64 @@ const App = (() => {
             updateAchCard('kpi-dno-achievement', 'kpi-dno-subtext', 'kpi-dno-trend', 'kpi-dno-status', dno, 'Avg Sub DEPT DNO', true);
             updateAchCard('kpi-dso-achievement', 'kpi-dso-subtext', 'kpi-dso-trend', 'kpi-dso-status', dso, 'Avg Sub DEPT DSO', true);
 
+            // Populate Subdept Average Value Cards under each group (WRO, CRO, ERO)
+            const subDeptsData = ach.sub_depts || {};
+            const updateSubDeptCard = (subKey) => {
+                const sKey = subKey.toLowerCase();
+                const sData = subDeptsData[sKey] || {};
+                const rawPct = sData.pct !== undefined && sData.pct !== null ? parseFloat(sData.pct) : 0;
+                const pct = Math.round(rawPct);
+                const count = sData.count || 0;
+                const total = sData.total_sites || 0;
+                const color = total === 0 ? '#94a3b8' : getPctColor(pct, false);
+
+                const valEl = document.getElementById(`kpi-subdept-val-${sKey}`);
+                if (valEl) {
+                    valEl.textContent = `${pct}%`;
+                    valEl.style.color = color;
+                }
+
+                const metaEl = document.getElementById(`kpi-subdept-meta-${sKey}`);
+                if (metaEl) {
+                    metaEl.textContent = `${count}/${total} Sites`;
+                }
+
+                const trendEl = document.getElementById(`kpi-subdept-trend-${sKey}`);
+                if (trendEl) {
+                    if (total === 0) {
+                        trendEl.innerHTML = '';
+                    } else {
+                        const targetThreshold = 85;
+                        const isAbove = (pct >= targetThreshold);
+                        const diff = pct - targetThreshold;
+                        const formattedDiff = (diff >= 0 ? '+' : '') + diff + '%';
+                        const triangleSvg = isAbove
+                            ? `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                            : `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
+
+                        trendEl.innerHTML = `
+                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" style="font-size: 9.5px; padding: 1.5px 5px;" title="Target: 85% (Gap: ${formattedDiff})">
+                                ${triangleSvg}
+                                <span>${formattedDiff}</span>
+                            </span>
+                        `;
+                    }
+                }
+
+                const statusEl = document.getElementById(`kpi-subdept-status-${sKey}`);
+                if (statusEl) {
+                    if (total === 0) {
+                        statusEl.innerHTML = '<span class="so-status-badge status-none">Belum Ada Data</span>';
+                    } else if (pct >= 85) {
+                        statusEl.innerHTML = '<span class="so-status-badge status-green">Tercapai</span>';
+                    } else {
+                        statusEl.innerHTML = '<span class="so-status-badge status-red">Tidak Tercapai</span>';
+                    }
+                }
+            };
+
+            ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo'].forEach(updateSubDeptCard);
+
             // Load Trend Line Graphics (DEPT, Sub DEPT, PMD Sub DEPT)
             loadTrendCharts(year);
 
@@ -2670,6 +2864,9 @@ const App = (() => {
 
             // Update Score Card Summary period & headers (rolling 3 months back)
             updateScoreCardPeriod(year, month);
+
+            // Load Catatan Executive Summary for selected period
+            loadExecutiveNotes(year, month);
 
         } catch (err) {
             console.error('Error loading summary totals:', err);
@@ -2990,8 +3187,8 @@ const App = (() => {
     let scorecardRatingData = [];
     let scorecardExecutionData = [];
     let scorecardPeriod = null;
-    let currentRatingFilter = 'all';
-    let currentExecutionFilter = 'all';
+    let currentRatingFilter = 'very_poor';
+    let currentExecutionFilter = 'not_executed';
     let currentNationalRatingFilter = 'very_poor';
 
     function getThreeMonthsBack(year, month) {
@@ -3082,6 +3279,22 @@ const App = (() => {
             natFilterEl.value = currentNationalRatingFilter;
         }
 
+        // Sync Rating Summary filter from dropdown (defaults to 'very_poor' on initial load)
+        const ratingFilterEl = document.getElementById('scorecard-rating-filter');
+        if (ratingFilterEl && ratingFilterEl.value) {
+            currentRatingFilter = ratingFilterEl.value;
+        } else if (ratingFilterEl) {
+            ratingFilterEl.value = currentRatingFilter;
+        }
+
+        // Sync SO Execution filter from dropdown (defaults to 'not_executed' on initial load)
+        const execFilterEl = document.getElementById('scorecard-execution-filter');
+        if (execFilterEl && execFilterEl.value) {
+            currentExecutionFilter = execFilterEl.value;
+        } else if (execFilterEl) {
+            execFilterEl.value = currentExecutionFilter;
+        }
+
         // 2. Current / Selected Month Period Badges for Rating Summary and SO Execution Summary
         const currentPeriodLabel = (threeMonths.length === 3)
             ? (threeMonths[2].fullName || `${threeMonths[2].label} ${threeMonths[2].year}`)
@@ -3099,11 +3312,11 @@ const App = (() => {
 
         const scRatingSubtitle = document.getElementById('scorecard-rating-subtitle');
         if (scRatingSubtitle) {
-            scRatingSubtitle.textContent = `Evaluasi performa SO Sites`;
+            scRatingSubtitle.textContent = `Rating Performa Stock Opname Sites`;
         }
         const scExecSubtitle = document.getElementById('scorecard-exec-subtitle');
         if (scExecSubtitle) {
-            scExecSubtitle.textContent = `Status eksekusi SO Sites`;
+            scExecSubtitle.textContent = `Status eksekusi Stock Opname Sites`;
         }
 
         const thRatingSel = document.getElementById('sc-rating-th-selected');
@@ -3192,6 +3405,10 @@ const App = (() => {
         const tbody3 = document.getElementById('national-rating-tbody-m3');
         if (!tbody1 || !tbody2 || !tbody3) return;
 
+        const trendEl1 = document.getElementById('national-col-trend-m1');
+        const trendEl2 = document.getElementById('national-col-trend-m2');
+        const trendEl3 = document.getElementById('national-col-trend-m3');
+
         if (scorecardRatingData.length === 0) {
             const emptyHtml = `
                 <tr>
@@ -3209,6 +3426,9 @@ const App = (() => {
             if (c1) c1.textContent = '0 Sites';
             if (c2) c2.textContent = '0 Sites';
             if (c3) c3.textContent = '0 Sites';
+            if (trendEl1) trendEl1.innerHTML = '';
+            if (trendEl2) trendEl2.innerHTML = '';
+            if (trendEl3) trendEl3.innerHTML = '';
             return;
         }
 
@@ -3233,7 +3453,7 @@ const App = (() => {
                         </td>
                     </tr>
                 `;
-                return;
+                return filtered;
             }
 
             let html = '';
@@ -3252,15 +3472,69 @@ const App = (() => {
                 `;
             });
             tbody.innerHTML = html;
+            return filtered;
         };
 
-        renderTableMonth(tbody1, document.getElementById('national-col-count-m1'), 'm1_pct', 'm1_rating');
-        renderTableMonth(tbody2, document.getElementById('national-col-count-m2'), 'm2_pct', 'm2_rating');
-        renderTableMonth(tbody3, document.getElementById('national-col-count-m3'), 'm3_pct', 'm3_rating');
+        const list1 = renderTableMonth(tbody1, document.getElementById('national-col-count-m1'), 'm1_pct', 'm1_rating') || [];
+        const list2 = renderTableMonth(tbody2, document.getElementById('national-col-count-m2'), 'm2_pct', 'm2_rating') || [];
+        const list3 = renderTableMonth(tbody3, document.getElementById('national-col-count-m3'), 'm3_pct', 'm3_rating') || [];
+
+        // Trend indicators comparing count of sites across the 3 backdate months
+        const title1 = document.getElementById('national-col-title-m1')?.textContent?.trim() || 'Bulan 1';
+        const title2 = document.getElementById('national-col-title-m2')?.textContent?.trim() || 'Bulan 2';
+        const title3 = document.getElementById('national-col-title-m3')?.textContent?.trim() || 'Bulan 3';
+
+        const isNegativeMetric = (currentNationalRatingFilter === 'very_poor' || currentNationalRatingFilter === 'poor');
+
+        const renderCountTrendBadge = (diff, prevLabel, isBaseline = false) => {
+            if (isBaseline) {
+                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="Bulan acuan (baseline)"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">-</span></span>`;
+            }
+            if (diff === null || diff === undefined || diff === 0) {
+                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="Tidak ada perubahan vs ${prevLabel}"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">0</span></span>`;
+            }
+
+            const isUp = diff > 0;
+            // For negative metrics (Very Poor / Poor), decrease in count is good (target-up/green), increase is bad (target-down/red)
+            const isGood = isNegativeMetric ? (diff < 0) : (diff > 0);
+            const cls = isGood ? 'target-up' : 'target-down';
+            const formatted = (diff > 0 ? '+' : '') + diff;
+
+            const triangleSvg = isUp
+                ? `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor" style="display: block; flex-shrink: 0;"><polygon points="12,4 21,20 3,20"/></svg>`
+                : `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor" style="display: block; flex-shrink: 0;"><polygon points="12,20 3,4 21,4"/></svg>`;
+
+            return `
+                <span class="kpi-target-indicator ${cls}" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="${formatted} Sites vs ${prevLabel}">
+                    ${triangleSvg}
+                    <span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">${formatted}</span>
+                </span>
+            `;
+        };
+
+        if (trendEl1) {
+            trendEl1.innerHTML = renderCountTrendBadge(null, title1, true);
+        }
+        if (trendEl2) {
+            const diff2 = list2.length - list1.length;
+            trendEl2.innerHTML = renderCountTrendBadge(diff2, title1, false);
+        }
+        if (trendEl3) {
+            const diff3 = list3.length - list2.length;
+            trendEl3.innerHTML = renderCountTrendBadge(diff3, title2, false);
+        }
     }
 
     function onScorecardRatingFilterChange(filterValue) {
         currentRatingFilter = filterValue || 'all';
+        renderScoreCardRating();
+    }
+
+    function toggleScorecardRatingFilter(filterValue) {
+        const sel = document.getElementById('scorecard-rating-filter');
+        const nextVal = (currentRatingFilter === filterValue) ? 'all' : filterValue;
+        currentRatingFilter = nextVal;
+        if (sel) sel.value = nextVal;
         renderScoreCardRating();
     }
 
@@ -3269,9 +3543,26 @@ const App = (() => {
         renderScoreCardExecution();
     }
 
+    function toggleScorecardExecutionFilter(filterValue) {
+        const sel = document.getElementById('scorecard-execution-filter');
+        const nextVal = (currentExecutionFilter === filterValue) ? 'all' : filterValue;
+        currentExecutionFilter = nextVal;
+        if (sel) sel.value = nextVal;
+        renderScoreCardExecution();
+    }
+
     function renderScoreCardRating() {
         const tbody = document.getElementById('scorecard-rating-tbody');
         if (!tbody) return;
+
+        // Highlight active stat row
+        document.querySelectorAll('#scorecard-rating-pie-stats .scorecard-pie-stat-row').forEach(row => {
+            if (row.getAttribute('data-rating') === currentRatingFilter) {
+                row.classList.add('active');
+            } else {
+                row.classList.remove('active');
+            }
+        });
 
         if (scorecardRatingData.length === 0) {
             tbody.innerHTML = `
@@ -3322,6 +3613,15 @@ const App = (() => {
     function renderScoreCardExecution() {
         const tbody = document.getElementById('scorecard-exec-tbody');
         if (!tbody) return;
+
+        // Highlight active stat row
+        document.querySelectorAll('#scorecard-exec-pie-stats .scorecard-pie-stat-row').forEach(row => {
+            if (row.getAttribute('data-exec') === currentExecutionFilter) {
+                row.classList.add('active');
+            } else {
+                row.classList.remove('active');
+            }
+        });
 
         if (scorecardExecutionData.length === 0) {
             tbody.innerHTML = `
@@ -3479,11 +3779,11 @@ const App = (() => {
         const elP = document.getElementById('sc-stat-p');
         const elVp = document.getElementById('sc-stat-vp');
 
-        if (elVg) elVg.textContent = total > 0 ? `${data[0]} (${Math.round((data[0] / total) * 100)}%)` : '0 (0%)';
-        if (elG) elG.textContent = total > 0 ? `${data[1]} (${Math.round((data[1] / total) * 100)}%)` : '0 (0%)';
-        if (elM) elM.textContent = total > 0 ? `${data[2]} (${Math.round((data[2] / total) * 100)}%)` : '0 (0%)';
-        if (elP) elP.textContent = total > 0 ? `${data[3]} (${Math.round((data[3] / total) * 100)}%)` : '0 (0%)';
-        if (elVp) elVp.textContent = total > 0 ? `${data[4]} (${Math.round((data[4] / total) * 100)}%)` : '0 (0%)';
+        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
+        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
+        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${Math.round((data[2] / total) * 100)}%)` : '0 sites (0%)';
+        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${Math.round((data[3] / total) * 100)}%)` : '0 sites (0%)';
+        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${Math.round((data[4] / total) * 100)}%)` : '0 sites (0%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -3532,6 +3832,20 @@ const App = (() => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                onClick: (evt, elements) => {
+                    if (elements && elements.length > 0) {
+                        const idx = elements[0].index;
+                        const filterMap = ['very_good', 'good', 'moderate', 'poor', 'very_poor'];
+                        const chosen = filterMap[idx];
+                        if (chosen) {
+                            toggleScorecardRatingFilter(chosen);
+                        }
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = (chartElement && chartElement.length > 0) ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -3575,8 +3889,8 @@ const App = (() => {
         const elExec = document.getElementById('sc-stat-exec');
         const elNotExec = document.getElementById('sc-stat-not-exec');
 
-        if (elExec) elExec.textContent = total > 0 ? `${data[0]} (${Math.round((data[0] / total) * 100)}%)` : '0 (0%)';
-        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} (${Math.round((data[1] / total) * 100)}%)` : '0 (0%)';
+        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
+        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -3625,6 +3939,20 @@ const App = (() => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                onClick: (evt, elements) => {
+                    if (elements && elements.length > 0) {
+                        const idx = elements[0].index;
+                        const filterMap = ['executed', 'not_executed'];
+                        const chosen = filterMap[idx];
+                        if (chosen) {
+                            toggleScorecardExecutionFilter(chosen);
+                        }
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = (chartElement && chartElement.length > 0) ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -3679,7 +4007,7 @@ const App = (() => {
             subDeptSelect.innerHTML = html;
         } else if (DEPT_SUBDEPTS_MAP[dept]) {
             const list = DEPT_SUBDEPTS_MAP[dept];
-            let html = `<option value="all">Semua Sub Dept (${dept})</option>`;
+            let html = '<option value="all">Semua Sub Dept</option>';
             list.forEach(code => {
                 const isSelected = (code === previousSub);
                 html += `<option value="${code}" ${isSelected ? 'selected' : ''}>${code}</option>`;
@@ -3698,6 +4026,7 @@ const App = (() => {
     async function loadSubDeptResults() {
         const deptSelect = document.getElementById('dept-result-filter');
         const subDeptSelect = document.getElementById('subdept-result-filter');
+        const statusSelect = document.getElementById('status-result-filter');
         const monthSelect = document.getElementById('summary-filter-month');
         const yearSelect = document.getElementById('summary-filter-year');
         const tbody = document.getElementById('subdept-results-tbody');
@@ -3707,7 +4036,8 @@ const App = (() => {
 
         const currentCategory = summaryCategory;
         const dept = (currentCategory === 'pmd') ? 'PMD' : (deptSelect ? deptSelect.value : 'all');
-        const subDept = subDeptSelect ? subDeptSelect.value : (currentCategory === 'pmd' ? 'all' : (summarySOType === 'quarterly' ? 'all' : 'CJDO'));
+        const subDept = subDeptSelect ? subDeptSelect.value : 'all';
+        const statusFilter = statusSelect ? statusSelect.value : 'all';
         const month = monthSelect ? monthSelect.value : '9';
         const year = yearSelect ? yearSelect.value : '2026';
         const isPmdMode = (currentCategory === 'pmd' || dept === 'PMD');
@@ -3778,29 +4108,87 @@ const App = (() => {
                 return;
             }
 
+            // Auto sort from pencapaian % lower to high (ascending)
+            rows.sort((a, b) => {
+                const pctA = (a.has_data && a.total_physic_pct !== null && a.total_physic_pct !== undefined)
+                    ? parseFloat(a.total_physic_pct)
+                    : -1;
+                const pctB = (b.has_data && b.total_physic_pct !== null && b.total_physic_pct !== undefined)
+                    ? parseFloat(b.total_physic_pct)
+                    : -1;
+                if (pctA !== pctB) {
+                    return pctA - pctB;
+                }
+                return (a.sitecode || '').localeCompare(b.sitecode || '');
+            });
+
+            // Classify each row into Tercapai / Tidak Tercapai
+            let countTercapai = 0;
+            let countTidakTercapai = 0;
+
+            rows.forEach((r) => {
+                let isTercapai = false;
+                if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
+                    const pct = Math.round(parseFloat(r.total_physic_pct));
+                    if (isPmdMode) {
+                        isTercapai = (pct >= 98);
+                    } else {
+                        isTercapai = (pct >= 85);
+                    }
+                }
+                r._isTercapai = isTercapai;
+                if (isTercapai) {
+                    countTercapai++;
+                } else {
+                    countTidakTercapai++;
+                }
+            });
+
+            // Filter rows by status if filter is selected
+            let displayRows = rows;
+            if (statusFilter === 'tercapai') {
+                displayRows = rows.filter(r => r._isTercapai);
+            } else if (statusFilter === 'tidak_tercapai') {
+                displayRows = rows.filter(r => !r._isTercapai);
+            }
+
             // Update Pie Card Subtitle
             const pieSubtitle = document.getElementById('subdept-pie-subtitle');
             if (pieSubtitle) {
                 let label = '';
                 if (currentCategory === 'pmd') {
-                    label = (subDept === 'all') ? 'PMD (Semua Sub Dept)' : `PMD - ${subDept}`;
+                    label = (subDept === 'all') ? 'Semua Sub Dept' : `PMD - ${subDept}`;
                 } else {
                     if (dept === 'all' && subDept === 'all') {
-                        label = 'Semua DEPT (Outlet Regional)';
+                        label = 'Semua DEPT';
                     } else if (subDept === 'all') {
                         label = `${dept} (Semua Sub Dept)`;
                     } else {
                         label = dept !== 'all' ? `${dept} - ${subDept}` : subDept;
                     }
                 }
-                pieSubtitle.textContent = `${label} (${rows.length} Sites)`;
+                const filterSuffix = (statusFilter !== 'all')
+                    ? ` [${statusFilter === 'tercapai' ? 'Tercapai' : 'Tidak Tercapai'}: ${displayRows.length} Sites]`
+                    : ` (${rows.length} Sites)`;
+                pieSubtitle.textContent = `${label}${filterSuffix}`;
             }
 
-            let countTercapai = 0;
-            let countTidakTercapai = 0;
+            if (displayRows.length === 0) {
+                const filterLabel = statusFilter === 'tercapai' ? 'Tercapai' : 'Tidak Tercapai';
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                            Tidak ada data dengan status <strong>${escapeHtml(filterLabel)}</strong>.
+                        </td>
+                    </tr>
+                `;
+                if (tfoot) tfoot.innerHTML = '';
+                renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length);
+                return;
+            }
 
             let html = '';
-            rows.forEach((r) => {
+            displayRows.forEach((r) => {
                 const sitecode = escapeHtml(r.sitecode || '-');
                 const nameSite = escapeHtml(r.name_site || '-');
                 const matchQty = Number(r.match_physic_qty || 0).toLocaleString();
@@ -3825,13 +4213,11 @@ const App = (() => {
                             statusClass = 'status-green';
                             progressClass = 'so-progress-green';
                             color = '#16a34a';
-                            countTercapai++;
                         } else {
                             statusText = 'Tidak Tercapai';
                             statusClass = 'status-red';
                             progressClass = 'so-progress-red';
                             color = '#dc2626';
-                            countTidakTercapai++;
                         }
                     } else {
                         if (pct >= 85) {
@@ -3839,19 +4225,16 @@ const App = (() => {
                             statusClass = 'status-green';
                             progressClass = 'so-progress-green';
                             color = '#16a34a';
-                            countTercapai++;
                         } else if (pct >= 75) {
                             statusText = 'Tidak Tercapai';
                             statusClass = 'status-orange';
                             progressClass = 'so-progress-orange';
                             color = '#ea580c';
-                            countTidakTercapai++;
                         } else {
                             statusText = 'Tidak Tercapai';
                             statusClass = 'status-red';
                             progressClass = 'so-progress-red';
                             color = '#dc2626';
-                            countTidakTercapai++;
                         }
                     }
 
@@ -3868,8 +4251,6 @@ const App = (() => {
                             </div>
                         </div>
                     `;
-                } else {
-                    countTidakTercapai++;
                 }
 
                 const cellColor = r.has_data ? (isPmdMode ? (pctDisplay !== '-' && parseInt(pctDisplay) >= 98 ? '#16a34a' : '#dc2626') : (pctDisplay !== '-' && parseInt(pctDisplay) >= 85 ? '#16a34a' : (pctDisplay !== '-' && parseInt(pctDisplay) >= 75 ? '#ea580c' : '#dc2626'))) : '#64748b';
@@ -3877,10 +4258,10 @@ const App = (() => {
                 html += `
                     <tr>
                         <td style="text-align: center; font-weight: 600; color: #1e293b;">${sitecode}</td>
-                        <td style="text-align: center; font-weight: 500; color: #334155;">${nameSite}</td>
-                        <td style="text-align: right; font-weight: 600; color: #0f172a;">${matchQty}</td>
-                        <td style="text-align: right; font-weight: 600; color: #0f172a;">${physicQty}</td>
-                        <td style="text-align: right; font-weight: 600; color: #0f172a;">${dbQty}</td>
+                        <td style="text-align: left; font-weight: 500; color: #334155;">${nameSite}</td>
+                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${matchQty}</td>
+                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${physicQty}</td>
+                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${dbQty}</td>
                         <td style="text-align: center; font-weight: 700; color: ${cellColor};">
                             ${pctDisplay}
                         </td>
@@ -3892,10 +4273,30 @@ const App = (() => {
 
             // Render Footer with Totals & Average
             if (tfoot) {
-                const totalMatch = Number(json.total_match_qty || 0).toLocaleString();
-                const totalPhysic = Number(json.total_physic_qty || 0).toLocaleString();
-                const totalDb = Number(json.total_db_qty || 0).toLocaleString();
-                const avgPct = Math.round(parseFloat(json.avg_pct || 0));
+                let totalMatch, totalPhysic, totalDb, avgPct, countWithData;
+                if (statusFilter === 'all') {
+                    totalMatch = Number(json.total_match_qty || 0).toLocaleString();
+                    totalPhysic = Number(json.total_physic_qty || 0).toLocaleString();
+                    totalDb = Number(json.total_db_qty || 0).toLocaleString();
+                    avgPct = Math.round(parseFloat(json.avg_pct || 0));
+                    countWithData = json.count_with_data || 0;
+                } else {
+                    let sMatch = 0, sPhysic = 0, sDb = 0, sPct = 0;
+                    countWithData = 0;
+                    displayRows.forEach(r => {
+                        sMatch += Number(r.match_physic_qty || 0);
+                        sPhysic += Number(r.physic_physic_qty || 0);
+                        sDb += Number(r.db_physic_qty || 0);
+                        if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
+                            sPct += parseFloat(r.total_physic_pct);
+                            countWithData++;
+                        }
+                    });
+                    totalMatch = sMatch.toLocaleString();
+                    totalPhysic = sPhysic.toLocaleString();
+                    totalDb = sDb.toLocaleString();
+                    avgPct = countWithData > 0 ? Math.round(sPct / countWithData) : 0;
+                }
                 const avgDisplay = `${avgPct}%`;
 
                 let overallText = 'Belum Ada Data';
@@ -3903,7 +4304,7 @@ const App = (() => {
                 let overallProgressClass = '';
                 let overallColor = '#64748b';
 
-                if (json.count_with_data > 0) {
+                if (countWithData > 0) {
                     if (isPmdMode) {
                         if (avgPct >= 98) {
                             overallText = 'Tercapai';
@@ -3938,7 +4339,7 @@ const App = (() => {
 
                 const clampedAvg = Math.min(Math.max(avgPct, 0), 100);
 
-                const overallStatusHtml = json.count_with_data > 0 ? `
+                const overallStatusHtml = countWithData > 0 ? `
                     <div class="so-progress-container">
                         <div class="so-progress-header">
                             <span class="so-status-badge ${overallStatusClass}">${overallText}</span>
@@ -3950,16 +4351,20 @@ const App = (() => {
                     </div>
                 ` : `<span class="so-status-badge status-none">Belum Ada Data</span>`;
 
+                const filterNote = (statusFilter !== 'all')
+                    ? ` - ${statusFilter === 'tercapai' ? 'Tercapai' : 'Tidak Tercapai'}`
+                    : '';
+
                 tfoot.innerHTML = `
                     <tr style="background: #f8fafc; position: sticky; bottom: 0; z-index: 5;">
-                        <td colspan="2" style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; padding: 0.85rem 1rem; color: #1e293b; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
-                            Total (${json.total_sites} Sites)
+                        <td colspan="2" style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: left; padding: 0.85rem 1rem; color: #1e293b; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
+                            Total (${displayRows.length} Sites${filterNote})
                         </td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalMatch}</td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalPhysic}</td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: right; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalDb}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalMatch}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalPhysic}</td>
+                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalDb}</td>
                         <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; font-size: 13.5px; color: ${overallColor}; font-weight: 800; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
-                            ${json.count_with_data > 0 ? avgDisplay : '-'}
+                            ${countWithData > 0 ? avgDisplay : '-'}
                         </td>
                         <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; padding: 0.85rem 1rem; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${overallStatusHtml}</td>
                     </tr>
@@ -3985,6 +4390,15 @@ const App = (() => {
     // ── Pie Chart: Tercapai vs Tidak Tercapai ─────────────────────
 
     let subDeptPieChart = null;
+
+    function toggleSubDeptStatusFilter(targetStatus) {
+        const sel = document.getElementById('status-result-filter');
+        if (!sel) return;
+        const current = sel.value || 'all';
+        const nextVal = (current === targetStatus) ? 'all' : targetStatus;
+        sel.value = nextVal;
+        loadSubDeptResults();
+    }
 
     function renderSubDeptPieChart(tercapai, tidakTercapai, total) {
         const canvas = document.getElementById('chart-subdept-pie');
@@ -4044,16 +4458,35 @@ const App = (() => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                onClick: (evt, elements) => {
+                    if (elements && elements.length > 0) {
+                        const idx = elements[0].index;
+                        const target = (idx === 0) ? 'tercapai' : 'tidak_tercapai';
+                        toggleSubDeptStatusFilter(target);
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = (chartElement && chartElement.length > 0) ? 'pointer' : 'default';
+                },
                 plugins: {
                     legend: {
                         position: 'bottom',
+                        onClick: (e, legendItem) => {
+                            const text = legendItem.text;
+                            const target = (text === 'Tercapai') ? 'tercapai' : 'tidak_tercapai';
+                            toggleSubDeptStatusFilter(target);
+                        },
+                        onHover: (e, legendItem, legend) => {
+                            legend.chart.canvas.style.cursor = 'pointer';
+                        },
                         labels: {
                             boxWidth: 12,
-                            padding: 10,
+                            padding: 12,
                             font: {
                                 family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
                                 size: 11,
-                                weight: '500'
+                                weight: '600'
                             }
                         }
                     },
@@ -4062,7 +4495,7 @@ const App = (() => {
                             label: function (context) {
                                 const val = context.raw || 0;
                                 const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                                return ` ${context.label}: ${val} Outlet (${pct}%)`;
+                                return ` ${context.label}: ${val} sites (${pct}%)`;
                             }
                         }
                     }
@@ -4075,31 +4508,36 @@ const App = (() => {
             const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
             const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
             const thresholdLabel = (summaryCategory === 'pmd') ? '98%' : '85%';
+            const statusSel = document.getElementById('status-result-filter');
+            const curStatus = statusSel ? statusSel.value : 'all';
+            const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
+            const activeTidak = (curStatus === 'tidak_tercapai') ? ' active' : '';
+            const activeAll = (curStatus === 'all') ? ' active' : '';
 
             let statsHtml = `
-                <div class="so-pie-stat-row">
+                <div class="so-pie-stat-row${activeTercapai}" onclick="App.toggleSubDeptStatusFilter('tercapai')" title="Klik untuk filter status Tercapai">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #16a34a;"></span>
                         Tercapai (≥${thresholdLabel})
                     </span>
                     <span class="so-pie-stat-val" style="color: #16a34a;">
-                        ${tercapai} <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
+                        ${tercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
                     </span>
                 </div>
-                <div class="so-pie-stat-row">
+                <div class="so-pie-stat-row${activeTidak}" onclick="App.toggleSubDeptStatusFilter('tidak_tercapai')" title="Klik untuk filter status Tidak Tercapai">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
                         Tidak Tercapai (<${thresholdLabel})
                     </span>
                     <span class="so-pie-stat-val" style="color: #dc2626;">
-                        ${tidakTercapai} <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
+                        ${tidakTercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
                     </span>
                 </div>
-                <div class="so-pie-stat-row" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
+                <div class="so-pie-stat-row${activeAll}" onclick="App.toggleSubDeptStatusFilter('all')" title="Klik untuk tampilkan Semua Status" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
                     <span class="so-pie-stat-label" style="font-weight: 600; color: #1e293b;">
                         Total Sites
                     </span>
-                    <span class="so-pie-stat-val" style="font-weight: 700; color: #0f172a;">${total} Sites</span>
+                    <span class="so-pie-stat-val" style="font-weight: 700; color: #0f172a;">${total} sites</span>
                 </div>
             `;
 
@@ -4244,6 +4682,136 @@ const App = (() => {
                 chart.update('none'); // Instant rendering without stutter
             };
 
+            // Department to Sub-Department mapping for synchronizing line charts
+            const DEPT_SUBDEPTS_MAP = {
+                'CRO': ['CJDO', 'EKO', 'WJO', 'WKO'],
+                'ERO': ['BNO', 'EJO', 'MPO', 'SMO'],
+                'WRO': ['CSO', 'NSO', 'SSO'],
+                'PMD': ['DNO', 'DSO']
+            };
+
+            // Helper to sync subdept chart with the selected DEPT group
+            const applySubDeptGroupHighlight = (chart, deptKey) => {
+                if (!chart || !chart.data || !chart.data.datasets) return;
+                chart._activeDeptGroup = deptKey || null;
+                const allowedSubs = deptKey ? (DEPT_SUBDEPTS_MAP[deptKey] || []) : null;
+
+                chart.data.datasets.forEach((ds, idx) => {
+                    const origColor = ds._origBorderColor || ds.borderColor;
+                    const meta = chart.getDatasetMeta ? chart.getDatasetMeta(idx) : null;
+
+                    if (!allowedSubs) {
+                        // Restored state: all lines normal
+                        ds.borderColor = origColor;
+                        ds.backgroundColor = origColor;
+                        ds.borderWidth = ds._origBorderWidth || 2;
+                        ds.pointRadius = ds._origPointRadius || 2;
+                        ds.radius = ds._origPointRadius || 2;
+                        ds.pointHoverRadius = ds._origPointHoverRadius || 5;
+                        ds.hoverRadius = ds._origPointHoverRadius || 5;
+                        ds.pointHitRadius = 5;
+                        ds.pointBackgroundColor = origColor;
+                        ds.pointBorderColor = origColor;
+                        ds.pointBorderWidth = 1;
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = ds._origPointRadius || 2;
+                                pt.options.hoverRadius = ds._origPointHoverRadius || 5;
+                                pt.options.hitRadius = 5;
+                                pt.options.borderWidth = 1;
+                                pt.options.backgroundColor = origColor;
+                                pt.options.borderColor = origColor;
+                            });
+                        }
+                    } else if (allowedSubs.includes(ds.label)) {
+                        // In the selected DEPT group: emphasized!
+                        const focusRadius = 4;
+                        const focusHoverRadius = 6;
+                        ds.borderColor = origColor;
+                        ds.backgroundColor = origColor;
+                        ds.borderWidth = 3.2;
+                        ds.pointRadius = focusRadius;
+                        ds.radius = focusRadius;
+                        ds.pointHoverRadius = focusHoverRadius;
+                        ds.hoverRadius = focusHoverRadius;
+                        ds.pointHitRadius = 8;
+                        ds.pointBackgroundColor = origColor;
+                        ds.pointBorderColor = '#ffffff';
+                        ds.pointBorderWidth = 1.5;
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = focusRadius;
+                                pt.options.hoverRadius = focusHoverRadius;
+                                pt.options.hitRadius = 8;
+                                pt.options.borderWidth = 1.5;
+                                pt.options.backgroundColor = origColor;
+                                pt.options.borderColor = '#ffffff';
+                            });
+                        }
+                    } else {
+                        // Dimmed lines outside the selected DEPT group
+                        const dimColor = hexToRgba(origColor, 0.12);
+                        ds.borderColor = dimColor;
+                        ds.backgroundColor = dimColor;
+                        ds.borderWidth = 1;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 0;
+                        ds.hoverRadius = 0;
+                        ds.pointHitRadius = 0;
+                        ds.pointBorderWidth = 0;
+                        ds.pointBackgroundColor = 'transparent';
+                        ds.pointBorderColor = 'transparent';
+
+                        if (meta && meta.data) {
+                            meta.data.forEach(pt => {
+                                if (!pt.options) pt.options = {};
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 0;
+                                pt.options.hitRadius = 0;
+                                pt.options.borderWidth = 0;
+                                pt.options.backgroundColor = 'transparent';
+                                pt.options.borderColor = 'transparent';
+                            });
+                        }
+                    }
+                });
+
+                chart.update('none');
+
+                // Dynamic Header / Subtitle sync for Sub DEPT chart
+                const subBadge = document.getElementById('trend-subdept-badge');
+                const subSubtitle = document.getElementById('trend-subdept-subtitle');
+                const yearVal = document.getElementById('summary-filter-year')?.value || 2026;
+                const defaultSubtitle = (summarySOType === 'monthly')
+                    ? `Monthly Physical % (Jan - Dec ${yearVal})`
+                    : `Quarterly Physical % (Q1 - Q4 ${yearVal})`;
+
+                if (subBadge) {
+                    if (deptKey) {
+                        subBadge.textContent = `${deptKey} Group`;
+                        subBadge.style.background = '#eff6ff';
+                        subBadge.style.color = '#2563eb';
+                    } else {
+                        subBadge.textContent = 'Outlet Regional';
+                        subBadge.style.background = '#f0fdf4';
+                        subBadge.style.color = '#16a34a';
+                    }
+                }
+
+                if (subSubtitle) {
+                    if (deptKey && allowedSubs) {
+                        subSubtitle.innerHTML = `<strong>Menampilkan Sub Dept ${deptKey} (${allowedSubs.join(', ')})</strong> &bull; ${defaultSubtitle}`;
+                    } else {
+                        subSubtitle.textContent = defaultSubtitle;
+                    }
+                }
+            };
+
             // Custom Legend onClick for Line Charts: Pin/unpin line highlight
             const onLegendClick = (e, legendItem, legend) => {
                 const chart = legend.chart;
@@ -4258,8 +4826,50 @@ const App = (() => {
                 }
             };
 
+            // Dedicated Legend onClick for DEPT Line Chart: Syncs Sub DEPT group!
+            const onDeptLegendClick = (e, legendItem, legend) => {
+                const chart = legend.chart;
+                const clickedIndex = legendItem.datasetIndex;
+                const deptLabel = chart.data.datasets[clickedIndex]?.label;
+
+                if (chart._pinnedIndex === clickedIndex) {
+                    chart._pinnedIndex = null;
+                    applyChartHighlight(chart, null);
+                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, null);
+                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, null);
+                } else {
+                    chart._pinnedIndex = clickedIndex;
+                    applyChartHighlight(chart, clickedIndex);
+                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, deptLabel);
+                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, deptLabel);
+                }
+            };
+
+            const onDeptLegendHover = (e, legendItem, legend) => {
+                legend.chart.canvas.style.cursor = 'pointer';
+                const chart = legend.chart;
+                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                    if (chart._highlightedIndex !== legendItem.datasetIndex) {
+                        applyChartHighlight(chart, legendItem.datasetIndex);
+                        const deptLabel = chart.data.datasets[legendItem.datasetIndex]?.label;
+                        if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, deptLabel);
+                        if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, deptLabel);
+                    }
+                }
+            };
+
+            const onDeptLegendLeave = (e, legendItem, legend) => {
+                legend.chart.canvas.style.cursor = 'default';
+                const chart = legend.chart;
+                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                    applyChartHighlight(chart, null);
+                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, null);
+                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, null);
+                }
+            };
+
             // Common Chart Options Builder with Dashed Target Line
-            const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85)) => ({
+            const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85), isDept = false) => ({
                 type: 'line',
                 data: {
                     labels: months,
@@ -4268,6 +4878,53 @@ const App = (() => {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                    onClick: (e, elements, chart) => {
+                        if (elements && elements.length > 0) {
+                            const clickedIndex = elements[0].datasetIndex;
+                            const deptLabel = chart.data.datasets[clickedIndex]?.label;
+                            if (isDept) {
+                                if (chart._pinnedIndex === clickedIndex) {
+                                    chart._pinnedIndex = null;
+                                    applyChartHighlight(chart, null);
+                                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, null);
+                                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, null);
+                                } else {
+                                    chart._pinnedIndex = clickedIndex;
+                                    applyChartHighlight(chart, clickedIndex);
+                                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, deptLabel);
+                                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, deptLabel);
+                                }
+                            } else {
+                                if (chart._pinnedIndex === clickedIndex) {
+                                    chart._pinnedIndex = null;
+                                    applyChartHighlight(chart, null);
+                                } else {
+                                    chart._pinnedIndex = clickedIndex;
+                                    applyChartHighlight(chart, clickedIndex);
+                                }
+                            }
+                            return;
+                        }
+
+                        // Check if an X-axis month label or tick was clicked
+                        try {
+                            const canvasPos = Chart.helpers?.getRelativePosition ? Chart.helpers.getRelativePosition(e, chart) : null;
+                            if (canvasPos && chart.scales && chart.scales.x) {
+                                const dataX = chart.scales.x.getValueForPixel(canvasPos.x);
+                                if (dataX !== undefined && dataX >= 0 && dataX < months.length) {
+                                    const monthIdx = dataX + 1;
+                                    const monthSel = document.getElementById('summary-filter-month');
+                                    if (monthSel && monthSel.value != monthIdx) {
+                                        monthSel.value = String(monthIdx);
+                                        loadSummaryData();
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            // Non-critical fallback
+                        }
+                    },
                     layout: {
                         padding: {
                             top: 14,
@@ -4284,8 +4941,8 @@ const App = (() => {
                         },
                         legend: {
                             position: 'bottom',
-                            onClick: onLegendClick,
-                            onHover: (e, legendItem, legend) => {
+                            onClick: isDept ? onDeptLegendClick : onLegendClick,
+                            onHover: isDept ? onDeptLegendHover : (e, legendItem, legend) => {
                                 legend.chart.canvas.style.cursor = 'pointer';
                                 const chart = legend.chart;
                                 if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
@@ -4294,7 +4951,7 @@ const App = (() => {
                                     }
                                 }
                             },
-                            onLeave: (e, legendItem, legend) => {
+                            onLeave: isDept ? onDeptLegendLeave : (e, legendItem, legend) => {
                                 legend.chart.canvas.style.cursor = 'default';
                                 const chart = legend.chart;
                                 if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
@@ -4302,19 +4959,21 @@ const App = (() => {
                                 }
                             },
                             labels: {
-                                boxWidth: 9,
-                                boxHeight: 9,
+                                boxWidth: 12,
+                                boxHeight: 12,
                                 usePointStyle: true,
-                                padding: 8,
-                                font: { size: 10, weight: '600' },
+                                padding: 12,
+                                font: { size: 11, weight: '600' },
                                 generateLabels: function (chart) {
                                     const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                                    // Strictly sort by datasetIndex to ensure legend items NEVER shift or change position!
                                     defaultLabels.sort((a, b) => a.datasetIndex - b.datasetIndex);
 
                                     const highlighted = chart._highlightedIndex;
+                                    const activeGroup = chart._activeDeptGroup;
+                                    const allowedSubs = activeGroup ? (DEPT_SUBDEPTS_MAP[activeGroup] || []) : null;
+
                                     defaultLabels.forEach((item) => {
-                                        item.hidden = false; // Never hide or strike through
+                                        item.hidden = false;
                                         const ds = chart.data.datasets[item.datasetIndex];
                                         const origColor = ds ? (ds._origBorderColor || ds.borderColor) : item.strokeStyle;
 
@@ -4327,6 +4986,16 @@ const App = (() => {
                                                 item.fontColor = '#94a3b8';
                                                 item.fillStyle = hexToRgba(origColor, 0.3);
                                                 item.strokeStyle = hexToRgba(origColor, 0.3);
+                                            }
+                                        } else if (allowedSubs) {
+                                            if (allowedSubs.includes(ds.label)) {
+                                                item.fontColor = '#0f172a';
+                                                item.fillStyle = origColor;
+                                                item.strokeStyle = origColor;
+                                            } else {
+                                                item.fontColor = '#cbd5e1';
+                                                item.fillStyle = hexToRgba(origColor, 0.2);
+                                                item.strokeStyle = hexToRgba(origColor, 0.2);
                                             }
                                         } else {
                                             item.fontColor = '#475569';
@@ -4355,6 +5024,11 @@ const App = (() => {
                                 const highlighted = chart ? chart._highlightedIndex : null;
                                 if (highlighted !== null && highlighted !== undefined) {
                                     return tooltipItem.datasetIndex === highlighted;
+                                }
+                                const activeGroup = chart ? chart._activeDeptGroup : null;
+                                if (activeGroup && DEPT_SUBDEPTS_MAP[activeGroup]) {
+                                    const ds = chart.data.datasets[tooltipItem.datasetIndex];
+                                    return DEPT_SUBDEPTS_MAP[activeGroup].includes(ds.label);
                                 }
                                 return true;
                             },
@@ -4516,7 +5190,7 @@ const App = (() => {
             }
 
             if (chartTrendDept) chartTrendDept.destroy();
-            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, isPmd ? 98 : 85));
+            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, isPmd ? 98 : 85, true));
 
             if (!isPmd) {
                 // 2. Render Card 2: Sub DEPT Trends (Outlet Regional)
@@ -5332,6 +6006,561 @@ const App = (() => {
         }
     }
 
+    // ── Catatan Executive Summary (Master Data & Summary Card) ────
+
+    let masterCatatanData = [];
+    let executiveNotesData = [];
+
+    const DEPT_SUBDEPTS_OPTIONS = {
+        'CRO': ['CJDO', 'EKO', 'WJO', 'WKO'],
+        'ERO': ['BNO', 'EJO', 'MPO', 'SMO'],
+        'WRO': ['CSO', 'NSO', 'SSO'],
+        'PMD': ['DNO', 'DSO']
+    };
+
+    const REGION_OPTIONS = [
+        'REGION CRO',
+        'REGION ERO',
+        'REGION WRO',
+        'GJO'
+    ];
+
+    async function loadExecutiveNotes(year, month) {
+        const y = year || document.getElementById('summary-filter-year')?.value || 2026;
+        const m = month || document.getElementById('summary-filter-month')?.value || 9;
+
+        const subtitleEl = document.getElementById('exec-catatan-subtitle');
+        const tbody = document.getElementById('exec-catatan-tbody');
+        const cardEl = document.getElementById('card-executive-catatan');
+
+        // Always show the Catatan card across all SO Types & categories
+        if (cardEl) cardEl.style.display = 'block';
+
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const mLabel = m ? (monthNames[parseInt(m, 10)] || `Bulan ${m}`) : 'Semua Bulan';
+        const periodStr = `${mLabel} ${y}`;
+
+        if (subtitleEl) subtitleEl.textContent = `Catatan dan evaluasi analisa performa Stock Opname`;
+
+        if (!tbody) return;
+
+        try {
+            const queryParams = [];
+            if (y) queryParams.push(`year=${encodeURIComponent(y)}`);
+            if (m && m !== 'all') queryParams.push(`month=${encodeURIComponent(m)}`);
+            const curSoType = (summarySOType || 'monthly').trim().toLowerCase();
+            queryParams.push(`so_type=${encodeURIComponent(curSoType)}`);
+
+            const res = await fetch(`api/executive_notes.php?${queryParams.join('&')}`);
+            const json = await res.json();
+
+            if (json.success && Array.isArray(json.data)) {
+                executiveNotesData = json.data;
+            } else {
+                executiveNotesData = [];
+            }
+
+            // Map and filter notes based on SO Type and active category (Dept & Sub Dept):
+            const mappedNotes = executiveNotesData.filter(note => {
+                const noteSoType = (note.so_type || 'monthly').trim().toLowerCase();
+                if (noteSoType !== curSoType) return false;
+
+                const dept = (note.dept || '').trim().toUpperCase();
+                const subDept = (note.sub_dept || '').trim().toUpperCase();
+
+                const isAllDept = !dept || dept === 'SEMUA DEPT' || dept === '(SEMUA DEPT)';
+
+                if (curSoType === 'monthly') {
+                    if (summaryCategory === 'pmd') {
+                        // PMD view: show PMD notes, DNO/DSO notes, or notes for all departments
+                        return isAllDept || dept === 'PMD' || subDept === 'DNO' || subDept === 'DSO';
+                    } else {
+                        // Outlet Regional view: show CRO, ERO, WRO, or notes for all departments (exclude specifically PMD-only notes)
+                        if (dept === 'PMD' || subDept === 'DNO' || subDept === 'DSO') {
+                            return false;
+                        }
+                        return true;
+                    }
+                }
+
+                // In Quarterly: all quarterly notes are mapped for the quarterly view
+                return true;
+            });
+
+            if (mappedNotes.length === 0) {
+                const contextName = curSoType === 'quarterly'
+                    ? (summaryCategory === 'warehouse_hub' ? 'Warehouse HUB (Quarterly)' : 'Outlet Subarep (Quarterly)')
+                    : (summaryCategory === 'pmd' ? 'PMD' : 'Outlet Regional');
+
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center" style="padding: 2.2rem 1rem; color: #94a3b8;">
+                            <div style="font-size: 12.5px; font-weight: 600; color: #64748b;">
+                                Tidak ada catatan ${escapeHtml(contextName)} untuk periode ${escapeHtml(periodStr)}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            mappedNotes.forEach((note, idx) => {
+                const displayDept = (note.dept && note.dept !== 'Semua Dept' && note.dept !== '(Semua Dept)') ? note.dept : 'Semua Dept';
+                const displaySubDept = (note.sub_dept && note.sub_dept !== 'Semua Sub Dept' && note.sub_dept !== '(Semua Sub Dept)') ? note.sub_dept : 'Semua Sub Dept';
+                html += `
+                    <tr>
+                        <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displayDept)}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displaySubDept)}</td>
+                        <td style="white-space: pre-line; line-height: 1.55; color: #1e293b; font-size: 12.5px; word-break: break-word;">${escapeHtml(note.keterangan || '')}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+        } catch (err) {
+            console.error('Error loading executive notes:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center" style="padding: 2rem; color: #ef4444;">
+                        Gagal memuat catatan: ${escapeHtml(err.message || 'Terjadi kesalahan sistem')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    async function loadMasterCatatan() {
+        const y = document.getElementById('master-catatan-filter-year')?.value || '';
+        const m = document.getElementById('master-catatan-filter-month')?.value || '';
+        const soTypeFilter = document.getElementById('master-catatan-filter-sotype')?.value || '';
+        const tbody = document.getElementById('master-catatan-tbody');
+        const badge = document.getElementById('master-catatan-count-badge');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    Memuat data catatan...
+                </td>
+            </tr>
+        `;
+
+        try {
+            const params = [];
+            if (y) params.push(`year=${encodeURIComponent(y)}`);
+            if (m && m !== 'all') params.push(`month=${encodeURIComponent(m)}`);
+            if (soTypeFilter) params.push(`so_type=${encodeURIComponent(soTypeFilter)}`);
+            const query = params.length > 0 ? `?${params.join('&')}` : '';
+
+            const res = await fetch(`api/executive_notes.php${query}`);
+            const json = await res.json();
+
+            if (json.success && Array.isArray(json.data)) {
+                masterCatatanData = json.data;
+            } else {
+                masterCatatanData = [];
+            }
+
+            if (badge) badge.textContent = `${masterCatatanData.length} Data`;
+
+            if (masterCatatanData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                            Tidak ada data catatan.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+            let html = '';
+            masterCatatanData.forEach((note, idx) => {
+                const mName = monthNames[note.month] || note.month;
+                const periodLabel = `${mName} ${note.year}`;
+                const noteType = (note.so_type || 'monthly').toLowerCase();
+                const typeBadge = noteType === 'quarterly'
+                    ? `<span style="min-width: 72px; display: inline-block; padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 6px; text-align: center; color: #0284c7; background: #e0f2fe; border: 1px solid #bae6fd; line-height: 15px;">Quarterly</span>`
+                    : `<span style="min-width: 72px; display: inline-block; padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 6px; text-align: center; color: #16a34a; background: #dcfce7; border: 1px solid #bbf7d0; line-height: 15px;">Monthly</span>`;
+
+                const displayDept = (note.dept && note.dept !== 'Semua Dept' && note.dept !== '(Semua Dept)') ? note.dept : 'Semua Dept';
+                const displaySubDept = (note.sub_dept && note.sub_dept !== 'Semua Sub Dept' && note.sub_dept !== '(Semua Sub Dept)') ? note.sub_dept : 'Semua Sub Dept';
+
+                html += `
+                    <tr>
+                        <td class="text-center" style="color: #64748b;">${idx + 1}</td>
+                        <td class="text-center">${typeBadge}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(periodLabel)}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displayDept)}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displaySubDept)}</td>
+                        <td style="max-width: 420px; white-space: normal; line-height: 1.45; word-break: break-word;">${escapeHtml(note.keterangan || '')}</td>
+                        <td class="text-center">
+                            <div style="display: inline-flex; gap: 4px;">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.editExecutiveNote(${note.id})" title="Edit" style="padding: 2px 6px; font-size: 11px;">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="App.deleteExecutiveNote(${note.id})" title="Hapus" style="padding: 2px 6px; font-size: 11px;">
+                                    Hapus
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+        } catch (err) {
+            console.error('Error loading master catatan:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2rem; color: #ef4444;">
+                        Gagal memuat data: ${escapeHtml(err.message || 'Terjadi kesalahan')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function openAddExecutiveNoteModal(periodYear, periodMonth, soType) {
+        const modal = document.getElementById('modal-executive-note');
+        if (!modal) return;
+
+        const titleEl = document.getElementById('modal-exec-note-title');
+        const editIdEl = document.getElementById('modal-note-edit-id');
+        const soTypeSel = document.getElementById('modal-note-so-type');
+        const monthSel = document.getElementById('modal-note-month');
+        const yearSel = document.getElementById('modal-note-year');
+        const btnAddRow = document.getElementById('btn-add-note-row');
+        const fabAddRow = document.getElementById('btn-add-note-row-fab');
+        const container = document.getElementById('modal-note-rows-container');
+        if (titleEl) titleEl.textContent = 'Tambah Catatan Executive Summary';
+        if (editIdEl) editIdEl.value = '';
+
+        const y = periodYear || document.getElementById('summary-filter-year')?.value || 2026;
+        const m = periodMonth || document.getElementById('summary-filter-month')?.value || 9;
+        const sType = soType || 'monthly';
+
+        if (soTypeSel) soTypeSel.value = sType;
+        if (yearSel) yearSel.value = String(y);
+        if (monthSel) monthSel.value = String(m || 9);
+
+        if (btnAddRow) btnAddRow.style.display = 'inline-flex';
+        if (fabAddRow) fabAddRow.style.display = 'inline-flex';
+        if (container) {
+            container.innerHTML = '';
+            addExecutiveNoteRow();
+        }
+
+        modal.classList.add('active');
+    }
+
+    function closeExecutiveNoteModal() {
+        const modal = document.getElementById('modal-executive-note');
+        if (modal) modal.classList.remove('active');
+    }
+
+    function addExecutiveNoteRow(data = null) {
+        const container = document.getElementById('modal-note-rows-container');
+        if (!container) return;
+
+        const rowCount = container.children.length + 1;
+        const rowId = `note-row-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+        const rawDept = data ? (data.dept || '') : '';
+        const rawSubDept = data ? (data.sub_dept || '') : '';
+        const deptVal = (rawDept === 'Semua Dept' || rawDept === '(Semua Dept)') ? '' : rawDept;
+        const subDeptVal = (rawSubDept === 'Semua Sub Dept' || rawSubDept === '(Semua Sub Dept)') ? '' : rawSubDept;
+        const ketVal = data?.keterangan || '';
+
+        const depts = ['', 'CRO', 'ERO', 'WRO', 'PMD'];
+        const deptOptions = depts.map(d => {
+            const label = d === '' ? 'Semua Dept' : d;
+            const sel = (deptVal === d) ? 'selected' : '';
+            return `<option value="${escapeHtml(d)}" ${sel}>${escapeHtml(label)}</option>`;
+        }).join('');
+
+        // Generate Sub Dept options based on initial dept
+        const currentDeptSubs = deptVal && DEPT_SUBDEPTS_OPTIONS[deptVal]
+            ? DEPT_SUBDEPTS_OPTIONS[deptVal]
+            : Array.from(new Set(Object.values(DEPT_SUBDEPTS_OPTIONS).flat()));
+        const subDeptList = ['', ...currentDeptSubs];
+        const subDeptOptions = subDeptList.map(s => {
+            const label = s === '' ? 'Semua Sub Dept' : s;
+            const sel = (subDeptVal === s) ? 'selected' : '';
+            return `<option value="${escapeHtml(s)}" ${sel}>${escapeHtml(label)}</option>`;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.className = 'modal-note-row-card';
+        card.id = rowId;
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                <span class="note-row-num" style="font-size: 11px; font-weight: 700; color: #2563eb; padding: 2px 7px; border-radius: 4px;">
+                    Catatan No.${rowCount}
+                </span>
+                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-row" onclick="App.removeExecutiveNoteRow(this)" style="font-size: 11px; padding: 2px 6px; line-height: 1;" title="Hapus baris ini">
+                    ✕
+                </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.6rem;">
+                <div>
+                    <label style="font-size: 10.5px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Dept</label>
+                    <select class="form-control form-control-sm note-input-dept" onchange="App.onDeptChangeInNoteRow(this)" style="font-size: 11.5px; padding: 3px 6px; height: 30px;">
+                        ${deptOptions}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 10.5px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Sub Dept</label>
+                    <select class="form-control form-control-sm note-input-subdept" style="font-size: 11.5px; padding: 3px 6px; height: 30px;">
+                        ${subDeptOptions}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label style="font-size: 10.5px; font-weight: 600; color: #64748b; margin-bottom: 2px; display: block;">Keterangan / Evaluasi Catatan <span style="color: #ef4444;">*</span></label>
+                <textarea class="form-control note-input-keterangan" rows="2" style="font-size: 12px; line-height: 1.5; padding: 6px 8px;" required>${escapeHtml(ketVal)}</textarea>
+            </div>
+        `;
+
+        container.appendChild(card);
+        updateNoteRowCounters();
+
+        // If newly added row beyond initial setup, smoothly scroll into view and focus textarea
+        if (container.children.length > 1) {
+            setTimeout(() => {
+                card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                const ta = card.querySelector('.note-input-keterangan');
+                if (ta) ta.focus();
+            }, 60);
+        }
+    }
+
+    function removeExecutiveNoteRow(btn) {
+        const card = btn.closest('.modal-note-row-card');
+        const container = document.getElementById('modal-note-rows-container');
+        if (card && container) {
+            if (container.children.length <= 1) {
+                showToast('warning', 'Peringatan', 'Minimal harus ada 1 baris catatan');
+                return;
+            }
+            card.remove();
+            updateNoteRowCounters();
+        }
+    }
+
+    function updateNoteRowCounters() {
+        const container = document.getElementById('modal-note-rows-container');
+        if (!container) return;
+        const rows = container.querySelectorAll('.modal-note-row-card');
+        rows.forEach((row, idx) => {
+            const numEl = row.querySelector('.note-row-num');
+            if (numEl) numEl.textContent = `Catatan No.${idx + 1}`;
+            const removeBtn = row.querySelector('.btn-remove-row');
+            if (removeBtn) {
+                removeBtn.style.visibility = (rows.length > 1) ? 'visible' : 'hidden';
+            }
+        });
+    }
+
+    function onDeptChangeInNoteRow(deptSelect) {
+        const card = deptSelect.closest('.modal-note-row-card');
+        if (!card) return;
+        const subDeptSelect = card.querySelector('.note-input-subdept');
+        if (!subDeptSelect) return;
+
+        const chosenDept = deptSelect.value;
+        const subs = chosenDept && DEPT_SUBDEPTS_OPTIONS[chosenDept]
+            ? DEPT_SUBDEPTS_OPTIONS[chosenDept]
+            : Array.from(new Set(Object.values(DEPT_SUBDEPTS_OPTIONS).flat()));
+
+        let optsHtml = '<option value="" selected>Semua Sub Dept</option>';
+        subs.forEach(s => {
+            optsHtml += `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`;
+        });
+        subDeptSelect.innerHTML = optsHtml;
+    }
+
+    function editExecutiveNote(id) {
+        const note = masterCatatanData.find(n => n.id === id);
+        if (!note) {
+            showToast('error', 'Gagal', 'Data catatan tidak ditemukan');
+            return;
+        }
+
+        const modal = document.getElementById('modal-executive-note');
+        if (!modal) return;
+
+        const titleEl = document.getElementById('modal-exec-note-title');
+        const editIdEl = document.getElementById('modal-note-edit-id');
+        const soTypeSel = document.getElementById('modal-note-so-type');
+        const monthSel = document.getElementById('modal-note-month');
+        const yearSel = document.getElementById('modal-note-year');
+        const btnAddRow = document.getElementById('btn-add-note-row');
+        const fabAddRow = document.getElementById('btn-add-note-row-fab');
+        const container = document.getElementById('modal-note-rows-container');
+
+        if (titleEl) titleEl.textContent = 'Edit Catatan Executive Summary';
+        if (editIdEl) editIdEl.value = String(note.id);
+        if (soTypeSel) soTypeSel.value = note.so_type || 'monthly';
+        if (yearSel) yearSel.value = String(note.year);
+        if (monthSel) monthSel.value = String(note.month);
+        if (btnAddRow) btnAddRow.style.display = 'none';
+        if (fabAddRow) fabAddRow.style.display = 'none';
+
+        if (container) {
+            container.innerHTML = '';
+            addExecutiveNoteRow({
+                dept: note.dept,
+                sub_dept: note.sub_dept,
+                keterangan: note.keterangan
+            });
+        }
+
+        modal.classList.add('active');
+    }
+
+    async function deleteExecutiveNote(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus catatan ini?')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`api/executive_notes.php?id=${encodeURIComponent(id)}`, {
+                method: 'DELETE'
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                showToast('success', 'Berhasil', 'Catatan berhasil dihapus');
+                loadMasterCatatan();
+                const curY = document.getElementById('summary-filter-year')?.value || 2026;
+                const curM = document.getElementById('summary-filter-month')?.value || 9;
+                loadExecutiveNotes(curY, curM);
+            } else {
+                showToast('error', 'Gagal', json.message || 'Gagal menghapus catatan');
+            }
+        } catch (err) {
+            console.error('Error deleting executive note:', err);
+            showToast('error', 'Kesalahan', 'Gagal menghapus catatan: ' + err.message);
+        }
+    }
+
+    async function submitExecutiveNote(e) {
+        e.preventDefault();
+
+        const editId = document.getElementById('modal-note-edit-id')?.value;
+        const soType = document.getElementById('modal-note-so-type')?.value || 'monthly';
+        const year = parseInt(document.getElementById('modal-note-year')?.value, 10);
+        const month = parseInt(document.getElementById('modal-note-month')?.value, 10);
+        const container = document.getElementById('modal-note-rows-container');
+        const submitBtn = document.getElementById('btn-submit-exec-note');
+
+        if (!year || !month) {
+            showToast('warning', 'Peringatan', 'Pilih bulan dan tahun periode');
+            return;
+        }
+
+        if (editId) {
+            const row = container?.querySelector('.modal-note-row-card');
+            const dept = row?.querySelector('.note-input-dept')?.value || '';
+            const subDept = row?.querySelector('.note-input-subdept')?.value || '';
+            const keterangan = row?.querySelector('.note-input-keterangan')?.value?.trim() || '';
+
+            if (!keterangan) {
+                showToast('warning', 'Peringatan', 'Keterangan catatan tidak boleh kosong');
+                return;
+            }
+
+            try {
+                if (submitBtn) submitBtn.disabled = true;
+                const res = await fetch('api/executive_notes.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: parseInt(editId, 10),
+                        year,
+                        month,
+                        so_type: soType,
+                        dept,
+                        sub_dept: subDept,
+                        keterangan
+                    })
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showToast('success', 'Berhasil', 'Catatan berhasil diperbarui');
+                    closeExecutiveNoteModal();
+                    loadMasterCatatan();
+                    loadExecutiveNotes(year, month);
+                } else {
+                    showToast('error', 'Gagal', json.message || 'Gagal memperbarui catatan');
+                }
+            } catch (err) {
+                console.error('Error updating note:', err);
+                showToast('error', 'Kesalahan', 'Terjadi kesalahan: ' + err.message);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+
+        } else {
+            const rows = container?.querySelectorAll('.modal-note-row-card') || [];
+            const items = [];
+
+            rows.forEach(r => {
+                const dept = r.querySelector('.note-input-dept')?.value || '';
+                const subDept = r.querySelector('.note-input-subdept')?.value || '';
+                const keterangan = r.querySelector('.note-input-keterangan')?.value?.trim() || '';
+                if (keterangan) {
+                    items.push({
+                        so_type: soType,
+                        dept,
+                        sub_dept: subDept,
+                        keterangan
+                    });
+                }
+            });
+
+            if (items.length === 0) {
+                showToast('warning', 'Peringatan', 'Masukkan minimal 1 keterangan catatan');
+                return;
+            }
+
+            try {
+                if (submitBtn) submitBtn.disabled = true;
+                const res = await fetch('api/executive_notes.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        year,
+                        month,
+                        so_type: soType,
+                        items
+                    })
+                });
+                const json = await res.json();
+                if (json.success) {
+                    showToast('success', 'Berhasil', json.message || 'Catatan berhasil disimpan');
+                    closeExecutiveNoteModal();
+                    loadMasterCatatan();
+                    loadExecutiveNotes(year, month);
+                } else {
+                    showToast('error', 'Gagal', json.message || 'Gagal menyimpan catatan');
+                }
+            } catch (err) {
+                console.error('Error saving notes:', err);
+                showToast('error', 'Kesalahan', 'Terjadi kesalahan: ' + err.message);
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+    }
+
     // ── Public Interface ───────────────────────────────────────
 
     return {
@@ -5405,7 +6634,10 @@ const App = (() => {
         updateScoreCardPeriod,
         onNationalRatingFilterChange,
         onScorecardRatingFilterChange,
+        toggleScorecardRatingFilter,
         onScorecardExecutionFilterChange,
+        toggleScorecardExecutionFilter,
+        toggleSubDeptStatusFilter,
         renderNationalScoreCardRating,
         renderScoreCardRating,
         renderScoreCardExecution,
@@ -5423,6 +6655,25 @@ const App = (() => {
         onKpiExecInputChange,
         saveScorecardExecKpi,
         resetScorecardExecKpi,
+        // Catatan Executive Summary exports
+        loadExecutiveNotes,
+        loadMasterCatatan,
+        openAddExecutiveNoteModal,
+        closeExecutiveNoteModal,
+        addExecutiveNoteRow,
+        removeExecutiveNoteRow,
+        onDeptChangeInNoteRow,
+        editExecutiveNote,
+        deleteExecutiveNote,
+        submitExecutiveNote,
+        // Quick Access & User Dropdown exports
+        toggleQuickAccess,
+        openQuickAccess,
+        closeQuickAccess,
+        scrollToCard,
+        handleQuickAccessLogin,
+        toggleUserDropdown,
+        closeUserDropdown,
     };
 })();
 

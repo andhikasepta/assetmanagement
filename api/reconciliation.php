@@ -148,8 +148,19 @@ try {
                 'PMD' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
             ];
             $subDeptStats = [
-                'DNO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                'DSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'CJDO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'EKO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'WJO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'WKO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'BNO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'EJO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'MPO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'SMO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'CSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'NSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'SSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'DNO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                'DSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
             ];
             $nationalSum = 0.0;
             $nationalCount = 0;
@@ -162,7 +173,10 @@ try {
                 if (isset($deptStats[$dept])) {
                     $deptStats[$dept]['total']++;
                 }
-                if (isset($subDeptStats[$sub])) {
+                if ($sub !== '') {
+                    if (!isset($subDeptStats[$sub])) {
+                        $subDeptStats[$sub] = ['sum' => 0.0, 'count' => 0, 'total' => 0];
+                    }
                     $subDeptStats[$sub]['total']++;
                 }
 
@@ -193,7 +207,7 @@ try {
                         $deptStats[$dept]['sum'] += $pct;
                         $deptStats[$dept]['count']++;
                     }
-                    if (isset($subDeptStats[$sub])) {
+                    if ($sub !== '' && isset($subDeptStats[$sub])) {
                         $subDeptStats[$sub]['sum'] += $pct;
                         $subDeptStats[$sub]['count']++;
                     }
@@ -203,6 +217,15 @@ try {
             $outletCount = $deptStats['CRO']['count'] + $deptStats['ERO']['count'] + $deptStats['WRO']['count'];
             $outletSum = $deptStats['CRO']['sum'] + $deptStats['ERO']['sum'] + $deptStats['WRO']['sum'];
             $totalOutletSites = $deptStats['CRO']['total'] + $deptStats['ERO']['total'] + $deptStats['WRO']['total'];
+
+            $compiledSubDepts = [];
+            foreach ($subDeptStats as $sCode => $sData) {
+                $compiledSubDepts[strtolower($sCode)] = [
+                    'pct' => $sData['count'] > 0 ? round($sData['sum'] / $sData['count']) : 0,
+                    'count' => $sData['count'],
+                    'total_sites' => $sData['total'],
+                ];
+            }
 
             return [
                 'national' => [
@@ -245,6 +268,7 @@ try {
                     'count' => $subDeptStats['DSO']['count'],
                     'total_sites' => $subDeptStats['DSO']['total'],
                 ],
+                'sub_depts' => $compiledSubDepts,
             ];
         };
 
