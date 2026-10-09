@@ -1651,12 +1651,37 @@ $currentYear = (int) date('Y');
 
                 <!-- ── Card: Rekapitulasi 2026 ────────────────────────── -->
                 <div class="card" id="card-rekapitulasi" style="margin-top: 1rem;">
-                    <div class="card-header">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                         <div>
                             <h2 class="card-title" id="rekap-card-title">Rekapitulasi 2026</h2>
                             <p class="card-subtitle" id="rekap-card-subtitle">Persentase Monthly Stock Opname PMD 2026</p>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;" id="rekap-dept-filter-container">
+                                <label for="rekap-dept-filter"
+                                    style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
+                                    DEPT
+                                </label>
+                                <select id="rekap-dept-filter" class="form-control"
+                                    style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
+                                    onchange="App.onRekapDeptFilterChange()">
+                                    <option value="all" selected>Semua DEPT</option>
+                                    <option value="PMD">PMD</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;" id="rekap-subdept-filter-container">
+                                <label for="rekap-subdept-filter"
+                                    style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
+                                    SUB DEPT
+                                </label>
+                                <select id="rekap-subdept-filter" class="form-control"
+                                    style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
+                                    onchange="App.onRekapSubDeptFilterChange()">
+                                    <option value="all" selected>Semua Sub Dept</option>
+                                    <option value="DNO">DNO</option>
+                                    <option value="DSO">DSO</option>
+                                </select>
+                            </div>
                             <button class="btn btn-secondary" onclick="App.loadRekapitulasi()">
                                 Refresh
                             </button>

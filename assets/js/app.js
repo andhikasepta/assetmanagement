@@ -44,6 +44,8 @@ const App = (() => {
     let rekapSearchQuery = '';
     let rekapSortCol = 'regional';
     let rekapSortDir = 'asc';
+    let rekapDeptFilter = 'all';
+    let rekapSubDeptFilter = 'all';
 
     // Summary SO Type & Category state
     let summarySOType = 'monthly';
@@ -2530,6 +2532,8 @@ const App = (() => {
                 : `Quarterly Stock Opname - ${catDisplayName}`;
         }
 
+        rekapDeptFilter = 'all';
+        rekapSubDeptFilter = 'all';
         loadRekapitulasi();
         loadSubDeptResults();
 
@@ -5315,6 +5319,8 @@ const App = (() => {
         }
 
         rekapSearchQuery = '';
+        rekapDeptFilter = 'all';
+        rekapSubDeptFilter = 'all';
         const searchInput = document.getElementById('rekap-search-input');
         if (searchInput) searchInput.value = '';
         rekapCurrentPage = 1;
@@ -5367,6 +5373,7 @@ const App = (() => {
 
             allRekapRows = json.data || [];
             rekapMonthAverages = json.month_averages || {};
+            populateRekapDeptAndSubDeptDropdowns();
             applyRekapFilterAndRender();
             loadTrendCharts(rekapYear);
 
@@ -5380,6 +5387,86 @@ const App = (() => {
                 </tr>
             `;
         }
+    }
+
+    function populateRekapDeptAndSubDeptDropdowns() {
+        const deptSelect = document.getElementById('rekap-dept-filter');
+        const subDeptSelect = document.getElementById('rekap-subdept-filter');
+        if (!deptSelect || !subDeptSelect) return;
+
+        const deptSet = new Set();
+        allRekapRows.forEach(r => {
+            const d = (r.dept || '').trim().toUpperCase();
+            if (d) deptSet.add(d);
+        });
+
+        const currentDept = deptSelect.value || rekapDeptFilter || 'all';
+        let deptHtml = '<option value="all">Semua DEPT</option>';
+        Array.from(deptSet).sort().forEach(d => {
+            deptHtml += `<option value="${d}">${d}</option>`;
+        });
+        deptSelect.innerHTML = deptHtml;
+
+        if (deptSet.has(currentDept)) {
+            deptSelect.value = currentDept;
+            rekapDeptFilter = currentDept;
+        } else {
+            deptSelect.value = 'all';
+            rekapDeptFilter = 'all';
+        }
+
+        updateRekapSubDeptOptions();
+    }
+
+    function updateRekapSubDeptOptions() {
+        const deptSelect = document.getElementById('rekap-dept-filter');
+        const subDeptSelect = document.getElementById('rekap-subdept-filter');
+        if (!subDeptSelect) return;
+
+        const selectedDept = deptSelect ? deptSelect.value : 'all';
+        const currentSub = subDeptSelect.value || rekapSubDeptFilter || 'all';
+
+        const subSet = new Set();
+        allRekapRows.forEach(r => {
+            const d = (r.dept || '').trim().toUpperCase();
+            const s = (r.sub_dept || '').trim().toUpperCase();
+            if (s) {
+                if (selectedDept === 'all' || d === selectedDept) {
+                    subSet.add(s);
+                }
+            }
+        });
+
+        let subHtml = '<option value="all">Semua Sub Dept</option>';
+        Array.from(subSet).sort().forEach(s => {
+            subHtml += `<option value="${s}">${s}</option>`;
+        });
+        subDeptSelect.innerHTML = subHtml;
+
+        if (subSet.has(currentSub)) {
+            subDeptSelect.value = currentSub;
+            rekapSubDeptFilter = currentSub;
+        } else {
+            subDeptSelect.value = 'all';
+            rekapSubDeptFilter = 'all';
+        }
+    }
+
+    function onRekapDeptFilterChange() {
+        const deptSelect = document.getElementById('rekap-dept-filter');
+        rekapDeptFilter = deptSelect ? deptSelect.value : 'all';
+        updateRekapSubDeptOptions();
+        const subDeptSelect = document.getElementById('rekap-subdept-filter');
+        rekapSubDeptFilter = subDeptSelect ? subDeptSelect.value : 'all';
+        rekapCurrentPage = 1;
+        applyRekapFilterAndRender();
+    }
+
+    function onRekapSubDeptFilterChange() {
+        const subDeptSelect = document.getElementById('rekap-subdept-filter');
+        rekapSubDeptFilter = subDeptSelect ? subDeptSelect.value : 'all';
+        rekapCurrentPage = 1;
+        applyRekapFilterAndRender();
     }
 
     function changeRekapPageSize(size) {
@@ -5427,6 +5514,14 @@ const App = (() => {
 
     function applyRekapFilterAndRender() {
         let rows = [...allRekapRows];
+
+        if (rekapDeptFilter && rekapDeptFilter !== 'all') {
+            rows = rows.filter(r => (r.dept || '').trim().toUpperCase() === rekapDeptFilter.toUpperCase());
+        }
+
+        if (rekapSubDeptFilter && rekapSubDeptFilter !== 'all') {
+            rows = rows.filter(r => (r.sub_dept || '').trim().toUpperCase() === rekapSubDeptFilter.toUpperCase());
+        }
 
         if (rekapSearchQuery) {
             rows = rows.filter(r => {
@@ -5554,8 +5649,21 @@ const App = (() => {
                         AVERAGE TOTAL PHYSICAL % (${totalItems} SITES)
                     </td>
             `;
+            const isFiltered = (rekapDeptFilter !== 'all' || rekapSubDeptFilter !== 'all' || Boolean(rekapSearchQuery));
             for (const m of visibleMonths) {
-                const avg = rekapMonthAverages ? rekapMonthAverages[m] : null;
+                let avg = null;
+                if (isFiltered) {
+                    let sum = 0, count = 0;
+                    filteredRekapRows.forEach(r => {
+                        if (r.months && r.months[m] !== null && r.months[m] !== undefined && r.months[m] !== '') {
+                            sum += parseFloat(r.months[m]);
+                            count++;
+                        }
+                    });
+                    avg = count > 0 ? (sum / count) : null;
+                } else {
+                    avg = rekapMonthAverages ? rekapMonthAverages[m] : null;
+                }
                 footHtml += `<td class="text-center" style="padding: 8px 6px;">${formatPctBadge(avg, isPmdCategory)}</td>`;
             }
             footHtml += '</tr>';
@@ -6611,6 +6719,8 @@ const App = (() => {
         submitSRImport,
         // Rekapitulasi exports
         loadRekapitulasi,
+        onRekapDeptFilterChange,
+        onRekapSubDeptFilterChange,
         loadTrendCharts,
         loadSubDeptResults,
         onDeptResultFilterChange,
