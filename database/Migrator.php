@@ -217,16 +217,16 @@ class Migrator
         foreach ($files as $name => $_filepath) {
             if (isset($applied[$name])) {
                 $status[] = [
-                    'name'        => $name,
-                    'status'      => 'Applied',
-                    'batch'       => (int) $applied[$name]['batch'],
+                    'name' => $name,
+                    'status' => 'Applied',
+                    'batch' => (int) $applied[$name]['batch'],
                     'executed_at' => $applied[$name]['executed_at'],
                 ];
             } else {
                 $status[] = [
-                    'name'        => $name,
-                    'status'      => 'Pending',
-                    'batch'       => null,
+                    'name' => $name,
+                    'status' => 'Pending',
+                    'batch' => null,
                     'executed_at' => null,
                 ];
             }

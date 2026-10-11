@@ -1418,15 +1418,23 @@ th.sortable.desc .sort-indicator {
 }
 
 /* ---- Report SO Outlet Regional Table & Progress ---- */
+.so-subdept-table {
+    border-collapse: collapse !important;
+}
+
+.so-subdept-table th,
+.so-subdept-table td {
+    border: 1px solid #e2e8f0 !important;
+}
+
 .so-subdept-table tbody tr:hover {
     background-color: #f8fafc;
 }
 
 .so-subdept-table td {
-    padding: 0.75rem 1rem;
-    font-size: 13px;
+    padding: 0.55rem 0.75rem;
+    font-size: 12.5px;
     vertical-align: middle;
-    border-bottom: 1px solid #f1f5f9;
 }
 
 .so-subdept-table tfoot {
@@ -1546,7 +1554,6 @@ th.sortable.desc .sort-indicator {
     padding: 0.55rem 0.75rem;
     font-size: 12.5px;
     vertical-align: middle;
-    border-bottom: 1px solid #f1f5f9;
 }
 
 .so-subdept-chart-wrapper {
@@ -2630,7 +2637,7 @@ textarea,
 }
 
 #exec-catatan-table {
-    min-width: 480px;
+    min-width: 540px;
 }
 
 .scorecard-table {
@@ -3438,4 +3445,240 @@ textarea,
     .user-dropdown-btn .chevron-icon {
         display: inline-block;
     }
-}
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Executive Summary: Bottom Row (Catatan dan Evaluasi + DB Analysis)
+   ═══════════════════════════════════════════════════════════════════ */
+.executive-bottom-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 1.25rem;
+    align-items: stretch;
+}
+
+#card-executive-catatan,
+#card-executive-db-analysis {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Vertical Big Dept Cards with Horizontal Subdepts */
+.db-analysis-scroll {
+    max-height: 440px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding-right: 4px;
+}
+
+.db-analysis-scroll::-webkit-scrollbar {
+    width: 5px;
+}
+
+.db-analysis-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.db-analysis-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.db-analysis-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.db-dept-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: all 0.15s ease;
+}
+
+.db-dept-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.db-dept-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.db-dept-name-title,
+.db-dept-name-badge {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+.db-dept-name-title.pmd-title,
+.db-dept-name-badge.pmd-badge {
+    color: #7e22ce;
+    background: transparent;
+}
+
+.db-dept-subtext {
+    font-size: 11px;
+    font-weight: 550;
+    color: #64748b;
+}
+
+.db-dept-header-val {
+    font-size: 18px;
+    font-weight: 850;
+    color: #0f172a;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.db-subdept-horizontal-row {
+    display: grid;
+    gap: 0.45rem;
+    align-items: stretch;
+}
+
+.db-subdept-horizontal-row .kpi-subdept-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    padding: 0.45rem 0.6rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: all 0.15s ease;
+    min-width: 0;
+}
+
+.db-subdept-horizontal-row .kpi-subdept-item:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.db-subdept-horizontal-row .kpi-subdept-name {
+    font-size: 10px;
+    font-weight: 750;
+    color: #475569;
+}
+
+.db-subdept-horizontal-row .kpi-subdept-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 3px 0 2px 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.db-subdept-horizontal-row .kpi-subdept-meta {
+    font-size: 9px;
+    color: #94a3b8;
+}
+
+@media (max-width: 1024px) {
+    .executive-bottom-row {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+}
+
+/* ── DB Analysis Trend Indicators (Comparing with previous period) ── */
+.db-trend-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3.5px;
+    font-size: 11px;
+    font-weight: 750;
+    padding: 2px 6.5px;
+    border-radius: 5px;
+    line-height: 1;
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+    font-variant-numeric: tabular-nums;
+    vertical-align: middle;
+}
+
+.db-trend-indicator svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+/* If DB is MORE than previous period: RED (worse discrepancy) */
+.db-trend-indicator.db-trend-up {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+/* If DB is LESS than previous period: GREEN (improved discrepancy) */
+.db-trend-indicator.db-trend-down {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.db-trend-indicator.db-trend-neutral {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+/* Dept header trend badge sizing (besides dept title) - bigger */
+.db-dept-trend .db-trend-indicator {
+    font-size: 12px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    gap: 4px;
+}
+
+/* Subdept-specific trend badge sizing */
+.db-subdept-trend .db-trend-indicator {
+    font-size: 9.5px;
+    padding: 1.5px 5px;
+    gap: 2.5px;
+}
+
+/* ---- Rekapitulasi Status Penyelesaian DB Accordion Styles ---- */
+.rdb-site-card {
+    transition: all 0.15s ease;
+}
+
+.rdb-site-card:hover {
+    border-color: #cbd5e1 !important;
+}
+
+.rdb-site-header:hover {
+    background-color: #f1f5f9 !important;
+}
+
+
+

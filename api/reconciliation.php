@@ -82,7 +82,7 @@ try {
             }
             $whereSql = !empty($whereParts) ? 'WHERE ' . implode(' AND ', $whereParts) : '';
 
-            $stmt = $db->prepare("SELECT id, profile, period_month, period_year, total_physic_pct FROM asset_reconciliation $whereSql");
+            $stmt = $db->prepare("SELECT id, profile, period_month, period_year, total_physic_pct, db_physic_qty FROM asset_reconciliation $whereSql");
             $stmt->execute($params);
             $recs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -90,15 +90,29 @@ try {
             $recList = [];
             foreach ($recs as $r) {
                 $pct = (float) $r['total_physic_pct'];
+                $dbQty = (int) ($r['db_physic_qty'] ?? 0);
                 $recList[] = [
                     'profile' => $r['profile'],
                     'pct' => $pct,
+                    'db_qty' => $dbQty,
                 ];
                 $parts = explode('-', $r['profile']);
                 foreach ($parts as $p) {
                     $token = strtoupper(trim($p));
-                    if ($token !== '' && !isset($recByCode[$token])) {
-                        $recByCode[$token] = $pct;
+                    if ($token !== '') {
+                        if (!isset($recByCode[$token])) {
+                            $recByCode[$token] = [
+                                'pct_sum' => $pct,
+                                'count' => 1,
+                                'pct' => $pct,
+                                'db_qty' => $dbQty,
+                            ];
+                        } else {
+                            $recByCode[$token]['pct_sum'] += $pct;
+                            $recByCode[$token]['count']++;
+                            $recByCode[$token]['pct'] = $recByCode[$token]['pct_sum'] / $recByCode[$token]['count'];
+                            $recByCode[$token]['db_qty'] += $dbQty;
+                        }
                     }
                 }
             }
@@ -162,8 +176,33 @@ try {
                 'DNO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
                 'DSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
             ];
+
+            // DB Analysis: Count/sum of Result DB QTY per dept & sub dept
+            $deptDbStats = [
+                'CRO' => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0],
+                'ERO' => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0],
+                'WRO' => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0],
+                'PMD' => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0],
+            ];
+            $subDeptDbStats = [
+                'CJDO' => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'CRO'],
+                'EKO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'CRO'],
+                'WJO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'CRO'],
+                'WKO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'CRO'],
+                'BNO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'ERO'],
+                'EJO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'ERO'],
+                'MPO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'ERO'],
+                'SMO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'ERO'],
+                'CSO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'WRO'],
+                'NSO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'WRO'],
+                'SSO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'WRO'],
+                'DNO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'PMD'],
+                'DSO'  => ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => 'PMD'],
+            ];
+
             $nationalSum = 0.0;
             $nationalCount = 0;
+            $nationalDbQty = 0;
             $totalNationalSites = count($sites);
 
             foreach ($sites as $s) {
@@ -172,19 +211,25 @@ try {
                 $sub = strtoupper(trim($s['sub_dept'] ?? ''));
                 if (isset($deptStats[$dept])) {
                     $deptStats[$dept]['total']++;
+                    $deptDbStats[$dept]['total']++;
                 }
                 if ($sub !== '') {
                     if (!isset($subDeptStats[$sub])) {
                         $subDeptStats[$sub] = ['sum' => 0.0, 'count' => 0, 'total' => 0];
                     }
                     $subDeptStats[$sub]['total']++;
+                    if (!isset($subDeptDbStats[$sub])) {
+                        $subDeptDbStats[$sub] = ['qty' => 0, 'sites_with_qty' => 0, 'count' => 0, 'total' => 0, 'dept' => $dept];
+                    }
+                    $subDeptDbStats[$sub]['total']++;
                 }
 
-                $pct = null;
+                $match = null;
                 if ($sc !== '') {
                     if (isset($recByCode[$sc])) {
-                        $pct = $recByCode[$sc];
+                        $match = $recByCode[$sc];
                     } else {
+                        $matchedRows = [];
                         foreach ($recList as $item) {
                             if (
                                 stripos($item['profile'], " - {$sc} - ") !== false ||
@@ -192,13 +237,27 @@ try {
                                 stripos($item['profile'], " {$sc} ") !== false ||
                                 stripos($item['profile'], $sc) !== false
                             ) {
-                                $pct = $item['pct'];
-                                $recByCode[$sc] = $pct;
-                                break;
+                                $matchedRows[] = $item;
                             }
+                        }
+                        if (!empty($matchedRows)) {
+                            $sumPct = 0.0;
+                            $sumDb = 0;
+                            foreach ($matchedRows as $mr) {
+                                $sumPct += (float) $mr['pct'];
+                                $sumDb += (int) $mr['db_qty'];
+                            }
+                            $match = [
+                                'pct' => $sumPct / count($matchedRows),
+                                'db_qty' => $sumDb,
+                            ];
+                            $recByCode[$sc] = $match;
                         }
                     }
                 }
+
+                $pct = $match !== null ? $match['pct'] : null;
+                $dbQty = $match !== null ? (int) $match['db_qty'] : null;
 
                 if ($pct !== null) {
                     $nationalSum += $pct;
@@ -212,11 +271,29 @@ try {
                         $subDeptStats[$sub]['count']++;
                     }
                 }
+
+                if ($dbQty !== null) {
+                    $nationalDbQty += $dbQty;
+                    if (isset($deptDbStats[$dept])) {
+                        $deptDbStats[$dept]['qty'] += $dbQty;
+                        $deptDbStats[$dept]['count']++;
+                        if ($dbQty > 0) $deptDbStats[$dept]['sites_with_qty']++;
+                    }
+                    if ($sub !== '' && isset($subDeptDbStats[$sub])) {
+                        $subDeptDbStats[$sub]['qty'] += $dbQty;
+                        $subDeptDbStats[$sub]['count']++;
+                        if ($dbQty > 0) $subDeptDbStats[$sub]['sites_with_qty']++;
+                    }
+                }
             }
 
             $outletCount = $deptStats['CRO']['count'] + $deptStats['ERO']['count'] + $deptStats['WRO']['count'];
             $outletSum = $deptStats['CRO']['sum'] + $deptStats['ERO']['sum'] + $deptStats['WRO']['sum'];
             $totalOutletSites = $deptStats['CRO']['total'] + $deptStats['ERO']['total'] + $deptStats['WRO']['total'];
+
+            $outletDbQty = $deptDbStats['CRO']['qty'] + $deptDbStats['ERO']['qty'] + $deptDbStats['WRO']['qty'];
+            $outletDbSitesWithQty = $deptDbStats['CRO']['sites_with_qty'] + $deptDbStats['ERO']['sites_with_qty'] + $deptDbStats['WRO']['sites_with_qty'];
+            $outletDbCount = $deptDbStats['CRO']['count'] + $deptDbStats['ERO']['count'] + $deptDbStats['WRO']['count'];
 
             $compiledSubDepts = [];
             foreach ($subDeptStats as $sCode => $sData) {
@@ -226,6 +303,74 @@ try {
                     'total_sites' => $sData['total'],
                 ];
             }
+
+            $compiledSubDeptDb = [];
+            foreach ($subDeptDbStats as $sCode => $sData) {
+                $compiledSubDeptDb[strtolower($sCode)] = [
+                    'qty' => $sData['qty'],
+                    'sites_with_qty' => $sData['sites_with_qty'],
+                    'count' => $sData['count'],
+                    'total_sites' => $sData['total'],
+                    'dept' => $sData['dept'],
+                ];
+            }
+
+            $dbAnalysis = [
+                'national' => [
+                    'qty' => $nationalDbQty,
+                    'count' => $nationalCount,
+                    'total_sites' => $totalNationalSites,
+                ],
+                'outlet_national' => [
+                    'qty' => $outletDbQty,
+                    'sites_with_qty' => $outletDbSitesWithQty,
+                    'count' => $outletDbCount,
+                    'total_sites' => $totalOutletSites,
+                ],
+                'cro' => [
+                    'name' => 'CRO',
+                    'qty' => $deptDbStats['CRO']['qty'],
+                    'sites_with_qty' => $deptDbStats['CRO']['sites_with_qty'],
+                    'count' => $deptDbStats['CRO']['count'],
+                    'total_sites' => $deptDbStats['CRO']['total'],
+                ],
+                'ero' => [
+                    'name' => 'ERO',
+                    'qty' => $deptDbStats['ERO']['qty'],
+                    'sites_with_qty' => $deptDbStats['ERO']['sites_with_qty'],
+                    'count' => $deptDbStats['ERO']['count'],
+                    'total_sites' => $deptDbStats['ERO']['total'],
+                ],
+                'wro' => [
+                    'name' => 'WRO',
+                    'qty' => $deptDbStats['WRO']['qty'],
+                    'sites_with_qty' => $deptDbStats['WRO']['sites_with_qty'],
+                    'count' => $deptDbStats['WRO']['count'],
+                    'total_sites' => $deptDbStats['WRO']['total'],
+                ],
+                'pmd' => [
+                    'name' => 'PMD',
+                    'qty' => $deptDbStats['PMD']['qty'],
+                    'sites_with_qty' => $deptDbStats['PMD']['sites_with_qty'],
+                    'count' => $deptDbStats['PMD']['count'],
+                    'total_sites' => $deptDbStats['PMD']['total'],
+                ],
+                'dno' => [
+                    'name' => 'DNO',
+                    'qty' => $subDeptDbStats['DNO']['qty'],
+                    'sites_with_qty' => $subDeptDbStats['DNO']['sites_with_qty'],
+                    'count' => $subDeptDbStats['DNO']['count'],
+                    'total_sites' => $subDeptDbStats['DNO']['total'],
+                ],
+                'dso' => [
+                    'name' => 'DSO',
+                    'qty' => $subDeptDbStats['DSO']['qty'],
+                    'sites_with_qty' => $subDeptDbStats['DSO']['sites_with_qty'],
+                    'count' => $subDeptDbStats['DSO']['count'],
+                    'total_sites' => $subDeptDbStats['DSO']['total'],
+                ],
+                'sub_depts' => $compiledSubDeptDb,
+            ];
 
             return [
                 'national' => [
@@ -269,6 +414,7 @@ try {
                     'total_sites' => $subDeptStats['DSO']['total'],
                 ],
                 'sub_depts' => $compiledSubDepts,
+                'db_analysis' => $dbAnalysis,
             ];
         };
 
@@ -324,6 +470,75 @@ try {
         ");
         $latestPeriod = $latestStmt->fetch(PDO::FETCH_ASSOC);
 
+        // Previous period comparison for DB Analysis (Result DB QTY)
+        $effY = $year ?: ($latestPeriod['period_year'] ?? (int) date('Y'));
+
+        $prevPeriod = null;
+        if ($month) {
+            // Specific month selected: compare with previous available month
+            $prevStmt = $db->prepare("
+                SELECT period_month, period_year 
+                FROM asset_reconciliation 
+                WHERE (period_year < :y OR (period_year = :y AND period_month < :m))
+                  AND period_year IS NOT NULL AND period_month IS NOT NULL $latestWhere
+                ORDER BY period_year DESC, period_month DESC, id DESC 
+                LIMIT 1
+            ");
+            $prevStmt->execute([':y' => (int) $effY, ':m' => (int) $month]);
+            $prevPeriod = $prevStmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            // "Semua Bulan" selected: compare cumulative year against previous year (Tahun Lalu)
+            $prevStmt = $db->prepare("
+                SELECT DISTINCT period_year, NULL as period_month 
+                FROM asset_reconciliation 
+                WHERE period_year < :y
+                  AND period_year IS NOT NULL $latestWhere
+                ORDER BY period_year DESC 
+                LIMIT 1
+            ");
+            $prevStmt->execute([':y' => (int) $effY]);
+            $prevPeriod = $prevStmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if ($prevPeriod) {
+            $prevM = !empty($prevPeriod['period_month']) ? (int) $prevPeriod['period_month'] : null;
+            $prevY = (int) $prevPeriod['period_year'];
+            $prevAchievements = $getAchievements($db, $prevM, $prevY, $srCategories, $soType, $category);
+            $prevDbAnalysis = $prevAchievements['db_analysis'] ?? null;
+
+            if ($prevDbAnalysis && isset($achievements['db_analysis'])) {
+                $dbA = &$achievements['db_analysis'];
+                $dbA['has_previous'] = true;
+                $dbA['previous_period'] = [
+                    'month' => $prevM,
+                    'year' => $prevY,
+                ];
+
+                $deptKeys = ['national', 'outlet_national', 'cro', 'ero', 'wro', 'pmd', 'dno', 'dso'];
+                foreach ($deptKeys as $dk) {
+                    if (isset($dbA[$dk])) {
+                        $currQty = (int) ($dbA[$dk]['qty'] ?? 0);
+                        $prevQty = (int) ($prevDbAnalysis[$dk]['qty'] ?? 0);
+                        $dbA[$dk]['prev_qty'] = $prevQty;
+                        $dbA[$dk]['diff_qty'] = $currQty - $prevQty;
+                    }
+                }
+
+                if (isset($dbA['sub_depts']) && is_array($dbA['sub_depts'])) {
+                    foreach ($dbA['sub_depts'] as $sKey => &$sVal) {
+                        $currQty = (int) ($sVal['qty'] ?? 0);
+                        $prevQty = (int) ($prevDbAnalysis['sub_depts'][$sKey]['qty'] ?? 0);
+                        $sVal['prev_qty'] = $prevQty;
+                        $sVal['diff_qty'] = $currQty - $prevQty;
+                    }
+                    unset($sVal);
+                }
+                unset($dbA);
+            }
+        } else if (isset($achievements['db_analysis'])) {
+            $achievements['db_analysis']['has_previous'] = false;
+        }
+
         // If summary action requested, return without fetching all rows
         if ($action === 'summary') {
             echo json_encode([
@@ -334,6 +549,7 @@ try {
                 'latest_period' => $latestPeriod ?: null,
                 'totals' => $totals,
                 'achievements' => $achievements,
+                'db_analysis' => $achievements['db_analysis'] ?? null,
             ]);
             exit;
         }
@@ -440,8 +656,8 @@ try {
                 $parts = explode('-', $profile);
                 foreach ($parts as $p) {
                     $token = strtoupper(trim($p));
-                    if ($token !== '' && !isset($recByCode[$token])) {
-                        $recByCode[$token] = $r;
+                    if ($token !== '') {
+                        $recByCode[$token][] = $r;
                     }
                 }
             }
@@ -456,11 +672,11 @@ try {
             foreach ($sites as $s) {
                 $sitecode = trim($s['sitecode'] ?? '');
                 $upperCode = strtoupper($sitecode);
-                $matchedRec = null;
+                $matchedRecs = [];
 
                 if ($sitecode !== '') {
                     if (isset($recByCode[$upperCode])) {
-                        $matchedRec = $recByCode[$upperCode];
+                        $matchedRecs = $recByCode[$upperCode];
                     } else {
                         foreach ($recList as $item) {
                             if (
@@ -469,22 +685,52 @@ try {
                                 stripos($item['profile'], " {$sitecode} ") !== false ||
                                 stripos($item['profile'], $sitecode) !== false
                             ) {
-                                $matchedRec = $item;
-                                $recByCode[$upperCode] = $item;
-                                break;
+                                $matchedRecs[] = $item;
                             }
+                        }
+                        if (!empty($matchedRecs)) {
+                            $recByCode[$upperCode] = $matchedRecs;
                         }
                     }
                 }
 
-                $matchQty = $matchedRec ? (int) $matchedRec['match_physic_qty'] : 0;
-                $physicQty = $matchedRec ? (int) $matchedRec['physic_physic_qty'] : 0;
-                $dbQty = $matchedRec ? (int) $matchedRec['db_physic_qty'] : 0;
-                $actual = $matchedRec ? (int) $matchedRec['total_physic_actual'] : 0;
-                $target = $matchedRec ? (int) $matchedRec['total_physic_target'] : 0;
-                $pct = $matchedRec ? (float) $matchedRec['total_physic_pct'] : null;
+                $matchQty = 0;
+                $physicQty = 0;
+                $dbQty = 0;
+                $actual = 0;
+                $target = 0;
+                $pct = null;
+                $hasData = !empty($matchedRecs);
 
-                $hasData = ($matchedRec !== null);
+                if ($hasData) {
+                    if (empty($month)) {
+                        // Semua Bulan: akumulasi match, physic, db, actual, target dari seluruh bulan dalam tahun ini
+                        foreach ($matchedRecs as $rec) {
+                            $matchQty += (int) $rec['match_physic_qty'];
+                            $physicQty += (int) $rec['physic_physic_qty'];
+                            $dbQty += (int) $rec['db_physic_qty'];
+                            $actual += (int) $rec['total_physic_actual'];
+                            $target += (int) $rec['total_physic_target'];
+                        }
+                        if ($target > 0) {
+                            $pct = ($actual / $target) * 100.0;
+                        } elseif ($actual > 0) {
+                            $pct = 100.0;
+                        } else {
+                            $pct = 0.0;
+                        }
+                    } else {
+                        // Bulan tertentu: ambil record bulan tersebut
+                        $rec = $matchedRecs[0];
+                        $matchQty = (int) $rec['match_physic_qty'];
+                        $physicQty = (int) $rec['physic_physic_qty'];
+                        $dbQty = (int) $rec['db_physic_qty'];
+                        $actual = (int) $rec['total_physic_actual'];
+                        $target = (int) $rec['total_physic_target'];
+                        $pct = $rec['total_physic_pct'] !== null ? (float) $rec['total_physic_pct'] : null;
+                    }
+                }
+
                 if ($hasData && $pct !== null) {
                     $totalPctSum += $pct;
                     $countWithData++;

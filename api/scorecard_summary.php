@@ -48,6 +48,8 @@ try {
         $curQ = (int)ceil($month / 3);
         if ($curQ < 1) $curQ = 1;
         if ($curQ > 4) $curQ = 4;
+        // Stop on Q1-Q3 because 2025 data not uploaded in the database
+        $curQ = max(3, $curQ);
 
         for ($i = 2; $i >= 0; $i--) {
             $tq = $curQ - $i;
@@ -66,8 +68,10 @@ try {
         }
     } else {
         $shortNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        // Stop rolling back at January - March because 2025 data is not uploaded in the database
+        $effM = max(3, $month);
         for ($i = 2; $i >= 0; $i--) {
-            $tm = $month - $i;
+            $tm = $effM - $i;
             $ty = $year;
             while ($tm <= 0) {
                 $tm += 12;

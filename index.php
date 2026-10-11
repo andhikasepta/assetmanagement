@@ -23,6 +23,20 @@ try {
 
 $currentMonth = (int) date('n');
 $currentYear = (int) date('Y');
+$monthNames = [
+    1 => 'Januari',
+    2 => 'Februari',
+    3 => 'Maret',
+    4 => 'April',
+    5 => 'Mei',
+    6 => 'Juni',
+    7 => 'Juli',
+    8 => 'Agustus',
+    9 => 'September',
+    10 => 'Oktober',
+    11 => 'November',
+    12 => 'Desember'
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -466,6 +480,120 @@ $currentYear = (int) date('Y');
                     <div class="table-pagination-footer">
                         <div id="sr-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
                         <div class="pagination-controls" id="sr-pagination-controls"></div>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- CARD 3: Rekap DB Master Data                                -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div class="card" id="card-rekap-db" style="margin-top: 2rem;">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Rekap DB Master Data</h2>
+                            <p class="card-subtitle">Raw Rekap DB Master Data (Sitecode, Reg No, Name, SN, NBV)</p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <button class="btn btn-refresh" onclick="App.loadRekapDbData()">
+                                Refresh
+                            </button>
+                            <button class="btn btn-danger" onclick="App.openRekapDbBulkDeleteModal()"
+                                title="Hapus data Rekap DB berdasarkan bulan dan tahun">
+                                Hapus Data
+                            </button>
+                            <button class="btn btn-primary" onclick="App.openRekapDbImportModal()">
+                                Impor Data Rekap DB
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table Toolbar: Page Size & Search & Period Filters -->
+                    <div class="table-toolbar">
+                        <div class="table-toolbar-left">
+                            <label for="rekap-db-page-size">Tampilkan</label>
+                            <select id="rekap-db-page-size" class="form-control"
+                                style="width: auto; padding: 0.25rem 0.5rem;" autocomplete="off"
+                                onchange="App.changeRekapDbPageSize(this.value)">
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all">Semua</option>
+                            </select>
+                            <span>baris per halaman</span>
+
+                            <span style="margin-left: 1rem; border-left: 1px solid #e2e8f0; padding-left: 1rem;"></span>
+
+                            <label for="rekap-db-filter-month">BULAN</label>
+                            <select id="rekap-db-filter-month" class="form-control"
+                                style="width: auto; padding: 0.25rem 0.5rem;" autocomplete="off"
+                                onchange="App.applyRekapDbFilter()">
+                                <option value="" selected>Semua Bulan</option>
+                                <?php foreach ($monthNames as $num => $name): ?>
+                                    <option value="<?= $num ?>"><?= $name ?></option>
+                                <?php endforeach; ?>
+                            </select>
+
+                            <label for="rekap-db-filter-year">TAHUN</label>
+                            <select id="rekap-db-filter-year" class="form-control"
+                                style="width: auto; padding: 0.25rem 0.5rem;" autocomplete="off"
+                                onchange="App.applyRekapDbFilter()">
+                                <option value="" selected>Semua Tahun</option>
+                                <?php for ($y = $currentYear; $y <= $currentYear + 5; $y++): ?>
+                                    <option value="<?= $y ?>"><?= $y ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="table-toolbar-right">
+                            <input type="text" id="rekap-db-search-input" class="table-search-input" placeholder="Search..."
+                                autocomplete="off" value="" oninput="App.handleRekapDbSearch(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Rekap DB Table -->
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-responsive">
+                            <table class="reconciliation-table" id="rekap-db-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center align-middle" style="width: 50px;">NO</th>
+                                        <th class="text-center align-middle sortable" style="width: 130px;"
+                                            onclick="App.toggleRekapDbSort('sitecode')">
+                                            SITECODE <span class="sort-indicator" data-rdb-col="sitecode">⇅</span>
+                                        </th>
+                                        <th class="text-center align-middle sortable" style="width: 140px;"
+                                            onclick="App.toggleRekapDbSort('reg_no')">
+                                            REG NO <span class="sort-indicator" data-rdb-col="reg_no">⇅</span>
+                                        </th>
+                                        <th class="text-left align-middle sortable" style="min-width: 220px;"
+                                            onclick="App.toggleRekapDbSort('name')">
+                                            NAME <span class="sort-indicator" data-rdb-col="name">⇅</span>
+                                        </th>
+                                        <th class="text-center align-middle sortable" style="width: 140px;"
+                                            onclick="App.toggleRekapDbSort('sn')">
+                                            SN <span class="sort-indicator" data-rdb-col="sn">⇅</span>
+                                        </th>
+                                        <th class="text-right align-middle sortable" style="width: 150px;"
+                                            onclick="App.toggleRekapDbSort('nbv')">
+                                            NBV <span class="sort-indicator" data-rdb-col="nbv">⇅</span>
+                                        </th>
+                                        <th class="text-center align-middle col-action" style="width: 90px;">ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rekap-db-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                            Memuat data Rekap DB...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Table Pagination Footer -->
+                    <div class="table-pagination-footer">
+                        <div id="rekap-db-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                        <div class="pagination-controls" id="rekap-db-pagination-controls"></div>
                     </div>
                 </div>
 
@@ -1013,36 +1141,257 @@ $currentYear = (int) date('Y');
                             </div>
                         </div>
 
-                        <!-- ── Section: Catatan dan Evaluasi Hasil Stock Opname ── -->
-                        <div id="card-executive-catatan"
-                            style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <h3
-                                    style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                    Catatan dan Evaluasi Hasil Stock Opname
-                                </h3>
+                        <!-- ── Bottom Row: Catatan & Evaluasi (Left) + Result DB Analysis (Right) ── -->
+                        <div class="executive-bottom-row" id="executive-bottom-row">
+
+                            <!-- Left: Catatan dan Evaluasi Hasil Stock Opname -->
+                            <div id="card-executive-catatan">
+                                <div
+                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div>
+                                        <h3
+                                            style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                            Catatan dan Evaluasi Hasil Stock Opname
+                                        </h3>
+                                        <div id="exec-catatan-subtitle"
+                                            style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                            Kesimpulan hasil evaluasi stock opname area
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="table-responsive"
+                                    style="max-height: 440px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                    <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
+                                        <thead>
+                                            <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                <th style="width: 45px; text-align: center;">NO</th>
+                                                <th style="width: 95px; text-align: center;" id="exec-catatan-th-period">BULAN</th>
+                                                <th style="width: 90px; text-align: center;">DEPT</th>
+                                                <th style="width: 100px; text-align: center;">SUB DEPT</th>
+                                                <th>KETERANGAN</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="exec-catatan-tbody">
+                                            <tr>
+                                                <td colspan="5" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
+                                                    Memuat catatan...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <div class="table-responsive"
-                                style="max-height: 420px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
-                                    <thead>
-                                        <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                            <th style="width: 50px; text-align: center;">NO</th>
-                                            <th style="width: 110px; text-align: center;">DEPT</th>
-                                            <th style="width: 120px; text-align: center;">SUB DEPT</th>
-                                            <th>KETERANGAN</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="exec-catatan-tbody">
-                                        <tr>
-                                            <td colspan="4" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
-                                                Memuat catatan...
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+
+                            <!-- Right: Result DB Analysis -->
+                            <div id="card-executive-db-analysis">
+                                <div
+                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div>
+                                        <h3
+                                            style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                            Result DB Analysis
+                                        </h3>
+                                        <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                            Perbandingan data DB dengan periode sebelumnya
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                        <span class="db-grand-trend" id="db-grand-trend"></span>
+                                        <span class="so-status-badge"
+                                            style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px;">
+                                            Total: <span id="db-analysis-grand-total">0</span> QTY
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div id="db-analysis-content" class="db-analysis-scroll">
+                                    <!-- WRO Big Dept Card -->
+                                    <div class="db-dept-card" id="db-group-wro">
+                                        <div class="db-dept-card-header">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-name-title">WRO</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-header-val" id="db-val-wro">0</span>
+                                                <span class="db-dept-trend" id="db-trend-wro"></span>
+                                                <span class="db-dept-subtext" id="db-subtext-wro">(0/0 Sites)</span>
+                                                <span class="so-status-badge"
+                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
+                                                    DB</span>
+                                            </div>
+                                        </div>
+                                        <div class="db-subdept-horizontal-row"
+                                            style="grid-template-columns: repeat(3, 1fr);">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">CSO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-cso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-cso">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-cso">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">NSO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-nso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-nso">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-nso">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">SSO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-sso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-sso">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-sso">0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- CRO Big Dept Card -->
+                                    <div class="db-dept-card" id="db-group-cro">
+                                        <div class="db-dept-card-header">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-name-title">CRO</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-header-val" id="db-val-cro">0</span>
+                                                <span class="db-dept-trend" id="db-trend-cro"></span>
+                                                <span class="db-dept-subtext" id="db-subtext-cro">(0/0 Sites)</span>
+                                                <span class="so-status-badge"
+                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
+                                                    DB</span>
+                                            </div>
+                                        </div>
+                                        <div class="db-subdept-horizontal-row"
+                                            style="grid-template-columns: repeat(4, 1fr);">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">CJDO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-cjdo"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-cjdo">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-cjdo">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">EKO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-eko"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-eko">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-eko">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">WJO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-wjo"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-wjo">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-wjo">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">WKO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-wko"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-wko">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-wko">0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ERO Big Dept Card -->
+                                    <div class="db-dept-card" id="db-group-ero">
+                                        <div class="db-dept-card-header">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-name-title">ERO</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-header-val" id="db-val-ero">0</span>
+                                                <span class="db-dept-trend" id="db-trend-ero"></span>
+                                                <span class="db-dept-subtext" id="db-subtext-ero">(0/0 Sites)</span>
+                                                <span class="so-status-badge"
+                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
+                                                    DB</span>
+                                            </div>
+                                        </div>
+                                        <div class="db-subdept-horizontal-row"
+                                            style="grid-template-columns: repeat(4, 1fr);">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">BNO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-bno"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-bno">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-bno">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">EJO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-ejo"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-ejo">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-ejo">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">MPO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-mpo"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-mpo">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-mpo">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">SMO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-smo"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-smo">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-smo">0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- PMD Big Dept Card -->
+                                    <div class="db-dept-card" id="db-group-pmd" style="display: none;">
+                                        <div class="db-dept-card-header">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-name-title pmd-title">PMD</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span class="db-dept-header-val" id="db-val-pmd"
+                                                    style="color: #7e22ce;">0</span>
+                                                <span class="db-dept-trend" id="db-trend-pmd"></span>
+                                                <span class="db-dept-subtext" id="db-subtext-pmd">(0/0 Sites)</span>
+                                                <span class="so-status-badge"
+                                                    style="background: #f3e8ff; color: #7e22ce; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
+                                                    DB</span>
+                                            </div>
+                                        </div>
+                                        <div class="db-subdept-horizontal-row"
+                                            style="grid-template-columns: repeat(2, 1fr);">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DNO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-dno"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-dno">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-dno">0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DSO</span>
+                                                    <span class="db-subdept-trend" id="db-subdept-trend-dso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-subdept-val-dso">0</div>
+                                                <div class="kpi-subdept-meta" id="db-subdept-meta-dso">0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -1649,6 +1998,200 @@ $currentYear = (int) date('Y');
                     </div>
                 </div>
 
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- CARD: Rekapitulasi Status Penyelesaian DB                   -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div class="card" id="card-rekap-status-db" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                                <h2 class="card-title"
+                                    style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">
+                                    Rekapitulasi Status Penyelesaian DB
+                                </h2>
+                                <span id="rdb-status-period-badge" class="badge"
+                                    style="background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">
+                                    Februari 2026
+                                </span>
+                            </div>
+                            <p class="card-subtitle" style="margin-top: 3px;">
+                                Perbandingan data DB dengan periode sebelumnya
+                            </p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <select id="rdb-status-filter-dept" class="form-control"
+                                style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
+                                autocomplete="off" onchange="App.onRekapDbStatusDeptChange()">
+                                <option value="all" selected>Semua Dept</option>
+                            </select>
+
+                            <select id="rdb-status-filter-subdept" class="form-control"
+                                style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
+                                autocomplete="off" onchange="App.onRekapDbStatusSubDeptChange()">
+                                <option value="all" selected>Semua Sub Dept</option>
+                            </select>
+
+                            <select id="rdb-status-filter-status" class="form-control"
+                                style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
+                                autocomplete="off" onchange="App.onRekapDbStatusFilterChange()">
+                                <option value="all" selected>Semua Status</option>
+                                <option value="solved">Solved DB</option>
+                                <option value="unsolved">Unsolved DB</option>
+                                <option value="new_db">New DB</option>
+                            </select>
+
+                            <button class="btn btn-refresh btn-sm" onclick="App.loadRekapDbStatusData()"
+                                style="padding: 5px 12px;">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Metric Summary Strip -->
+                    <div class="card-body"
+                        style="padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem;">
+                            <!-- Metric 1: Total Sites -->
+                            <div id="rdb-card-kpi-all"
+                                style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+                                <div>
+                                    <span
+                                        style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">TOTAL
+                                        DB</span>
+                                </div>
+                                <div
+                                    style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px; flex-wrap: wrap;">
+                                    <span id="rdb-metric-total-items"
+                                        style="font-size: 1.4rem; font-weight: 800; color: #0f172a;">0</span>
+                                    <span id="rdb-metric-total-sites"
+                                        style="font-size: 11px; font-weight: 600; color: #475569;">(0/0 Sites)</span>
+                                </div>
+                                <div id="rdb-metric-total-nbv"
+                                    style="font-size: 11px; color: #64748b; margin-top: 2px; font-weight: 500;">Total NBV :
+                                    Rp 0</div>
+                            </div>
+
+                            <!-- Metric 2: Solved -->
+                            <div id="rdb-card-kpi-solved"
+                                style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.85rem 1rem;">
+                                <div>
+                                    <span
+                                        style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.03em;">SOLVED
+                                        DB</span>
+                                </div>
+                                <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                    <span id="rdb-metric-solved"
+                                        style="font-size: 1.4rem; font-weight: 800; color: #16a34a;">0</span>
+                                    <span id="rdb-metric-solved-pct"
+                                        style="font-size: 11px; font-weight: 600; color: #15803d;">(0%)</span>
+                                </div>
+                                <div id="rdb-metric-solved-nbv"
+                                    style="font-size: 11px; color: #166534; margin-top: 2px; font-weight: 500;">Total NBV :
+                                    Rp 0</div>
+                            </div>
+
+                            <!-- Metric 3: Unsolved -->
+                            <div id="rdb-card-kpi-unsolved"
+                                style="background: #ffffff; border: 1px solid #fecaca; border-radius: 8px; padding: 0.85rem 1rem;">
+                                <div>
+                                    <span
+                                        style="font-size: 11px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.03em;">UNSOLVED
+                                        DB</span>
+                                </div>
+                                <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                    <span id="rdb-metric-unsolved"
+                                        style="font-size: 1.4rem; font-weight: 800; color: #dc2626;">0</span>
+                                    <span id="rdb-metric-unsolved-pct"
+                                        style="font-size: 11px; font-weight: 600; color: #b91c1c;">(0%)</span>
+                                </div>
+                                <div id="rdb-metric-unsolved-nbv"
+                                    style="font-size: 11px; color: #991b1b; margin-top: 2px; font-weight: 500;">Total NBV :
+                                    Rp 0</div>
+                            </div>
+
+                            <!-- Metric 4: New DB -->
+                            <div id="rdb-card-kpi-new_db"
+                                style="background: #ffffff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.85rem 1rem;">
+                                <div>
+                                    <span
+                                        style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.03em;">NEW
+                                        DB</span>
+                                </div>
+                                <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                    <span id="rdb-metric-new-db"
+                                        style="font-size: 1.4rem; font-weight: 800; color: #2563eb;">0</span>
+                                    <span id="rdb-metric-new-db-pct"
+                                        style="font-size: 11px; font-weight: 600; color: #1d4ed8;">(0%)</span>
+                                </div>
+                                <div id="rdb-metric-new-db-nbv"
+                                    style="font-size: 11px; color: #1e40af; margin-top: 2px; font-weight: 500;">Total NBV :
+                                    Rp 0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar (Page Size & Search) -->
+                    <div class="table-toolbar" style="flex-wrap: wrap; gap: 0.75rem;">
+                        <div class="table-toolbar-left" style="flex-wrap: wrap; gap: 0.6rem;">
+                            <label for="rdb-status-page-size">Tampilkan</label>
+                            <select id="rdb-status-page-size" class="form-control"
+                                style="width: auto; padding: 0.25rem 0.5rem;" autocomplete="off"
+                                onchange="App.changeRekapDbStatusPageSize(this.value)">
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all">Semua</option>
+                            </select>
+                        </div>
+                        <div class="table-toolbar-right">
+                            <input type="text" id="rdb-status-search-input" class="table-search-input"
+                                placeholder="Cari Dept, Sub Dept, Sitecode, Reg No, Name, SN..." autocomplete="off" value=""
+                                oninput="App.handleRekapDbStatusSearch(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Container for Flat Table View -->
+                    <div class="card-body" style="padding: 0;">
+                        <div id="rdb-status-flat-container" style="display: block;">
+                            <div class="table-responsive">
+                                <table class="reconciliation-table" id="rdb-status-flat-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center align-middle" style="width: 45px;">NO</th>
+                                            <th class="text-center align-middle" style="width: 85px;">DEPT</th>
+                                            <th class="text-center align-middle" style="width: 95px;">SUB DEPT</th>
+                                            <th class="text-center align-middle" style="width: 110px;">SITECODE</th>
+                                            <th class="text-left align-middle" style="min-width: 140px;">NAMA SITE</th>
+                                            <th class="text-center align-middle" style="width: 150px;">REG NO</th>
+                                            <th class="text-left align-middle" style="min-width: 160px;">NAME</th>
+                                            <th class="text-center align-middle" style="width: 140px;">SN</th>
+                                            <th class="text-right align-middle" style="width: 130px;">NBV</th>
+                                            <th class="text-center align-middle" style="width: 105px;">STATUS</th>
+                                            <th class="text-left align-middle" style="min-width: 180px;">KETERANGAN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rdb-status-flat-tbody">
+                                        <tr>
+                                            <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                                Memuat data status...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pagination Footer -->
+                    <div class="table-pagination-footer">
+                        <div id="rdb-status-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                        <div class="pagination-controls" id="rdb-status-pagination-controls"></div>
+                    </div>
+                </div>
+
                 <!-- ── Card: Rekapitulasi 2026 ────────────────────────── -->
                 <div class="card" id="card-rekapitulasi" style="margin-top: 1rem;">
                     <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
@@ -1669,7 +2212,8 @@ $currentYear = (int) date('Y');
                                     <option value="PMD">PMD</option>
                                 </select>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;" id="rekap-subdept-filter-container">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;"
+                                id="rekap-subdept-filter-container">
                                 <label for="rekap-subdept-filter"
                                     style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
                                     SUB DEPT
@@ -2408,6 +2952,131 @@ $currentYear = (int) date('Y');
                     <button type="submit" class="btn btn-primary" id="btn-submit-exec-note">Simpan</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Impor Data Rekap DB                                  -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="rekap-db-import-modal" class="modal-backdrop">
+        <div class="modal-dialog" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Impor Rekap DB Master Data</h3>
+                <button class="modal-close-btn" onclick="App.closeRekapDbImportModal()">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding: 1.25rem;">
+                <!-- Periode Dropdowns -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" for="rekap-db-import-month">Bulan Periode</label>
+                        <select id="rekap-db-import-month" class="form-control">
+                            <?php foreach ($monthNames as $num => $name): ?>
+                                <option value="<?= $num ?>" <?= $num == $currentMonth ? 'selected' : '' ?>><?= $name ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" for="rekap-db-import-year">Tahun Periode</label>
+                        <select id="rekap-db-import-year" class="form-control">
+                            <?php for ($y = $currentYear - 1; $y <= $currentYear + 5; $y++): ?>
+                                <option value="<?= $y ?>" <?= $y == $currentYear ? 'selected' : '' ?>><?= $y ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Drag and Drop Upload Area -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Unggah File Excel/CSV (.xlsx, .xls, .csv)</label>
+                    <div id="rekap-db-drag-drop-zone" class="drag-drop-zone"
+                        onclick="document.getElementById('rekap-db-import-file-input').click()">
+                        <div class="drag-drop-text">Tarik &amp; lepas file Rekap DB di sini</div>
+                        <div class="drag-drop-subtext">atau klik untuk memilih dari komputer</div>
+                    </div>
+                    <input type="file" id="rekap-db-import-file-input" accept=".xlsx,.xls,.csv" style="display: none;"
+                        onchange="App.handleRekapDbFileSelect(this.files)">
+
+                    <!-- Selected File Display -->
+                    <div id="rekap-db-selected-file-display" style="display: none; margin-top: 0.5rem;">
+                        <div class="selected-file-badge">
+                            <div class="selected-file-info">
+                                <span id="rekap-db-selected-file-name">file.xlsx</span>
+                                <span id="rekap-db-selected-file-size" style="color: #64748b; font-size: 11px;">(0
+                                    KB)</span>
+                            </div>
+                            <button type="button" class="selected-file-remove"
+                                onclick="App.clearRekapDbSelectedFile()">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Replace Existing Option -->
+                <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    <label
+                        style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
+                        <input type="checkbox" id="rekap-db-import-replace" checked
+                            style="width: 16px; height: 16px; cursor: pointer;">
+                        <span><strong>Ganti data yang ada</strong> (Hapus data periode ini terlebih dahulu)</span>
+                    </label>
+                </div>
+
+                <!-- Status message in modal -->
+                <div id="modal-rekap-db-import-status"
+                    style="display: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-top: 12px;">
+                </div>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="App.closeRekapDbImportModal()">Batal</button>
+                <button class="btn btn-primary" id="rekap-db-modal-upload-btn"
+                    onclick="App.submitRekapDbImport()">Unggah &amp; Impor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Bulk Delete Rekap DB Master Data                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="rekap-db-bulk-delete-modal" class="modal-backdrop">
+        <div class="modal-dialog" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Hapus Data Rekap DB Berdasarkan Periode</h3>
+                <button class="modal-close-btn" onclick="App.closeRekapDbBulkDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem;">
+                <p style="font-size: 13px; color: #64748b; margin-top: 0; margin-bottom: 1rem;">
+                    Pilih periode data Rekap DB yang ingin dihapus. Semua data pada periode tersebut akan dihapus secara
+                    permanen.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" for="rekap-db-bulk-delete-month">Bulan</label>
+                        <select id="rekap-db-bulk-delete-month" class="form-control">
+                            <option value="">Semua Bulan</option>
+                            <?php foreach ($monthNames as $num => $name): ?>
+                                <option value="<?= $num ?>"><?= $name ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" for="rekap-db-bulk-delete-year">Tahun</label>
+                        <select id="rekap-db-bulk-delete-year" class="form-control">
+                            <option value="">Semua Tahun</option>
+                            <?php for ($y = $currentYear - 1; $y <= $currentYear + 5; $y++): ?>
+                                <option value="<?= $y ?>" <?= $y == $currentYear ? 'selected' : '' ?>><?= $y ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="App.closeRekapDbBulkDeleteModal()">Batal</button>
+                <button class="btn btn-danger" id="rekap-db-bulk-delete-submit-btn"
+                    onclick="App.submitRekapDbBulkDelete()">Hapus Data</button>
+            </div>
         </div>
     </div>
 

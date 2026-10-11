@@ -282,6 +282,7 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
         <div class="quick-access-body" id="quick-access-nav-list">
             <a class="quick-access-item" href="index.php#card-executive-summary"><span>Executive Summary</span></a>
             <a class="quick-access-item" href="index.php#card-executive-catatan"><span>Catatan Dan Evaluasi</span></a>
+            <a class="quick-access-item" href="index.php#card-executive-db-analysis"><span>Result DB Analysis</span></a>
             <a class="quick-access-item" href="index.php#card-scorecard-summary"><span>Score Card Summary</span></a>
             <a class="quick-access-item" href="index.php#card-trend-dept-wrapper"><span>Trend Chart</span></a>
             <a class="quick-access-item" href="index.php#card-hasil-so-subdept"><span>Report SO</span></a>

@@ -124,6 +124,7 @@ const App = (() => {
 
         setupDragAndDrop();
         setupSRDragAndDrop();
+        setupRekapDbDragAndDrop();
 
         // Clean legacy localStorage to prevent stale storage hijacking default landing page
         try {
@@ -245,6 +246,7 @@ const App = (() => {
         if (page === 'master-data') {
             loadMasterData();
             loadSiteRegional();
+            loadRekapDbData();
             loadScorecardKpi();
             loadMasterCatatan();
         } else if (page === 'summary') {
@@ -256,9 +258,11 @@ const App = (() => {
     const QUICK_ACCESS_ITEMS = [
         { id: 'card-executive-summary', title: 'Executive Summary' },
         { id: 'card-executive-catatan', title: 'Catatan Dan Evaluasi' },
+        { id: 'card-executive-db-analysis', title: 'Result DB Analysis' },
         { id: 'card-scorecard-summary', title: 'Score Card Summary' },
         { id: 'card-trend-dept-wrapper', title: 'Trend Chart' },
         { id: 'card-hasil-so-subdept', title: 'Report SO' },
+        { id: 'card-rekap-status-db', title: 'Status Penyelesaian DB' },
         { id: 'card-rekapitulasi', title: 'Rekapitulasi' },
         { id: 'card-site-movements', title: 'History & Log' }
     ];
@@ -1669,6 +1673,496 @@ const App = (() => {
         }
     }
 
+    // ── Rekap DB Master Data Management ─────────────────────────
+    let rekapDbCurrentPage = 1;
+    let rekapDbPageSize = 10;
+    let rekapDbSearchTerm = '';
+    let rekapDbFilterMonth = '';
+    let rekapDbFilterYear = '';
+    let rekapDbSortCol = 'id';
+    let rekapDbSortDir = 'asc';
+    let selectedRekapDbFile = null;
+    let rekapDbSearchDebounce = null;
+
+    function setupRekapDbDragAndDrop() {
+        const dropZone = document.getElementById('rekap-db-drag-drop-zone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleRekapDbFileSelect(dt.files);
+            }
+        });
+    }
+
+    async function loadRekapDbData() {
+        const tbody = document.getElementById('rekap-db-tbody');
+        const pageInfo = document.getElementById('rekap-db-pagination-info');
+        const paginationControls = document.getElementById('rekap-db-pagination-controls');
+
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <span class="spinner" style="width: 16px; height: 16px;"></span>
+                        <span>Memuat data Rekap DB...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const params = new URLSearchParams({
+                page: rekapDbCurrentPage,
+                limit: rekapDbPageSize,
+                month: rekapDbFilterMonth,
+                year: rekapDbFilterYear,
+                search: rekapDbSearchTerm,
+                sort_col: rekapDbSortCol,
+                sort_dir: rekapDbSortDir
+            });
+
+            const res = await fetch(`api/rekap_db.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="padding: 2rem; color: #ef4444;">
+                            Gagal memuat data: ${escapeHtml(json.message || 'Kesalahan sistem')}
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const rows = json.data || [];
+            const total = json.total || 0;
+
+            if (rows.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                            Tidak ada data Rekap DB.
+                        </td>
+                    </tr>
+                `;
+                if (pageInfo) pageInfo.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+                if (paginationControls) paginationControls.innerHTML = '';
+                return;
+            }
+
+            const startIdx = rekapDbPageSize === 'all' ? 0 : (json.page - 1) * parseInt(json.limit, 10);
+
+            let html = '';
+            rows.forEach((r, i) => {
+                const no = startIdx + i + 1;
+                const sitecode = escapeHtml(r.sitecode || '-');
+                const regNo = escapeHtml(r.reg_no || '-');
+                const name = escapeHtml(r.name || '-');
+                const sn = escapeHtml(r.sn || '-');
+                const nbvNum = parseFloat(r.nbv || 0);
+                const nbvFormatted = Number(nbvNum).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                html += `
+                    <tr>
+                        <td class="text-center" style="color: #64748b; font-weight: 600;">${no}</td>
+                        <td class="text-center" style="font-weight: 700; color: #0284c7;">${sitecode}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
+                        <td class="text-left" style="font-weight: 500; color: #334155; word-break: break-word;">${name}</td>
+                        <td class="text-center" style="font-weight: 500; color: #475569;">${sn}</td>
+                        <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">Rp ${nbvFormatted}</td>
+                        <td class="text-center col-action">
+                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRekapDbItem(${r.id})" title="Hapus data ini">
+                                Hapus
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+
+            // Update Pagination Info
+            if (pageInfo) {
+                const endIdx = rekapDbPageSize === 'all' ? total : Math.min(startIdx + rows.length, total);
+                pageInfo.textContent = `Menampilkan ${startIdx + 1} sampai ${endIdx} dari ${total.toLocaleString()} data`;
+            }
+
+            renderRekapDbPagination(json.page, json.total_pages);
+
+        } catch (err) {
+            console.error('Error loading rekap db data:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center" style="padding: 2rem; color: #ef4444;">
+                        Kesalahan jaringan saat memuat Rekap DB: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function renderRekapDbPagination(currentPage, totalPages) {
+        const controls = document.getElementById('rekap-db-pagination-controls');
+        if (!controls) return;
+
+        if (totalPages <= 1 || rekapDbPageSize === 'all') {
+            controls.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        html += `<button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="App.goToRekapDbPage(${currentPage - 1})">&laquo; Prev</button>`;
+
+        const maxButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="App.goToRekapDbPage(1)">1</button>`;
+            if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            html += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="App.goToRekapDbPage(${p})">${p}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+            html += `<button class="pagination-btn" onclick="App.goToRekapDbPage(${totalPages})">${totalPages}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="App.goToRekapDbPage(${currentPage + 1})">Next &raquo;</button>`;
+        controls.innerHTML = html;
+    }
+
+    function goToRekapDbPage(p) {
+        rekapDbCurrentPage = p;
+        loadRekapDbData();
+    }
+
+    function changeRekapDbPageSize(sz) {
+        rekapDbPageSize = sz;
+        rekapDbCurrentPage = 1;
+        loadRekapDbData();
+    }
+
+    function applyRekapDbFilter() {
+        rekapDbFilterMonth = document.getElementById('rekap-db-filter-month')?.value || '';
+        rekapDbFilterYear = document.getElementById('rekap-db-filter-year')?.value || '';
+        rekapDbCurrentPage = 1;
+        loadRekapDbData();
+    }
+
+    function handleRekapDbSearch(term) {
+        clearTimeout(rekapDbSearchDebounce);
+        rekapDbSearchDebounce = setTimeout(() => {
+            rekapDbSearchTerm = (term || '').trim();
+            rekapDbCurrentPage = 1;
+            loadRekapDbData();
+        }, 300);
+    }
+
+    function toggleRekapDbSort(col) {
+        if (rekapDbSortCol === col) {
+            rekapDbSortDir = (rekapDbSortDir === 'asc') ? 'desc' : 'asc';
+        } else {
+            rekapDbSortCol = col;
+            rekapDbSortDir = 'asc';
+        }
+
+        document.querySelectorAll('[data-rdb-col]').forEach(el => {
+            if (el.getAttribute('data-rdb-col') === col) {
+                el.textContent = rekapDbSortDir === 'asc' ? '▲' : '▼';
+            } else {
+                el.textContent = '⇅';
+            }
+        });
+
+        rekapDbCurrentPage = 1;
+        loadRekapDbData();
+    }
+
+    // Modal & File Handlers for Rekap DB Import
+    function openRekapDbImportModal() {
+        const modal = document.getElementById('rekap-db-import-modal');
+        if (!modal) return;
+        clearRekapDbSelectedFile();
+        const statusDiv = document.getElementById('modal-rekap-db-import-status');
+        if (statusDiv) statusDiv.style.display = 'none';
+        modal.classList.add('active');
+    }
+
+    function closeRekapDbImportModal() {
+        const modal = document.getElementById('rekap-db-import-modal');
+        if (modal) modal.classList.remove('active');
+        clearRekapDbSelectedFile();
+    }
+
+    function handleRekapDbFileSelect(files) {
+        if (!files || files.length === 0) return;
+        selectedRekapDbFile = files[0];
+        const display = document.getElementById('rekap-db-selected-file-display');
+        const nameEl = document.getElementById('rekap-db-selected-file-name');
+        const sizeEl = document.getElementById('rekap-db-selected-file-size');
+        const zone = document.getElementById('rekap-db-drag-drop-zone');
+
+        if (nameEl) nameEl.textContent = selectedRekapDbFile.name;
+        if (sizeEl) sizeEl.textContent = `(${Math.round(selectedRekapDbFile.size / 1024)} KB)`;
+        if (display) display.style.display = 'block';
+        if (zone) zone.style.display = 'none';
+    }
+
+    function clearRekapDbSelectedFile() {
+        selectedRekapDbFile = null;
+        const input = document.getElementById('rekap-db-import-file-input');
+        if (input) input.value = '';
+        const display = document.getElementById('rekap-db-selected-file-display');
+        const zone = document.getElementById('rekap-db-drag-drop-zone');
+        if (display) display.style.display = 'none';
+        if (zone) zone.style.display = 'block';
+    }
+
+    async function submitRekapDbImport() {
+        if (!selectedRekapDbFile) {
+            showToast('error', 'File Belum Dipilih', 'Silakan pilih file Excel atau CSV Rekap DB.');
+            return;
+        }
+
+        const monthSelect = document.getElementById('rekap-db-import-month');
+        const yearSelect = document.getElementById('rekap-db-import-year');
+        const replaceCheck = document.getElementById('rekap-db-import-replace');
+        const submitBtn = document.getElementById('rekap-db-modal-upload-btn');
+        const statusDiv = document.getElementById('modal-rekap-db-import-status');
+
+        const month = monthSelect ? monthSelect.value : '';
+        const year = yearSelect ? yearSelect.value : '';
+        const replaceExisting = replaceCheck && replaceCheck.checked ? '1' : '0';
+
+        const formData = new FormData();
+        formData.append('action', 'import');
+        formData.append('month', month);
+        formData.append('year', year);
+        formData.append('replace_existing', replaceExisting);
+        formData.append('excel_file', selectedRekapDbFile);
+        formData.append('csrf_token', csrfToken);
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mengunggah & Mengimpor...';
+        }
+
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#eff6ff';
+            statusDiv.style.color = '#1d4ed8';
+            statusDiv.style.border = '1px solid #bfdbfe';
+            statusDiv.textContent = 'Memproses data Rekap DB...';
+        }
+
+        try {
+            const res = await fetch('api/rekap_db.php', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
+            });
+
+            const rawText = await res.text();
+            let json;
+            try {
+                json = JSON.parse(rawText);
+            } catch (e) {
+                console.error('Non-JSON response:', rawText);
+                if (statusDiv) {
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = 'Kesalahan server: ' + (rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 150) || 'Respon server tidak valid');
+                }
+                showToast('error', 'Kesalahan Server', 'Gagal memproses data di server.');
+                return;
+            }
+
+            if (json.success) {
+                if (statusDiv) {
+                    statusDiv.style.background = '#f0fdf4';
+                    statusDiv.style.color = '#15803d';
+                    statusDiv.style.border = '1px solid #bbf7d0';
+                    statusDiv.textContent = json.message || 'Impor data Rekap DB berhasil!';
+                }
+                showToast('success', 'Impor Rekap DB Berhasil', json.message || 'Data berhasil diimpor.');
+
+                // Sync filter and reload table
+                const filterMonth = document.getElementById('rekap-db-filter-month');
+                const filterYear = document.getElementById('rekap-db-filter-year');
+                if (filterMonth && month) filterMonth.value = month;
+                if (filterYear && year) filterYear.value = year;
+                rekapDbFilterMonth = month;
+                rekapDbFilterYear = year;
+                rekapDbCurrentPage = 1;
+                loadRekapDbData();
+
+                setTimeout(() => {
+                    closeRekapDbImportModal();
+                }, 1200);
+            } else {
+                if (statusDiv) {
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = json.message || 'Impor Rekap DB gagal.';
+                }
+                showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor file Rekap DB.');
+            }
+
+        } catch (err) {
+            console.error('Upload fetch error:', err);
+            if (statusDiv) {
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = 'Kesalahan koneksi: ' + (err.message || 'Gagal terhubung');
+            }
+            showToast('error', 'Kesalahan Jaringan', err.message || 'Gagal terhubung ke server.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    // Bulk Delete Rekap DB
+    function openRekapDbBulkDeleteModal() {
+        const modal = document.getElementById('rekap-db-bulk-delete-modal');
+        if (!modal) return;
+        const curM = document.getElementById('rekap-db-filter-month')?.value || '';
+        const curY = document.getElementById('rekap-db-filter-year')?.value || '';
+        const modalM = document.getElementById('rekap-db-bulk-delete-month');
+        const modalY = document.getElementById('rekap-db-bulk-delete-year');
+        if (modalM && curM) modalM.value = curM;
+        if (modalY && curY) modalY.value = curY;
+        modal.classList.add('active');
+    }
+
+    function closeRekapDbBulkDeleteModal() {
+        const modal = document.getElementById('rekap-db-bulk-delete-modal');
+        if (!modal) return;
+        modal.classList.remove('active');
+    }
+
+    async function submitRekapDbBulkDelete() {
+        const monthSelect = document.getElementById('rekap-db-bulk-delete-month');
+        const yearSelect = document.getElementById('rekap-db-bulk-delete-year');
+        const submitBtn = document.getElementById('rekap-db-bulk-delete-submit-btn');
+
+        const month = monthSelect ? monthSelect.value : '';
+        const year = yearSelect ? yearSelect.value : '';
+
+        if (!year && !month) {
+            showToast('error', 'Pilihan Diperlukan', 'Pilih minimal Bulan atau Tahun yang akan dihapus.');
+            return;
+        }
+
+        const monthName = month ? monthSelect.options[monthSelect.selectedIndex].text : 'Semua Bulan';
+        const confirmMsg = `Apakah Anda yakin ingin menghapus permanen data Rekap DB untuk:\nBulan: ${monthName}\nTahun: ${year || 'Semua Tahun'}?\n\nTindakan ini tidak dapat dibatalkan!`;
+
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Menghapus...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'bulk_delete');
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('csrf_token', csrfToken);
+
+            const res = await fetch('api/rekap_db.php', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+                body: formData
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                showToast('success', 'Hapus Berhasil', json.message || 'Data Rekap DB berhasil dihapus.');
+                closeRekapDbBulkDeleteModal();
+                loadRekapDbData();
+            } else {
+                showToast('error', 'Hapus Gagal', json.message || 'Gagal menghapus data.');
+            }
+        } catch (err) {
+            console.error('Bulk delete error:', err);
+            showToast('error', 'Kesalahan Sistem', 'Gagal berkomunikasi dengan server.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Hapus Data Rekap DB';
+            }
+        }
+    }
+
+    async function deleteRekapDbItem(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus baris data Rekap DB ini?')) {
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('id', id);
+            formData.append('csrf_token', csrfToken);
+
+            const res = await fetch('api/rekap_db.php', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+                body: formData
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                showToast('success', 'Data Dihapus', 'Baris data berhasil dihapus.');
+                loadRekapDbData();
+            } else {
+                showToast('error', 'Gagal Menghapus', json.message || 'Gagal menghapus data.');
+            }
+        } catch (err) {
+            console.error('Delete item error:', err);
+            showToast('error', 'Kesalahan Sistem', 'Gagal berkomunikasi dengan server.');
+        }
+    }
+
     // ── Score Card KPI Master Data ───────────────────────────────
 
     let scorecardKpiData = [];
@@ -2469,6 +2963,9 @@ const App = (() => {
             if (el) el.style.display = (cat === 'pmd') ? 'flex' : 'none';
         });
 
+        // Sync DB Analysis visibility and grand total
+        syncDbAnalysisVisibility();
+
         // Ensure Catatan Executive Summary card is always displayed across all categories
         const execCatatanCard = document.getElementById('card-executive-catatan');
         if (execCatatanCard) {
@@ -2534,6 +3031,10 @@ const App = (() => {
 
         rekapDeptFilter = 'all';
         rekapSubDeptFilter = 'all';
+        rdbStatusDept = 'all';
+        rdbStatusSubDept = 'all';
+        rdbStatusCurrentPage = 1;
+        rdbStatusFiltersPopulated = false;
         loadRekapitulasi();
         loadSubDeptResults();
 
@@ -2854,6 +3355,9 @@ const App = (() => {
 
             ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo'].forEach(updateSubDeptCard);
 
+            // Populate DB Analysis Card (Result DB QTY)
+            updateDbAnalysis(json.db_analysis || ach.db_analysis || {});
+
             // Load Trend Line Graphics (DEPT, Sub DEPT, PMD Sub DEPT)
             loadTrendCharts(year);
 
@@ -2872,9 +3376,170 @@ const App = (() => {
             // Load Catatan Executive Summary for selected period
             loadExecutiveNotes(year, month);
 
+            // Load Rekapitulasi Status Penyelesaian DB for selected period
+            loadRekapDbStatusData(year, month);
+
         } catch (err) {
             console.error('Error loading summary totals:', err);
         }
+    }
+
+    // ── DB Analysis (Result DB QTY) Helper Functions ─────────────
+    let currentDbAnalysisData = null;
+
+    function syncDbAnalysisVisibility() {
+        const isPmd = (summaryCategory === 'pmd');
+        const isQuarterly = (summarySOType === 'quarterly');
+
+        const gWro = document.getElementById('db-group-wro');
+        const gCro = document.getElementById('db-group-cro');
+        const gEro = document.getElementById('db-group-ero');
+        const gPmd = document.getElementById('db-group-pmd');
+
+        if (isPmd) {
+            if (gWro) gWro.style.display = 'none';
+            if (gCro) gCro.style.display = 'none';
+            if (gEro) gEro.style.display = 'none';
+            if (gPmd) gPmd.style.display = 'flex';
+        } else {
+            if (gWro) gWro.style.display = 'flex';
+            if (gCro) gCro.style.display = isQuarterly ? 'none' : 'flex';
+            if (gEro) gEro.style.display = 'flex';
+            if (gPmd) gPmd.style.display = 'none';
+        }
+        updateDbAnalysisGrandTotalBadge();
+    }
+
+    function setDbAnalysisDept() {
+        syncDbAnalysisVisibility();
+    }
+
+    function getDbPrevPeriodLabel() {
+        if (!currentDbAnalysisData || !currentDbAnalysisData.previous_period) return 'periode sebelumnya';
+        const prev = currentDbAnalysisData.previous_period;
+        const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        if (prev.month) {
+            return `${monthNames[prev.month] || ('Bulan ' + prev.month)} ${prev.year}`;
+        }
+        return `Tahun ${prev.year}`;
+    }
+
+    function renderDbTrendBadge(item, isSmall = false) {
+        if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || !item || item.diff_qty === undefined || item.diff_qty === null) {
+            return `
+                <span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya">
+                    <span>-</span>
+                </span>
+            `;
+        }
+        const diff = item.diff_qty;
+        const prevQty = item.prev_qty !== undefined ? item.prev_qty : 0;
+        const prevLabel = getDbPrevPeriodLabel();
+        const svgSize = isSmall ? '8' : '10';
+        const formatQty = (n) => Number(n || 0).toLocaleString();
+
+        // User requirement: If DB is MORE than previous period -> UP arrow, color RED.
+        // If DB is LESS than previous period -> DOWN arrow, color GREEN.
+        if (diff > 0) {
+            const formatted = `+${formatQty(diff)}`;
+            return `
+                <span class="db-trend-indicator db-trend-up" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})">
+                    <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12,4 21,20 3,20"/>
+                    </svg>
+                    <span>${formatted}</span>
+                </span>
+            `;
+        } else if (diff < 0) {
+            const formatted = `${formatQty(diff)}`;
+            return `
+                <span class="db-trend-indicator db-trend-down" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})">
+                    <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12,20 3,4 21,4"/>
+                    </svg>
+                    <span>${formatted}</span>
+                </span>
+            `;
+        } else {
+            return `
+                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 QTY selisih)">
+                    <span>-</span>
+                </span>
+            `;
+        }
+    }
+
+    function updateDbAnalysisGrandTotalBadge() {
+        if (!currentDbAnalysisData) return;
+        const badgeEl = document.getElementById('db-analysis-grand-total');
+        const trendEl = document.getElementById('db-grand-trend');
+        if (!badgeEl) return;
+        const isPmd = (summaryCategory === 'pmd');
+        let totalQty = 0;
+        let activeItem = null;
+        if (isPmd) {
+            activeItem = currentDbAnalysisData.pmd || {};
+            totalQty = activeItem.qty || 0;
+        } else {
+            activeItem = currentDbAnalysisData.outlet_national || currentDbAnalysisData.national || {};
+            totalQty = activeItem.qty || 0;
+        }
+        badgeEl.textContent = Number(totalQty).toLocaleString();
+        if (trendEl && activeItem) {
+            trendEl.innerHTML = renderDbTrendBadge(activeItem, false);
+        }
+    }
+
+    function updateDbAnalysis(data) {
+        currentDbAnalysisData = data || {};
+        syncDbAnalysisVisibility();
+
+        const formatQty = (n) => Number(n || 0).toLocaleString();
+
+        const updateDeptGroup = (deptKey, valId, trendId, subtextId) => {
+            const item = currentDbAnalysisData[deptKey] || {};
+            const valEl = document.getElementById(valId);
+            if (valEl) valEl.textContent = formatQty(item.qty);
+
+            const trendEl = document.getElementById(trendId);
+            if (trendEl) {
+                trendEl.innerHTML = renderDbTrendBadge(item, false);
+            }
+
+            const subEl = document.getElementById(subtextId);
+            if (subEl) {
+                const withQty = item.sites_with_qty !== undefined ? item.sites_with_qty : (item.count || 0);
+                const total = item.total_sites || 0;
+                subEl.textContent = `(${withQty}/${total} Sites)`;
+            }
+        };
+
+        updateDeptGroup('wro', 'db-val-wro', 'db-trend-wro', 'db-subtext-wro');
+        updateDeptGroup('cro', 'db-val-cro', 'db-trend-cro', 'db-subtext-cro');
+        updateDeptGroup('ero', 'db-val-ero', 'db-trend-ero', 'db-subtext-ero');
+        updateDeptGroup('pmd', 'db-val-pmd', 'db-trend-pmd', 'db-subtext-pmd');
+
+        const subData = currentDbAnalysisData.sub_depts || {};
+        const updateSubDeptDb = (sKey) => {
+            const key = sKey.toLowerCase();
+            const item = subData[key] || {};
+            const valEl = document.getElementById(`db-subdept-val-${key}`);
+            if (valEl) valEl.textContent = formatQty(item.qty);
+
+            const trendEl = document.getElementById(`db-subdept-trend-${key}`);
+            if (trendEl) {
+                trendEl.innerHTML = renderDbTrendBadge(item, true);
+            }
+
+            const metaEl = document.getElementById(`db-subdept-meta-${key}`);
+            if (metaEl) {
+                const withQty = item.sites_with_qty !== undefined ? item.sites_with_qty : (item.count || 0);
+                const total = item.total_sites || 0;
+                metaEl.textContent = `${withQty}/${total} Sites`;
+            }
+        };
+
+        ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo', 'dno', 'dso'].forEach(updateSubDeptDb);
     }
 
     // ── Site Movement History & Comparison Logs ──────────────────
@@ -3186,6 +3851,594 @@ const App = (() => {
         }
     }
 
+    // ── Rekapitulasi Status Penyelesaian DB (Solved, Unsolved, New DB) ──
+    // ── Rekapitulasi Status Penyelesaian DB (Solved, Unsolved, New DB) ──
+    let rdbStatusCurrentPage = 1;
+    let rdbStatusPageSize = 10;
+    let rdbStatusMonth = 2;
+    let rdbStatusYear = 2026;
+    let rdbStatusDept = 'all';
+    let rdbStatusSubDept = 'all';
+    let rdbStatusFilterStatusVal = 'all';
+    let rdbStatusSearchQuery = '';
+    let rdbStatusView = 'flat'; // Default: flat table view with pagination
+    let rdbStatusExpandedSites = new Set();
+    let rdbStatusDebounceTimer = null;
+    let rdbStatusTotalSites = 0;
+    let rdbStatusTotalPages = 1;
+    let rdbStatusUserInteracted = false;
+    let rdbStatusDeptSubDeptMap = {};
+    let rdbStatusFiltersPopulated = false;
+
+    async function loadRekapDbStatusData(forcedYear = null, forcedMonth = null) {
+        const masterMonthEl = document.getElementById('summary-filter-month');
+        const masterYearEl = document.getElementById('summary-filter-year');
+        const deptSelect = document.getElementById('rdb-status-filter-dept');
+        const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
+        const statusSelect = document.getElementById('rdb-status-filter-status');
+        const searchInput = document.getElementById('rdb-status-search-input');
+        const pageSizeSelect = document.getElementById('rdb-status-page-size');
+
+        // Master period synchronization from top of page
+        if (forcedYear) {
+            rdbStatusYear = parseInt(forcedYear, 10);
+        } else if (masterYearEl && masterYearEl.value) {
+            rdbStatusYear = parseInt(masterYearEl.value, 10);
+        }
+
+        if (forcedMonth && forcedMonth !== '') {
+            rdbStatusMonth = parseInt(forcedMonth, 10);
+        } else if (masterMonthEl && masterMonthEl.value && masterMonthEl.value !== '') {
+            rdbStatusMonth = parseInt(masterMonthEl.value, 10);
+        } else {
+            // Default to February if master filter is "Semua Bulan"
+            rdbStatusMonth = 2;
+        }
+
+        if (deptSelect) rdbStatusDept = deptSelect.value;
+        if (subDeptSelect) rdbStatusSubDept = subDeptSelect.value;
+        if (statusSelect) rdbStatusFilterStatusVal = statusSelect.value;
+        if (searchInput) rdbStatusSearchQuery = searchInput.value.trim();
+        if (pageSizeSelect) rdbStatusPageSize = pageSizeSelect.value;
+
+        const flatTbody = document.getElementById('rdb-status-flat-tbody');
+        const paginationInfo = document.getElementById('rdb-status-pagination-info');
+        const paginationControls = document.getElementById('rdb-status-pagination-controls');
+
+        if (flatTbody) {
+            flatTbody.innerHTML = `
+                <tr>
+                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                        <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <span class="spinner" style="width: 16px; height: 16px;"></span>
+                            <span>Memuat data status penyelesaian DB...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const currentCat = summaryCategory || 'pmd';
+            const currentSoType = summarySOType || 'monthly';
+
+            const params = new URLSearchParams({
+                month: rdbStatusMonth,
+                year: rdbStatusYear,
+                category: currentCat,
+                so_type: currentSoType,
+                dept: rdbStatusDept,
+                sub_dept: rdbStatusSubDept,
+                status: rdbStatusFilterStatusVal,
+                search: rdbStatusSearchQuery,
+                view: rdbStatusView,
+                page: rdbStatusCurrentPage,
+                limit: rdbStatusPageSize
+            });
+
+            const res = await fetch(`api/rekap_db_status.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                const errMsg = escapeHtml(json.message || 'Gagal memuat data');
+                if (rdbStatusView === 'grouped' && groupedContainer) {
+                    groupedContainer.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 2rem;">${errMsg}</div>`;
+                } else if (flatTbody) {
+                    flatTbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 2rem; color: #ef4444;">${errMsg}</td></tr>`;
+                }
+                return;
+            }
+
+            // Populate DEPT and SUB DEPT filters for the current category
+            if (json.filter_options && !rdbStatusFiltersPopulated) {
+                populateRekapDbStatusFilters(json.filter_options);
+                rdbStatusFiltersPopulated = true;
+            }
+
+            // Update Period Badge
+            const pBadge = document.getElementById('rdb-status-period-badge');
+            if (pBadge && json.period) {
+                pBadge.textContent = json.period.current_label || '';
+            }
+
+            // Update KPI Strip - Follows filtered Site Master Data
+            const stats = json.stats || {};
+            const totalItems = parseInt(stats.total_items || 0, 10);
+            const totalSites = parseInt(stats.total_sites || 0, 10);
+            const solvedCount = parseInt(stats.solved_count || 0, 10);
+            const unsolvedCount = parseInt(stats.unsolved_count || 0, 10);
+            const newDbCount = parseInt(stats.new_db_count || 0, 10);
+
+            const solvedPct = totalItems > 0 ? ((solvedCount / totalItems) * 100).toFixed(1) : 0;
+            const unsolvedPct = totalItems > 0 ? ((unsolvedCount / totalItems) * 100).toFixed(1) : 0;
+            const newDbPct = totalItems > 0 ? ((newDbCount / totalItems) * 100).toFixed(1) : 0;
+
+            const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const elTotalItems = document.getElementById('rdb-metric-total-items');
+            if (elTotalItems) elTotalItems.textContent = totalItems.toLocaleString('id-ID');
+
+            const elTotalNbv = document.getElementById('rdb-metric-total-nbv');
+            if (elTotalNbv) elTotalNbv.textContent = `Total NBV : ${formatRp(stats.total_nbv)}`;
+
+            const elTotalSites = document.getElementById('rdb-metric-total-sites');
+            if (elTotalSites) {
+                if (stats.sites_display) {
+                    elTotalSites.textContent = `(${stats.sites_display})`;
+                } else {
+                    const totalMasterSites = stats.total_master_sites != null ? stats.total_master_sites : totalSites;
+                    elTotalSites.textContent = `(${totalSites}/${totalMasterSites} Sites)`;
+                }
+            }
+
+            const elSolved = document.getElementById('rdb-metric-solved');
+            if (elSolved) elSolved.textContent = solvedCount.toLocaleString('id-ID');
+            const elSolvedPct = document.getElementById('rdb-metric-solved-pct');
+            if (elSolvedPct) elSolvedPct.textContent = `(${solvedPct}%)`;
+            const elSolvedNbv = document.getElementById('rdb-metric-solved-nbv');
+            if (elSolvedNbv) elSolvedNbv.textContent = `Total NBV : ${formatRp(stats.solved_nbv)}`;
+
+            const elUnsolved = document.getElementById('rdb-metric-unsolved');
+            if (elUnsolved) elUnsolved.textContent = unsolvedCount.toLocaleString('id-ID');
+            const elUnsolvedPct = document.getElementById('rdb-metric-unsolved-pct');
+            if (elUnsolvedPct) elUnsolvedPct.textContent = `(${unsolvedPct}%)`;
+
+            const elUnsolvedNbv = document.getElementById('rdb-metric-unsolved-nbv');
+            if (elUnsolvedNbv) elUnsolvedNbv.textContent = `Total NBV : ${formatRp(stats.unsolved_nbv)}`;
+
+            const elNewDb = document.getElementById('rdb-metric-new-db');
+            if (elNewDb) elNewDb.textContent = newDbCount.toLocaleString('id-ID');
+            const elNewDbPct = document.getElementById('rdb-metric-new-db-pct');
+            if (elNewDbPct) elNewDbPct.textContent = `(${newDbPct}%)`;
+            const elNewDbNbv = document.getElementById('rdb-metric-new-db-nbv');
+            if (elNewDbNbv) elNewDbNbv.textContent = `Total NBV : ${formatRp(stats.new_db_nbv)}`;
+
+            // Render Flat View Table
+            renderRekapDbStatusFlat(json.data || [], json.period);
+            const totalFlat = json.total || 0;
+            rdbStatusTotalPages = json.total_pages || 1;
+            if (paginationInfo) {
+                const startIdx = rdbStatusPageSize === 'all' ? 0 : (json.page - 1) * parseInt(json.limit, 10);
+                const endIdx = rdbStatusPageSize === 'all' ? totalFlat : Math.min(startIdx + (json.data || []).length, totalFlat);
+                paginationInfo.textContent = `Menampilkan ${totalFlat > 0 ? startIdx + 1 : 0} sampai ${endIdx} dari ${totalFlat.toLocaleString('id-ID')} data`;
+            }
+
+            // Pagination Controls
+            renderRekapDbStatusPagination(paginationControls);
+
+        } catch (err) {
+            console.error('Error loading rekap db status:', err);
+            const errStr = escapeHtml(err.message || 'Kesalahan jaringan');
+            if (flatTbody) {
+                flatTbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 2rem; color: #ef4444;">Gagal memuat: ${errStr}</td></tr>`;
+            }
+        }
+    }
+
+    function populateRekapDbStatusFilters(filterOpts) {
+        rdbStatusDeptSubDeptMap = filterOpts.dept_subdept_map || {};
+        const deptSelect = document.getElementById('rdb-status-filter-dept');
+        if (deptSelect && filterOpts.depts) {
+            const curVal = rdbStatusDept || deptSelect.value || 'all';
+            let html = '<option value="all">Semua Dept</option>';
+            filterOpts.depts.forEach(d => {
+                html += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
+            });
+            deptSelect.innerHTML = html;
+            if (filterOpts.depts.includes(curVal)) {
+                deptSelect.value = curVal;
+                rdbStatusDept = curVal;
+            } else {
+                deptSelect.value = 'all';
+                rdbStatusDept = 'all';
+            }
+        }
+        updateRekapDbSubDeptDropdown();
+    }
+
+    function updateRekapDbSubDeptDropdown() {
+        const deptSelect = document.getElementById('rdb-status-filter-dept');
+        const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
+        if (!subDeptSelect) return;
+
+        const selectedDept = deptSelect ? deptSelect.value : 'all';
+        let availableSubs = [];
+
+        if (selectedDept === 'all') {
+            const allSet = new Set();
+            Object.values(rdbStatusDeptSubDeptMap).forEach(arr => {
+                arr.forEach(s => allSet.add(s));
+            });
+            availableSubs = Array.from(allSet).sort();
+        } else {
+            availableSubs = rdbStatusDeptSubDeptMap[selectedDept] || [];
+        }
+
+        const curSub = rdbStatusSubDept || subDeptSelect.value || 'all';
+        let html = '<option value="all">Semua Sub Dept</option>';
+        availableSubs.forEach(sd => {
+            html += `<option value="${escapeHtml(sd)}">${escapeHtml(sd)}</option>`;
+        });
+        subDeptSelect.innerHTML = html;
+        if (availableSubs.includes(curSub)) {
+            subDeptSelect.value = curSub;
+            rdbStatusSubDept = curSub;
+        } else {
+            subDeptSelect.value = 'all';
+            rdbStatusSubDept = 'all';
+        }
+    }
+
+    function onRekapDbStatusDeptChange() {
+        const deptSelect = document.getElementById('rdb-status-filter-dept');
+        if (deptSelect) rdbStatusDept = deptSelect.value;
+        updateRekapDbSubDeptDropdown();
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function onRekapDbStatusSubDeptChange() {
+        const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
+        if (subDeptSelect) rdbStatusSubDept = subDeptSelect.value;
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function renderRekapDbStatusGrouped(sites, period) {
+        const container = document.getElementById('rdb-status-grouped-container');
+        if (!container) return;
+
+        if (sites.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; color: #94a3b8; padding: 2.5rem;">
+                    Tidak ada data Site yang sesuai dengan filter atau pencarian.
+                </div>
+            `;
+            return;
+        }
+
+        const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const prevLabel = period?.previous_label || 'Bulan Sebelumnya';
+        const currLabel = period?.current_label || 'Bulan Berjalan';
+
+        let html = '';
+        sites.forEach(site => {
+            const sc = escapeHtml(site.sitecode || '-');
+            const nameSite = escapeHtml(site.name_site || '-');
+            const regional = escapeHtml(site.regional || '-');
+            const dept = escapeHtml(site.dept || '-');
+            const subDept = escapeHtml(site.sub_dept || '-');
+            const isExpanded = rdbStatusExpandedSites.has(site.sitecode);
+
+            const totalItems = parseInt(site.total_items || 0, 10);
+            const solvedCount = parseInt(site.solved_count || 0, 10);
+            const unsolvedCount = parseInt(site.unsolved_count || 0, 10);
+            const newDbCount = parseInt(site.new_db_count || 0, 10);
+            const totalNbv = formatRp(site.total_nbv);
+
+            const items = site.items || [];
+
+            html += `
+                <div class="rdb-site-card" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 0.85rem; overflow: hidden; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <!-- Site Header Accordion Toggle -->
+                    <div class="rdb-site-header" onclick="App.toggleRekapDbSiteAccordion('${escapeHtml(site.sitecode)}')"
+                        style="padding: 0.75rem 1rem; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; user-select: none; border-bottom: ${isExpanded ? '1px solid #e2e8f0' : 'none'};">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <span class="rdb-chevron" style="display: inline-block; transition: transform 0.2s ease; font-size: 11px; color: #64748b; transform: ${isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'};">
+                                &#9654;
+                            </span>
+                            <span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: 4px; font-family: monospace;">
+                                ${sc}
+                            </span>
+                            <strong style="font-size: 13px; color: #0f172a;">${nameSite}</strong>
+                            <span style="font-size: 11.5px; color: #64748b;">
+                                (${regional} &bull; ${dept}${subDept !== '-' ? ' - ' + subDept : ''})
+                            </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                            <span class="badge" style="background: #f1f5f9; color: #334155; font-size: 11px; padding: 2.5px 7px; border-radius: 4px;">
+                                ${totalItems.toLocaleString('id-ID')} Aset
+                            </span>
+                            ${solvedCount > 0 ? `
+                                <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 600; padding: 2.5px 7px; border-radius: 4px;">
+                                    ${solvedCount.toLocaleString('id-ID')} Solved
+                                </span>
+                            ` : ''}
+                            ${unsolvedCount > 0 ? `
+                                <span class="badge" style="background: #fee2e2; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 2.5px 7px; border-radius: 4px;">
+                                    ${unsolvedCount.toLocaleString('id-ID')} Unsolved
+                                </span>
+                            ` : ''}
+                            ${newDbCount > 0 ? `
+                                <span class="badge" style="background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600; padding: 2.5px 7px; border-radius: 4px;">
+                                    ${newDbCount.toLocaleString('id-ID')} New DB
+                                </span>
+                            ` : ''}
+                            <span class="badge" style="background: #ffffff; color: #0f172a; font-weight: 700; border: 1px solid #cbd5e1; font-size: 11px; padding: 2.5px 8px; border-radius: 4px;">
+                                ${totalNbv}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Items Collapsible Body -->
+                    <div class="rdb-site-body" style="display: ${isExpanded ? 'block' : 'none'}; padding: 0.5rem 0.75rem 0.75rem 0.75rem; background: #ffffff;">
+                        ${items.length === 0 ? `
+                            <div style="text-align: center; color: #94a3b8; padding: 1.25rem; font-size: 12px;">
+                                Tidak ada aset yang cocok dengan filter pada site ini.
+                            </div>
+                        ` : `
+                            <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 6px;">
+                                <table class="reconciliation-table" style="font-size: 11.5px; width: 100%;">
+                                    <thead>
+                                        <tr style="background: #f8fafc;">
+                                            <th class="text-center" style="width: 45px; padding: 5px 8px;">NO</th>
+                                            <th class="text-center" style="width: 170px; padding: 5px 8px;">REG NO</th>
+                                            <th class="text-left" style="padding: 5px 8px;">NAME</th>
+                                            <th class="text-center" style="width: 160px; padding: 5px 8px;">SN</th>
+                                            <th class="text-right" style="width: 125px; padding: 5px 8px;">NBV</th>
+                                            <th class="text-center" style="width: 105px; padding: 5px 8px;">STATUS</th>
+                                            <th class="text-left" style="min-width: 180px; padding: 5px 8px;">KETERANGAN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${items.map((it, idx) => {
+                const regNo = escapeHtml(it.reg_no || '-');
+                const name = escapeHtml(it.name || '-');
+                const sn = escapeHtml(it.sn || '-');
+                const nbvVal = formatRp(it.nbv);
+
+                let statusBadge = '';
+                let note = '';
+                if (it.status === 'solved') {
+                    statusBadge = `<span class="badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; border: 1px solid #bbf7d0;">SOLVED</span>`;
+                    note = `<span style="color: #15803d;">Ada di ${prevLabel}, <strong>DB solved</strong> di ${currLabel}</span>`;
+                } else if (it.status === 'unsolved') {
+                    statusBadge = `<span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; border: 1px solid #fecaca;">UNSOLVED</span>`;
+                    note = `<span style="color: #b91c1c;">Belum solved (masih tercatat di ${currLabel})</span>`;
+                } else {
+                    statusBadge = `<span class="badge" style="background: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; border: 1px solid #bfdbfe;">NEW DB</span>`;
+                    note = `<span style="color: #1d4ed8;">Temuan DB baru di ${currLabel}</span>`;
+                }
+
+                return `
+                                                <tr>
+                                                    <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
+                                                    <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
+                                                    <td class="text-left" style="color: #334155; font-weight: 500;">${name}</td>
+                                                    <td class="text-center" style="color: #475569; font-weight: 500;">${sn}</td>
+                                                    <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">${nbvVal}</td>
+                                                    <td class="text-center" style="white-space: nowrap;">${statusBadge}</td>
+                                                    <td class="text-left" style="font-size: 11px;">${note}</td>
+                                                </tr>
+                                            `;
+            }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function renderRekapDbStatusFlat(items, period) {
+        const tbody = document.getElementById('rdb-status-flat-tbody');
+        if (!tbody) return;
+
+        if (items.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                        No data.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const startIdx = rdbStatusPageSize === 'all' ? 0 : (rdbStatusCurrentPage - 1) * parseInt(rdbStatusPageSize, 10);
+        const prevLabel = period?.previous_label || 'Bulan Sebelumnya';
+        const currLabel = period?.current_label || 'Bulan Berjalan';
+
+        let html = '';
+        items.forEach((it, idx) => {
+            const no = startIdx + idx + 1;
+            const sc = escapeHtml(it.sitecode || '-');
+            const nameSite = escapeHtml(it.name_site || '-');
+            const dept = escapeHtml(it.dept || '-');
+            const subDept = escapeHtml(it.sub_dept || '-');
+            const regNo = escapeHtml(it.reg_no || '-');
+            const name = escapeHtml(it.name || '-');
+            const sn = escapeHtml(it.sn || '-');
+            const nbvVal = formatRp(it.nbv);
+
+            let statusBadge = '';
+            let note = '';
+            if (it.status === 'solved') {
+                statusBadge = `<span class="badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px; border: 1px solid #bbf7d0;">SOLVED</span>`;
+                note = `<span style="color: #15803d; font-size: 11px;">Ada di ${prevLabel}, <strong>DB solved</strong> di ${currLabel}</span>`;
+            } else if (it.status === 'unsolved') {
+                statusBadge = `<span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px; border: 1px solid #fecaca;">UNSOLVED</span>`;
+                note = `<span style="color: #b91c1c; font-size: 11px;">Belum solved (masih tercatat di ${currLabel})</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 4px; border: 1px solid #bfdbfe;">NEW DB</span>`;
+                note = `<span style="color: #1d4ed8; font-size: 11px;">Temuan DB baru di ${currLabel}</span>`;
+            }
+
+            html += `
+                <tr>
+                    <td class="text-center" style="color: #64748b; font-weight: 600;">${no}</td>
+                    <td class="text-center" style="font-weight: 600; color: #475569;"><span class="badge" style="background: #f1f5f9; color: #334155; font-size: 11px;">${dept}</span></td>
+                    <td class="text-center" style="font-weight: 500; color: #64748b; font-size: 11px;">${subDept}</td>
+                    <td class="text-center" style="font-weight: 600; color: #1e293b;">${sc}</td>
+                    <td class="text-left" style="font-weight: 500; color: #1e293b;">${nameSite}</td>
+                    <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
+                    <td class="text-left" style="color: #334155; font-weight: 500;">${name}</td>
+                    <td class="text-center" style="color: #475569; font-weight: 500;">${sn}</td>
+                    <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">${nbvVal}</td>
+                    <td class="text-center" style="white-space: nowrap;">${statusBadge}</td>
+                    <td class="text-left" style="font-size: 11px;">${note}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function switchRekapDbStatusView(mode) {
+        rdbStatusView = mode;
+        const btnGrouped = document.getElementById('rdb-btn-view-grouped');
+        const btnFlat = document.getElementById('rdb-btn-view-flat');
+        const groupedContainer = document.getElementById('rdb-status-grouped-container');
+        const flatContainer = document.getElementById('rdb-status-flat-container');
+
+        if (mode === 'grouped') {
+            if (btnGrouped) {
+                btnGrouped.style.background = '#1e3a8a';
+                btnGrouped.style.color = '#ffffff';
+            }
+            if (btnFlat) {
+                btnFlat.style.background = '#ffffff';
+                btnFlat.style.color = '#475569';
+            }
+            if (groupedContainer) groupedContainer.style.display = 'block';
+            if (flatContainer) flatContainer.style.display = 'none';
+        } else {
+            if (btnGrouped) {
+                btnGrouped.style.background = '#ffffff';
+                btnGrouped.style.color = '#475569';
+            }
+            if (btnFlat) {
+                btnFlat.style.background = '#1e3a8a';
+                btnFlat.style.color = '#ffffff';
+            }
+            if (groupedContainer) groupedContainer.style.display = 'none';
+            if (flatContainer) flatContainer.style.display = 'block';
+        }
+
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function toggleRekapDbSiteAccordion(sitecode) {
+        if (rdbStatusExpandedSites.has(sitecode)) {
+            rdbStatusExpandedSites.delete(sitecode);
+        } else {
+            rdbStatusExpandedSites.add(sitecode);
+        }
+        loadRekapDbStatusData();
+    }
+
+    function toggleAllRekapDbStatusSites() {
+        const btn = document.getElementById('rdb-btn-toggle-all');
+        const allSitecodes = [];
+        document.querySelectorAll('.rdb-site-header').forEach(h => {
+            const onclickStr = h.getAttribute('onclick') || '';
+            const match = onclickStr.match(/'([^']+)'/);
+            if (match && match[1]) allSitecodes.push(match[1]);
+        });
+
+        if (rdbStatusExpandedSites.size >= allSitecodes.length && allSitecodes.length > 0) {
+            rdbStatusExpandedSites.clear();
+            if (btn) btn.textContent = 'Expand All';
+        } else {
+            allSitecodes.forEach(sc => rdbStatusExpandedSites.add(sc));
+            if (btn) btn.textContent = 'Collapse All';
+        }
+        loadRekapDbStatusData();
+    }
+
+    function filterRekapDbStatus(status) {
+        const select = document.getElementById('rdb-status-filter-status');
+        if (select) {
+            select.value = status;
+        }
+        rdbStatusFilterStatusVal = status;
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function onRekapDbStatusPeriodChange() {
+        rdbStatusUserInteracted = true;
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function onRekapDbStatusFilterChange() {
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function changeRekapDbStatusPageSize(val) {
+        rdbStatusPageSize = val;
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function goToRekapDbStatusPage(page) {
+        if (page < 1) page = 1;
+        if (page > rdbStatusTotalPages) page = rdbStatusTotalPages;
+        rdbStatusCurrentPage = page;
+        loadRekapDbStatusData();
+    }
+
+    function handleRekapDbStatusSearch(val) {
+        clearTimeout(rdbStatusDebounceTimer);
+        rdbStatusDebounceTimer = setTimeout(() => {
+            rdbStatusSearchQuery = (val || '').trim();
+            rdbStatusCurrentPage = 1;
+            loadRekapDbStatusData();
+        }, 300);
+    }
+
+    function renderRekapDbStatusPagination(container) {
+        if (!container) return;
+        if (rdbStatusTotalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === 1 ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage - 1})">&laquo;</button>`;
+
+        let startP = Math.max(1, rdbStatusCurrentPage - 2);
+        let endP = Math.min(rdbStatusTotalPages, startP + 4);
+        if (endP - startP < 4) {
+            startP = Math.max(1, endP - 4);
+        }
+
+        for (let p = startP; p <= endP; p++) {
+            html += `<button class="pagination-btn ${p === rdbStatusCurrentPage ? 'active' : ''}" onclick="App.goToRekapDbStatusPage(${p})">${p}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === rdbStatusTotalPages ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage + 1})">&raquo;</button>`;
+        container.innerHTML = html;
+    }
+
     // ── Score Card Summary (Rating & SO Execution - Rolling 3 Months) ──
 
     let scorecardRatingData = [];
@@ -3209,6 +4462,8 @@ const App = (() => {
             let curQ = Math.ceil(m / 3);
             if (curQ < 1) curQ = 1;
             if (curQ > 4) curQ = 4;
+            // Stop on Q1-Q3 because 2025 data not uploaded in the database
+            curQ = Math.max(3, curQ);
 
             const quarters = [];
             for (let i = 2; i >= 0; i--) {
@@ -3229,8 +4484,10 @@ const App = (() => {
         }
 
         const months = [];
+        // Stop rolling back at January - March because 2025 data is not uploaded in the database
+        const effM = Math.max(3, m);
         for (let i = 2; i >= 0; i--) {
-            let targetM = m - i;
+            let targetM = effM - i;
             let targetY = y;
             while (targetM <= 0) {
                 targetM += 12;
@@ -5077,7 +6334,7 @@ const App = (() => {
                         },
                         y: {
                             min: 0,
-                            suggestedMax: targetVal >= 95 ? 105 : 100,
+                            max: 100,
                             ticks: {
                                 stepSize: 25,
                                 color: '#64748b',
@@ -6135,7 +7392,10 @@ const App = (() => {
 
     async function loadExecutiveNotes(year, month) {
         const y = year || document.getElementById('summary-filter-year')?.value || 2026;
-        const m = month || document.getElementById('summary-filter-month')?.value || 9;
+        const monthVal = (month !== undefined && month !== null)
+            ? month
+            : (document.getElementById('summary-filter-month')?.value ?? '');
+        const m = (monthVal === 'all' || monthVal === '') ? '' : monthVal;
 
         const subtitleEl = document.getElementById('exec-catatan-subtitle');
         const tbody = document.getElementById('exec-catatan-tbody');
@@ -6148,14 +7408,20 @@ const App = (() => {
         const mLabel = m ? (monthNames[parseInt(m, 10)] || `Bulan ${m}`) : 'Semua Bulan';
         const periodStr = `${mLabel} ${y}`;
 
-        if (subtitleEl) subtitleEl.textContent = `Catatan dan evaluasi analisa performa Stock Opname`;
+        if (subtitleEl) subtitleEl.textContent = `Kesimpulan hasil evaluasi stock opname area`;
+
+        const thPeriod = document.getElementById('exec-catatan-th-period');
+        if (thPeriod) {
+            const curSoType = (summarySOType || 'monthly').trim().toLowerCase();
+            thPeriod.textContent = (curSoType === 'quarterly') ? 'QUARTER' : 'BULAN';
+        }
 
         if (!tbody) return;
 
         try {
             const queryParams = [];
             if (y) queryParams.push(`year=${encodeURIComponent(y)}`);
-            if (m && m !== 'all') queryParams.push(`month=${encodeURIComponent(m)}`);
+            if (m) queryParams.push(`month=${encodeURIComponent(m)}`);
             const curSoType = (summarySOType || 'monthly').trim().toLowerCase();
             queryParams.push(`so_type=${encodeURIComponent(curSoType)}`);
 
@@ -6202,7 +7468,7 @@ const App = (() => {
 
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4" class="text-center" style="padding: 2.2rem 1rem; color: #94a3b8;">
+                        <td colspan="5" class="text-center" style="padding: 2.2rem 1rem; color: #94a3b8;">
                             <div style="font-size: 12.5px; font-weight: 600; color: #64748b;">
                                 Tidak ada catatan ${escapeHtml(contextName)} untuk periode ${escapeHtml(periodStr)}
                             </div>
@@ -6216,9 +7482,28 @@ const App = (() => {
             mappedNotes.forEach((note, idx) => {
                 const displayDept = (note.dept && note.dept !== 'Semua Dept' && note.dept !== '(Semua Dept)') ? note.dept : 'Semua Dept';
                 const displaySubDept = (note.sub_dept && note.sub_dept !== 'Semua Sub Dept' && note.sub_dept !== '(Semua Sub Dept)') ? note.sub_dept : 'Semua Sub Dept';
+
+                // Format mapped month from master data (just month, not year)
+                let periodDisplay = '-';
+                const nMonth = parseInt(note.month, 10);
+                const noteSoType = (note.so_type || curSoType).toLowerCase();
+                if (noteSoType === 'quarterly' && nMonth) {
+                    const q = Math.ceil(nMonth / 3);
+                    periodDisplay = `Q${q}`;
+                } else if (nMonth && monthNames[nMonth]) {
+                    periodDisplay = monthNames[nMonth];
+                } else if (nMonth) {
+                    periodDisplay = `Bulan ${nMonth}`;
+                }
+
                 html += `
                     <tr>
                         <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
+                        <td class="text-center" style="font-weight: 600; color: #334155; font-size: 11.5px; white-space: nowrap;">
+                            <span class="badge" style="background: #f1f5f9; color: #1e293b; font-weight: 600; font-size: 11px; padding: 2.5px 8px; border-radius: 5px; border: 1px solid #cbd5e1;">
+                                ${escapeHtml(periodDisplay)}
+                            </span>
+                        </td>
                         <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displayDept)}</td>
                         <td class="text-center" style="font-weight: 600; color: #1e293b;">${escapeHtml(displaySubDept)}</td>
                         <td style="white-space: pre-line; line-height: 1.55; color: #1e293b; font-size: 12.5px; word-break: break-word;">${escapeHtml(note.keterangan || '')}</td>
@@ -6232,7 +7517,7 @@ const App = (() => {
             console.error('Error loading executive notes:', err);
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" class="text-center" style="padding: 2rem; color: #ef4444;">
+                    <td colspan="5" class="text-center" style="padding: 2rem; color: #ef4444;">
                         Gagal memuat catatan: ${escapeHtml(err.message || 'Terjadi kesalahan sistem')}
                     </td>
                 </tr>
@@ -6765,6 +8050,8 @@ const App = (() => {
         onKpiExecInputChange,
         saveScorecardExecKpi,
         resetScorecardExecKpi,
+        // DB Analysis exports
+        setDbAnalysisDept,
         // Catatan Executive Summary exports
         loadExecutiveNotes,
         loadMasterCatatan,
@@ -6776,6 +8063,35 @@ const App = (() => {
         editExecutiveNote,
         deleteExecutiveNote,
         submitExecutiveNote,
+        // Rekap DB Master Data exports
+        loadRekapDbData,
+        changeRekapDbPageSize,
+        applyRekapDbFilter,
+        handleRekapDbSearch,
+        toggleRekapDbSort,
+        goToRekapDbPage,
+        openRekapDbImportModal,
+        closeRekapDbImportModal,
+        handleRekapDbFileSelect,
+        clearRekapDbSelectedFile,
+        submitRekapDbImport,
+        openRekapDbBulkDeleteModal,
+        closeRekapDbBulkDeleteModal,
+        submitRekapDbBulkDelete,
+        deleteRekapDbItem,
+        // Rekapitulasi Status Penyelesaian DB exports
+        loadRekapDbStatusData,
+        switchRekapDbStatusView,
+        toggleRekapDbSiteAccordion,
+        toggleAllRekapDbStatusSites,
+        filterRekapDbStatus,
+        onRekapDbStatusPeriodChange,
+        onRekapDbStatusDeptChange,
+        onRekapDbStatusSubDeptChange,
+        onRekapDbStatusFilterChange,
+        changeRekapDbStatusPageSize,
+        goToRekapDbStatusPage,
+        handleRekapDbStatusSearch,
         // Quick Access & User Dropdown exports
         toggleQuickAccess,
         openQuickAccess,
