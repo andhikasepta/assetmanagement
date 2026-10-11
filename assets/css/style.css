@@ -2637,7 +2637,13 @@ textarea,
 }
 
 #exec-catatan-table {
-    min-width: 540px;
+    min-width: 420px;
+}
+
+#exec-catatan-table th,
+#exec-catatan-table td {
+    padding: 7px 8px;
+    font-size: 11.5px;
 }
 
 .scorecard-table {
@@ -3452,7 +3458,7 @@ textarea,
    ═══════════════════════════════════════════════════════════════════ */
 .executive-bottom-row {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
+    grid-template-columns: minmax(360px, 0.85fr) minmax(0, 2fr);
     gap: 1.25rem;
     margin-top: 1.5rem;
     border-top: 1px solid #e2e8f0;
@@ -3467,145 +3473,275 @@ textarea,
     min-width: 0;
 }
 
-/* Vertical Big Dept Cards with Horizontal Subdepts */
-.db-analysis-scroll {
-    max-height: 440px;
-    overflow-y: auto;
+/* ── Result DB Analysis (Card Groups Layout matching Achievement Cards) ── */
+#card-executive-db-analysis .db-analysis-scroll {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.65rem;
-    padding-right: 4px;
+    overflow-y: visible;
+    align-items: stretch;
 }
 
-.db-analysis-scroll::-webkit-scrollbar {
-    width: 5px;
+#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar {
+    width: 4px;
 }
 
-.db-analysis-scroll::-webkit-scrollbar-track {
+#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar-track {
     background: #f1f5f9;
     border-radius: 4px;
 }
 
-.db-analysis-scroll::-webkit-scrollbar-thumb {
+#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 4px;
 }
 
-.db-analysis-scroll::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-.db-dept-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 0.65rem 0.85rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+#card-executive-db-analysis .kpi-card-group {
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.45rem;
+}
+
+#card-executive-db-analysis #db-group-wro {
+    flex: 1.6 1 0;
+}
+
+#card-executive-db-analysis #db-group-cro {
+    flex: 1.7 1 0;
+}
+
+#card-executive-db-analysis #db-group-ero {
+    flex: 1.5 1 0;
+}
+
+#card-executive-db-analysis .kpi-card-split {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    padding: 0.55rem 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: auto;
     transition: all 0.15s ease;
 }
 
-.db-dept-card:hover {
+#card-executive-db-analysis .kpi-card-split:hover {
     border-color: #cbd5e1;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
-.db-dept-card-header {
+#card-executive-db-analysis .kpi-title {
+    font-size: 10px;
+    font-weight: 750;
+    color: #475569;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+#card-executive-db-analysis .kpi-card-main {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding-bottom: 0.45rem;
-    border-bottom: 1px solid #f1f5f9;
+    margin: 0.2rem 0;
+    gap: 0.35rem;
 }
 
-.db-dept-name-title,
-.db-dept-name-badge {
-    font-size: 13.5px;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    background: transparent;
-    padding: 0;
-    border-radius: 0;
-}
-
-.db-dept-name-title.pmd-title,
-.db-dept-name-badge.pmd-badge {
-    color: #7e22ce;
-    background: transparent;
-}
-
-.db-dept-subtext {
-    font-size: 11px;
-    font-weight: 550;
-    color: #64748b;
-}
-
-.db-dept-header-val {
-    font-size: 18px;
+#card-executive-db-analysis .kpi-split-value {
+    font-size: 26px;
     font-weight: 850;
-    color: #0f172a;
-    line-height: 1;
+    line-height: 1.1;
+    color: #0284c7;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
 }
 
-.db-subdept-horizontal-row {
+#card-executive-db-analysis .kpi-subtext {
+    font-size: 9.5px;
+    font-weight: 550;
+    color: #64748b;
+    margin: 0;
+}
+
+#card-executive-db-analysis .kpi-subdept-container {
     display: grid;
-    gap: 0.45rem;
+    gap: 0.35rem;
+    padding: 0.45rem 0.5rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    flex: 1;
     align-items: stretch;
 }
 
-.db-subdept-horizontal-row .kpi-subdept-item {
+#card-executive-db-analysis #db-group-wro .kpi-subdept-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#card-executive-db-analysis #db-group-cro .kpi-subdept-container,
+#card-executive-db-analysis #db-group-ero .kpi-subdept-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#card-executive-db-analysis #db-group-pmd .kpi-subdept-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#card-executive-db-analysis .kpi-subdept-item {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    background: #f8fafc;
+    background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 7px;
-    padding: 0.45rem 0.6rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    padding: 0.4rem 0.45rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.015);
     transition: all 0.15s ease;
     min-width: 0;
 }
 
-.db-subdept-horizontal-row .kpi-subdept-item:hover {
-    background: #ffffff;
+#card-executive-db-analysis .kpi-subdept-item:hover {
     border-color: #cbd5e1;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
 }
 
-.db-subdept-horizontal-row .kpi-subdept-name {
+#card-executive-db-analysis .kpi-subdept-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    margin-bottom: 2px;
+    min-width: 0;
+}
+
+#card-executive-db-analysis .kpi-subdept-name {
     font-size: 10px;
     font-weight: 750;
     color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
 }
 
-.db-subdept-horizontal-row .kpi-subdept-val {
-    font-size: 16px;
-    font-weight: 800;
-    color: #0f172a;
-    line-height: 1.2;
-    margin: 3px 0 2px 0;
-    font-variant-numeric: tabular-nums;
+#card-executive-db-analysis .db-subdept-trend {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
 }
 
-.db-subdept-horizontal-row .kpi-subdept-meta {
+#card-executive-db-analysis .db-subdept-trend .db-trend-indicator {
     font-size: 9px;
-    color: #94a3b8;
+    font-weight: 750;
+    height: 18px;
+    padding: 0 5px;
+    gap: 2.5px;
+    border-radius: 4px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
 }
 
-@media (max-width: 1024px) {
+#card-executive-db-analysis .db-subdept-trend .db-trend-indicator svg {
+    width: 7px;
+    height: 7px;
+    display: block;
+    flex-shrink: 0;
+}
+
+#card-executive-db-analysis .db-subdept-trend .db-trend-indicator span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+#card-executive-db-analysis .kpi-subdept-val {
+    font-size: 14.5px;
+    font-weight: 850;
+    color: #0f172a;
+    line-height: 1.15;
+    margin: 2px 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#card-executive-db-analysis .kpi-subdept-meta {
+    font-size: 8.5px;
+    color: #94a3b8;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* ── DB Analysis Status Section Header & Separator Line ── */
+.db-status-section-header {
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* ── DB Analysis Status Card Groups (SOLVED DB, UNSOLVED DB, NEW DB) ── */
+.db-status-groups-container {
+    display: flex;
+    flex-direction: row;
+    gap: 0.65rem;
+    align-items: stretch;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.db-status-groups-container > .kpi-card-group {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.db-status-groups-container .kpi-subdept-container {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.45rem 0.5rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    flex: 1;
+    align-items: stretch;
+}
+
+.db-status-groups-container .db-status-sub-pmd {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+    .db-status-groups-container {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 992px) {
     .executive-bottom-row {
         grid-template-columns: 1fr;
         gap: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #card-executive-db-analysis .db-analysis-scroll {
+        flex-direction: column;
     }
 }
 
@@ -3617,12 +3753,14 @@ textarea,
     gap: 3.5px;
     font-size: 11px;
     font-weight: 750;
-    padding: 2px 6.5px;
+    height: 20px;
+    padding: 0 7px;
     border-radius: 5px;
     line-height: 1;
     white-space: nowrap;
     letter-spacing: 0.1px;
     font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
     vertical-align: middle;
 }
 
@@ -3631,18 +3769,40 @@ textarea,
     flex-shrink: 0;
 }
 
+.db-trend-indicator span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
 /* If DB is MORE than previous period: RED (worse discrepancy) */
-.db-trend-indicator.db-trend-up {
+.db-trend-indicator.db-trend-up,
+.db-trend-indicator.db-trend-bad-up {
     background-color: #fee2e2;
     color: #b91c1c;
     border: 1px solid #fecaca;
 }
 
 /* If DB is LESS than previous period: GREEN (improved discrepancy) */
-.db-trend-indicator.db-trend-down {
+.db-trend-indicator.db-trend-down,
+.db-trend-indicator.db-trend-good-down {
     background-color: #dcfce7;
     color: #15803d;
     border: 1px solid #bbf7d0;
+}
+
+/* If positive metric (like Solved) increased: GREEN */
+.db-trend-indicator.db-trend-good-up {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+/* If positive metric (like Solved) decreased: RED */
+.db-trend-indicator.db-trend-bad-down {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
 }
 
 .db-trend-indicator.db-trend-neutral {
@@ -3655,16 +3815,102 @@ textarea,
 .db-dept-trend .db-trend-indicator {
     font-size: 12px;
     font-weight: 800;
-    padding: 3px 8px;
+    height: 22px;
+    padding: 0 8px;
     border-radius: 6px;
     gap: 4px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.db-dept-trend .db-trend-indicator svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.db-dept-trend .db-trend-indicator span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
 }
 
 /* Subdept-specific trend badge sizing */
 .db-subdept-trend .db-trend-indicator {
-    font-size: 9.5px;
-    padding: 1.5px 5px;
+    font-size: 9px;
+    height: 18px;
+    padding: 0 5px;
     gap: 2.5px;
+    border-radius: 4px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.db-subdept-trend .db-trend-indicator svg {
+    width: 7px;
+    height: 7px;
+    display: block;
+    flex-shrink: 0;
+}
+
+.db-subdept-trend .db-trend-indicator span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+/* ── DB Analysis Status Breakdown (Vertical Stack on Far Right) ── */
+.db-status-breakdown-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5px;
+    min-width: 105px;
+}
+
+.db-status-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 2px 6.5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    transition: all 0.15s ease;
+}
+
+.db-status-chip span {
+    font-weight: 750;
+}
+
+/* Solved DB: Soft Emerald */
+.db-status-chip.db-chip-solved {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+/* Unsolved DB: Soft Rose / Red */
+.db-status-chip.db-chip-unsolved {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* New DB: Soft Blue */
+.db-status-chip.db-chip-new {
+    background-color: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
 }
 
 /* ---- Rekapitulasi Status Penyelesaian DB Accordion Styles ---- */

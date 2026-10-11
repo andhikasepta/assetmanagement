@@ -922,7 +922,13 @@ $monthNames = [
                 <div class="card" id="card-executive-summary" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                     <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                         <div>
-                            <h2 class="card-title" style="margin: 0;">Executive Summary</h2>
+                            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                                <h2 class="card-title" style="margin: 0;">Executive Summary</h2>
+                                <span id="executive-period-badge" class="badge"
+                                    style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
+                                    September 2026
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body" style="padding: 1.25rem;">
@@ -1159,21 +1165,22 @@ $monthNames = [
                                         </div>
                                     </div>
                                 </div>
-                                <div class="table-responsive"
-                                    style="max-height: 440px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 8px;">
                                     <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                <th style="width: 45px; text-align: center;">NO</th>
-                                                <th style="width: 95px; text-align: center;" id="exec-catatan-th-period">BULAN</th>
-                                                <th style="width: 90px; text-align: center;">DEPT</th>
-                                                <th style="width: 100px; text-align: center;">SUB DEPT</th>
+                                                <th style="width: 38px; text-align: center;">NO</th>
+                                                <th style="width: 85px; text-align: center;" id="exec-catatan-th-period">
+                                                    BULAN</th>
+                                                <th style="width: 65px; text-align: center;">DEPT</th>
+                                                <th style="width: 80px; text-align: center;">SUB DEPT</th>
                                                 <th>KETERANGAN</th>
                                             </tr>
                                         </thead>
                                         <tbody id="exec-catatan-tbody">
                                             <tr>
-                                                <td colspan="5" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
+                                                <td colspan="5" class="text-center"
+                                                    style="padding: 2.2rem; color: #94a3b8;">
                                                     Memuat catatan...
                                                 </td>
                                             </tr>
@@ -1185,7 +1192,7 @@ $monthNames = [
                             <!-- Right: Result DB Analysis -->
                             <div id="card-executive-db-analysis">
                                 <div
-                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
                                     <div>
                                         <h3
                                             style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -1195,33 +1202,34 @@ $monthNames = [
                                             Perbandingan data DB dengan periode sebelumnya
                                         </div>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
-                                        <span class="db-grand-trend" id="db-grand-trend"></span>
-                                        <span class="so-status-badge"
-                                            style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px;">
-                                            Total: <span id="db-analysis-grand-total">0</span> QTY
-                                        </span>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <!-- Trend & Total QTY -->
+                                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                            <span class="db-grand-trend" id="db-grand-trend"></span>
+                                            <span class="so-status-badge"
+                                                style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                                Total DB: <span id="db-analysis-grand-total">0</span> QTY
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div id="db-analysis-content" class="db-analysis-scroll">
-                                    <!-- WRO Big Dept Card -->
-                                    <div class="db-dept-card" id="db-group-wro">
-                                        <div class="db-dept-card-header">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-name-title">WRO</span>
+                                    <!-- WRO Group: WRO Card + Subdept Cards (CSO, NSO, SSO) -->
+                                    <div class="kpi-card-group" id="db-group-wro">
+                                        <div class="kpi-card kpi-card-split" id="db-card-wro">
+                                            <div class="kpi-title">WRO Result DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-val-wro" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-wro"></span>
+                                                </div>
                                             </div>
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-header-val" id="db-val-wro">0</span>
-                                                <span class="db-dept-trend" id="db-trend-wro"></span>
-                                                <span class="db-dept-subtext" id="db-subtext-wro">(0/0 Sites)</span>
-                                                <span class="so-status-badge"
-                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
-                                                    DB</span>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-wro">Avg DEPT WRO (0/0 Sites)</div>
                                             </div>
                                         </div>
-                                        <div class="db-subdept-horizontal-row"
-                                            style="grid-template-columns: repeat(3, 1fr);">
+                                        <div class="kpi-subdept-container">
                                             <div class="kpi-subdept-item">
                                                 <div class="kpi-subdept-header">
                                                     <span class="kpi-subdept-name">CSO</span>
@@ -1249,23 +1257,21 @@ $monthNames = [
                                         </div>
                                     </div>
 
-                                    <!-- CRO Big Dept Card -->
-                                    <div class="db-dept-card" id="db-group-cro">
-                                        <div class="db-dept-card-header">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-name-title">CRO</span>
+                                    <!-- CRO Group: CRO Card + Subdept Cards (CJDO, EKO, WJO, WKO) -->
+                                    <div class="kpi-card-group" id="db-group-cro">
+                                        <div class="kpi-card kpi-card-split" id="db-card-cro">
+                                            <div class="kpi-title">CRO Result DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-val-cro" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-cro"></span>
+                                                </div>
                                             </div>
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-header-val" id="db-val-cro">0</span>
-                                                <span class="db-dept-trend" id="db-trend-cro"></span>
-                                                <span class="db-dept-subtext" id="db-subtext-cro">(0/0 Sites)</span>
-                                                <span class="so-status-badge"
-                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
-                                                    DB</span>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-cro">Avg DEPT CRO (0/0 Sites)</div>
                                             </div>
                                         </div>
-                                        <div class="db-subdept-horizontal-row"
-                                            style="grid-template-columns: repeat(4, 1fr);">
+                                        <div class="kpi-subdept-container">
                                             <div class="kpi-subdept-item">
                                                 <div class="kpi-subdept-header">
                                                     <span class="kpi-subdept-name">CJDO</span>
@@ -1301,23 +1307,21 @@ $monthNames = [
                                         </div>
                                     </div>
 
-                                    <!-- ERO Big Dept Card -->
-                                    <div class="db-dept-card" id="db-group-ero">
-                                        <div class="db-dept-card-header">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-name-title">ERO</span>
+                                    <!-- ERO Group: ERO Card + Subdept Cards (BNO, EJO, MPO, SMO) -->
+                                    <div class="kpi-card-group" id="db-group-ero">
+                                        <div class="kpi-card kpi-card-split" id="db-card-ero">
+                                            <div class="kpi-title">ERO Result DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-val-ero" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-ero"></span>
+                                                </div>
                                             </div>
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-header-val" id="db-val-ero">0</span>
-                                                <span class="db-dept-trend" id="db-trend-ero"></span>
-                                                <span class="db-dept-subtext" id="db-subtext-ero">(0/0 Sites)</span>
-                                                <span class="so-status-badge"
-                                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
-                                                    DB</span>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-ero">Avg DEPT ERO (0/0 Sites)</div>
                                             </div>
                                         </div>
-                                        <div class="db-subdept-horizontal-row"
-                                            style="grid-template-columns: repeat(4, 1fr);">
+                                        <div class="kpi-subdept-container">
                                             <div class="kpi-subdept-item">
                                                 <div class="kpi-subdept-header">
                                                     <span class="kpi-subdept-name">BNO</span>
@@ -1353,24 +1357,21 @@ $monthNames = [
                                         </div>
                                     </div>
 
-                                    <!-- PMD Big Dept Card -->
-                                    <div class="db-dept-card" id="db-group-pmd" style="display: none;">
-                                        <div class="db-dept-card-header">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-name-title pmd-title">PMD</span>
+                                    <!-- PMD Group: PMD Card + Subdept Cards (DNO, DSO) -->
+                                    <div class="kpi-card-group" id="db-group-pmd" style="display: none;">
+                                        <div class="kpi-card kpi-card-split" id="db-card-pmd">
+                                            <div class="kpi-title" style="color: #7e22ce;">PMD Result DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-val-pmd" style="color: #7e22ce;">0</div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-pmd"></span>
+                                                </div>
                                             </div>
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span class="db-dept-header-val" id="db-val-pmd"
-                                                    style="color: #7e22ce;">0</span>
-                                                <span class="db-dept-trend" id="db-trend-pmd"></span>
-                                                <span class="db-dept-subtext" id="db-subtext-pmd">(0/0 Sites)</span>
-                                                <span class="so-status-badge"
-                                                    style="background: #f3e8ff; color: #7e22ce; font-weight: 700; font-size: 10px; padding: 2px 7px;">Result
-                                                    DB</span>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-pmd">Avg PMD (0/0 Sites)</div>
                                             </div>
                                         </div>
-                                        <div class="db-subdept-horizontal-row"
-                                            style="grid-template-columns: repeat(2, 1fr);">
+                                        <div class="kpi-subdept-container">
                                             <div class="kpi-subdept-item">
                                                 <div class="kpi-subdept-header">
                                                     <span class="kpi-subdept-name">DNO</span>
@@ -1386,6 +1387,211 @@ $monthNames = [
                                                 </div>
                                                 <div class="kpi-subdept-val" id="db-subdept-val-dso">0</div>
                                                 <div class="kpi-subdept-meta" id="db-subdept-meta-dso">0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ── Status DB Analysis Section (SOLVED DB, UNSOLVED DB, NEW DB) ── -->
+                                <div class="db-status-section-header">
+                                    <div>
+                                        <h3
+                                            style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                            Status Penyelesaian DB
+                                        </h3>
+                                    </div>
+                                </div>
+
+                                <div class="db-status-groups-container" id="db-status-groups-container">
+                                    <!-- Solved DB Group -->
+                                    <div class="kpi-card-group" id="db-status-group-solved">
+                                        <div class="kpi-card kpi-card-split" id="db-card-solved">
+                                            <div class="kpi-title" style="color: #166534;">SOLVED DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-grand-solved" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-solved"></span>
+                                                </div>
+                                            </div>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-solved">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-outlet">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">WRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-wro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-solved-wro" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-wro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">CRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-cro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-solved-cro" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-cro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">ERO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-ero"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-solved-ero" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-ero">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DNO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-dno"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-solved-dno" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-dno">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DSO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-dso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-solved-dso" style="color: #16a34a;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-dso">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Unsolved DB Group -->
+                                    <div class="kpi-card-group" id="db-status-group-unsolved">
+                                        <div class="kpi-card kpi-card-split" id="db-card-unsolved">
+                                            <div class="kpi-title" style="color: #991b1b;">UNSOLVED DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-grand-unsolved" style="color: #dc2626;">
+                                                    0</div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-unsolved"></span>
+                                                </div>
+                                            </div>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-unsolved">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-outlet">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">WRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-wro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-unsolved-wro" style="color: #dc2626;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-wro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">CRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-cro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-unsolved-cro" style="color: #dc2626;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-cro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">ERO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-ero"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-unsolved-ero" style="color: #dc2626;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-ero">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DNO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-dno"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-unsolved-dno" style="color: #dc2626;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dno">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DSO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-dso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-unsolved-dso" style="color: #dc2626;">0
+                                                </div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dso">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- New DB Group -->
+                                    <div class="kpi-card-group" id="db-status-group-new">
+                                        <div class="kpi-card kpi-card-split" id="db-card-new">
+                                            <div class="kpi-title" style="color: #1e40af;">NEW DB</div>
+                                            <div class="kpi-card-main">
+                                                <div class="kpi-split-value" id="db-grand-new" style="color: #2563eb;">0
+                                                </div>
+                                                <div class="kpi-split-badges">
+                                                    <span class="db-dept-trend" id="db-trend-new"></span>
+                                                </div>
+                                            </div>
+                                            <div class="kpi-card-meta">
+                                                <div class="kpi-subtext" id="db-subtext-new">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-outlet">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">WRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-new-wro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-new-wro" style="color: #2563eb;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-wro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">CRO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-new-cro"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-new-cro" style="color: #2563eb;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-cro">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">ERO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-new-ero"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-new-ero" style="color: #2563eb;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-ero">0/0 Sites</div>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DNO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-new-dno"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-new-dno" style="color: #2563eb;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-dno">0/0 Sites</div>
+                                            </div>
+                                            <div class="kpi-subdept-item">
+                                                <div class="kpi-subdept-header">
+                                                    <span class="kpi-subdept-name">DSO</span>
+                                                    <span class="db-subdept-trend" id="db-sub-trend-new-dso"></span>
+                                                </div>
+                                                <div class="kpi-subdept-val" id="db-new-dso" style="color: #2563eb;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-dso">0/0 Sites</div>
                                             </div>
                                         </div>
                                     </div>
@@ -2148,7 +2354,7 @@ $monthNames = [
                         </div>
                         <div class="table-toolbar-right">
                             <input type="text" id="rdb-status-search-input" class="table-search-input"
-                                placeholder="Cari Dept, Sub Dept, Sitecode, Reg No, Name, SN..." autocomplete="off" value=""
+                                placeholder="Search..." autocomplete="off" value=""
                                 oninput="App.handleRekapDbStatusSearch(this.value)">
                         </div>
                     </div>

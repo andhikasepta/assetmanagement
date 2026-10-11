@@ -3189,6 +3189,23 @@ const App = (() => {
             if (year) sessionStorage.setItem('summary_filter_year', year);
         } catch (e) { }
 
+        // Update Executive Summary period badge next to title
+        const execPeriodText = document.getElementById('executive-period-text');
+        const execPeriodBadge = document.getElementById('executive-period-badge');
+        if (execPeriodText || execPeriodBadge) {
+            const mText = monthSelect && monthSelect.selectedIndex >= 0 && monthSelect.options[monthSelect.selectedIndex]
+                ? monthSelect.options[monthSelect.selectedIndex].text
+                : (month ? `Bulan ${month}` : 'Semua Bulan');
+            const pLabel = (summarySOType === 'quarterly')
+                ? `${mText} ${year} (Quarterly)`
+                : `${mText} ${year}`;
+            if (execPeriodText) {
+                execPeriodText.textContent = pLabel;
+            } else if (execPeriodBadge) {
+                execPeriodBadge.textContent = pLabel;
+            }
+        }
+
         // Update achievement card helper
         const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false) => {
             const rawPct = item && item.pct !== null && item.pct !== undefined ? parseFloat(item.pct) : 0;
@@ -3407,6 +3424,15 @@ const App = (() => {
             if (gEro) gEro.style.display = 'flex';
             if (gPmd) gPmd.style.display = 'none';
         }
+
+        // Toggle subdepts in Status Groups (Outlet vs PMD)
+        document.querySelectorAll('.db-status-sub-outlet').forEach(el => {
+            el.style.display = isPmd ? 'none' : 'grid';
+        });
+        document.querySelectorAll('.db-status-sub-pmd').forEach(el => {
+            el.style.display = isPmd ? 'grid' : 'none';
+        });
+
         updateDbAnalysisGrandTotalBadge();
     }
 
@@ -3437,13 +3463,16 @@ const App = (() => {
         const prevLabel = getDbPrevPeriodLabel();
         const svgSize = isSmall ? '8' : '10';
         const formatQty = (n) => Number(n || 0).toLocaleString();
+        const statusDetail = (item.solved !== undefined || item.unsolved !== undefined || item.new_db !== undefined)
+            ? ` | Solved: ${formatQty(item.solved || 0)}, Unsolved: ${formatQty(item.unsolved || 0)}, New: ${formatQty(item.new_db || 0)}`
+            : '';
 
         // User requirement: If DB is MORE than previous period -> UP arrow, color RED.
         // If DB is LESS than previous period -> DOWN arrow, color GREEN.
         if (diff > 0) {
             const formatted = `+${formatQty(diff)}`;
             return `
-                <span class="db-trend-indicator db-trend-up" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})">
+                <span class="db-trend-indicator db-trend-up" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})${statusDetail}">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,4 21,20 3,20"/>
                     </svg>
@@ -3453,7 +3482,7 @@ const App = (() => {
         } else if (diff < 0) {
             const formatted = `${formatQty(diff)}`;
             return `
-                <span class="db-trend-indicator db-trend-down" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})">
+                <span class="db-trend-indicator db-trend-down" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})${statusDetail}">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,20 3,4 21,4"/>
                     </svg>
@@ -3462,7 +3491,50 @@ const App = (() => {
             `;
         } else {
             return `
-                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 QTY selisih)">
+                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 QTY selisih)${statusDetail}">
+                    <span>-</span>
+                </span>
+            `;
+        }
+    }
+
+    function renderStatusTrendBadge(diff, prevVal, isSmall = false, isGoodPositive = false) {
+        if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || diff === undefined || diff === null) {
+            return `
+                <span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya">
+                    <span>-</span>
+                </span>
+            `;
+        }
+        const prevLabel = getDbPrevPeriodLabel();
+        const svgSize = isSmall ? '8' : '10';
+        const formatQty = (n) => Number(n || 0).toLocaleString();
+
+        if (diff > 0) {
+            const formatted = `+${formatQty(diff)}`;
+            const trendClass = isGoodPositive ? 'db-trend-good-up' : 'db-trend-bad-up';
+            return `
+                <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
+                    <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12,4 21,20 3,20"/>
+                    </svg>
+                    <span>${formatted}</span>
+                </span>
+            `;
+        } else if (diff < 0) {
+            const formatted = `${formatQty(diff)}`;
+            const trendClass = isGoodPositive ? 'db-trend-bad-down' : 'db-trend-good-down';
+            return `
+                <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
+                    <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="12,20 3,4 21,4"/>
+                    </svg>
+                    <span>${formatted}</span>
+                </span>
+            `;
+        } else {
+            return `
+                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 selisih)">
                     <span>-</span>
                 </span>
             `;
@@ -3473,6 +3545,9 @@ const App = (() => {
         if (!currentDbAnalysisData) return;
         const badgeEl = document.getElementById('db-analysis-grand-total');
         const trendEl = document.getElementById('db-grand-trend');
+        const gSolvedEl = document.getElementById('db-grand-solved');
+        const gUnsolvedEl = document.getElementById('db-grand-unsolved');
+        const gNewEl = document.getElementById('db-grand-new');
         if (!badgeEl) return;
         const isPmd = (summaryCategory === 'pmd');
         let totalQty = 0;
@@ -3488,6 +3563,28 @@ const App = (() => {
         if (trendEl && activeItem) {
             trendEl.innerHTML = renderDbTrendBadge(activeItem, false);
         }
+
+        const formatQty = (n) => Number(n || 0).toLocaleString();
+        if (gSolvedEl) gSolvedEl.textContent = formatQty(activeItem?.solved || 0);
+        if (gUnsolvedEl) gUnsolvedEl.textContent = formatQty(activeItem?.unsolved || 0);
+        if (gNewEl) gNewEl.textContent = formatQty(activeItem?.new_db || 0);
+
+        // Trend badges for Status top cards
+        const trendSolved = document.getElementById('db-trend-solved');
+        const trendUnsolved = document.getElementById('db-trend-unsolved');
+        const trendNew = document.getElementById('db-trend-new');
+        if (trendSolved) trendSolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_solved, activeItem?.prev_solved, false, true);
+        if (trendUnsolved) trendUnsolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_unsolved, activeItem?.prev_unsolved, false, false);
+        if (trendNew) trendNew.innerHTML = renderStatusTrendBadge(activeItem?.diff_new_db, activeItem?.prev_new_db, false, false);
+
+        // Sites under value for Status top cards
+        const subtextSolved = document.getElementById('db-subtext-solved');
+        const subtextUnsolved = document.getElementById('db-subtext-unsolved');
+        const subtextNew = document.getElementById('db-subtext-new');
+        const totalScopeSites = isPmd ? 6 : (activeItem?.total_sites || 58);
+        if (subtextSolved) subtextSolved.textContent = `${activeItem?.solved_sites || 0}/${totalScopeSites} Sites`;
+        if (subtextUnsolved) subtextUnsolved.textContent = `${activeItem?.unsolved_sites || 0}/${totalScopeSites} Sites`;
+        if (subtextNew) subtextNew.textContent = `${activeItem?.new_db_sites || 0}/${totalScopeSites} Sites`;
     }
 
     function updateDbAnalysis(data) {
@@ -3512,6 +3609,39 @@ const App = (() => {
                 const total = item.total_sites || 0;
                 subEl.textContent = `(${withQty}/${total} Sites)`;
             }
+
+            const solvedDeptEl = document.getElementById(`db-solved-${deptKey}`);
+            if (solvedDeptEl) solvedDeptEl.textContent = formatQty(item.solved);
+            const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${deptKey}`);
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, true);
+            const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${deptKey}`);
+            if (sitesSolvedEl) {
+                const sSites = item.solved_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesSolvedEl.textContent = `${sSites}/${tSites} Sites`;
+            }
+
+            const unsolvedDeptEl = document.getElementById(`db-unsolved-${deptKey}`);
+            if (unsolvedDeptEl) unsolvedDeptEl.textContent = formatQty(item.unsolved);
+            const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${deptKey}`);
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, false);
+            const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${deptKey}`);
+            if (sitesUnsolvedEl) {
+                const uSites = item.unsolved_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesUnsolvedEl.textContent = `${uSites}/${tSites} Sites`;
+            }
+
+            const newDeptEl = document.getElementById(`db-new-${deptKey}`);
+            if (newDeptEl) newDeptEl.textContent = formatQty(item.new_db);
+            const trendNewEl = document.getElementById(`db-sub-trend-new-${deptKey}`);
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, false);
+            const sitesNewEl = document.getElementById(`db-sub-sites-new-${deptKey}`);
+            if (sitesNewEl) {
+                const nSites = item.new_db_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesNewEl.textContent = `${nSites}/${tSites} Sites`;
+            }
         };
 
         updateDeptGroup('wro', 'db-val-wro', 'db-trend-wro', 'db-subtext-wro');
@@ -3522,7 +3652,7 @@ const App = (() => {
         const subData = currentDbAnalysisData.sub_depts || {};
         const updateSubDeptDb = (sKey) => {
             const key = sKey.toLowerCase();
-            const item = subData[key] || {};
+            const item = subData[key] || currentDbAnalysisData[key] || {};
             const valEl = document.getElementById(`db-subdept-val-${key}`);
             if (valEl) valEl.textContent = formatQty(item.qty);
 
@@ -3537,9 +3667,44 @@ const App = (() => {
                 const total = item.total_sites || 0;
                 metaEl.textContent = `${withQty}/${total} Sites`;
             }
+
+            const solvedEl = document.getElementById(`db-solved-${key}`);
+            if (solvedEl) solvedEl.textContent = formatQty(item.solved);
+            const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${key}`);
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, true);
+            const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${key}`);
+            if (sitesSolvedEl) {
+                const sSites = item.solved_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesSolvedEl.textContent = `${sSites}/${tSites} Sites`;
+            }
+
+            const unsolvedEl = document.getElementById(`db-unsolved-${key}`);
+            if (unsolvedEl) unsolvedEl.textContent = formatQty(item.unsolved);
+            const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${key}`);
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, false);
+            const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${key}`);
+            if (sitesUnsolvedEl) {
+                const uSites = item.unsolved_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesUnsolvedEl.textContent = `${uSites}/${tSites} Sites`;
+            }
+
+            const newEl = document.getElementById(`db-new-${key}`);
+            if (newEl) newEl.textContent = formatQty(item.new_db);
+            const trendNewEl = document.getElementById(`db-sub-trend-new-${key}`);
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, false);
+            const sitesNewEl = document.getElementById(`db-sub-sites-new-${key}`);
+            if (sitesNewEl) {
+                const nSites = item.new_db_sites || 0;
+                const tSites = item.total_sites || 0;
+                sitesNewEl.textContent = `${nSites}/${tSites} Sites`;
+            }
         };
 
         ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo', 'dno', 'dso'].forEach(updateSubDeptDb);
+
+        updateDbAnalysisGrandTotalBadge();
     }
 
     // ── Site Movement History & Comparison Logs ──────────────────
