@@ -1165,7 +1165,7 @@ $monthNames = [
                                         </div>
                                     </div>
                                 </div>
-                                <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <div class="table-responsive" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
                                     <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
@@ -1220,7 +1220,7 @@ $monthNames = [
                                         <div class="kpi-card kpi-card-split" id="db-card-wro">
                                             <div class="kpi-title">WRO Result DB</div>
                                             <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-wro" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-value" id="db-val-wro" style="color: #0f172a;">0</div>
                                                 <div class="kpi-split-badges">
                                                     <span class="db-dept-trend" id="db-trend-wro"></span>
                                                 </div>
@@ -1262,7 +1262,7 @@ $monthNames = [
                                         <div class="kpi-card kpi-card-split" id="db-card-cro">
                                             <div class="kpi-title">CRO Result DB</div>
                                             <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-cro" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-value" id="db-val-cro" style="color: #0f172a;">0</div>
                                                 <div class="kpi-split-badges">
                                                     <span class="db-dept-trend" id="db-trend-cro"></span>
                                                 </div>
@@ -1312,7 +1312,7 @@ $monthNames = [
                                         <div class="kpi-card kpi-card-split" id="db-card-ero">
                                             <div class="kpi-title">ERO Result DB</div>
                                             <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-ero" style="color: #0284c7;">0</div>
+                                                <div class="kpi-split-value" id="db-val-ero" style="color: #0f172a;">0</div>
                                                 <div class="kpi-split-badges">
                                                     <span class="db-dept-trend" id="db-trend-ero"></span>
                                                 </div>
@@ -1362,7 +1362,7 @@ $monthNames = [
                                         <div class="kpi-card kpi-card-split" id="db-card-pmd">
                                             <div class="kpi-title" style="color: #7e22ce;">PMD Result DB</div>
                                             <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-pmd" style="color: #7e22ce;">0</div>
+                                                <div class="kpi-split-value" id="db-val-pmd" style="color: #0f172a;">0</div>
                                                 <div class="kpi-split-badges">
                                                     <span class="db-dept-trend" id="db-trend-pmd"></span>
                                                 </div>

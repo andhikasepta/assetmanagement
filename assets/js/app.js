@@ -3498,7 +3498,7 @@ const App = (() => {
         }
     }
 
-    function renderStatusTrendBadge(diff, prevVal, isSmall = false, isGoodPositive = false) {
+    function renderStatusTrendBadge(diff, prevVal, isSmall = false, statusType = 'unsolved') {
         if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || diff === undefined || diff === null) {
             return `
                 <span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya">
@@ -3510,9 +3510,12 @@ const App = (() => {
         const svgSize = isSmall ? '8' : '10';
         const formatQty = (n) => Number(n || 0).toLocaleString();
 
+        const isSolved = (statusType === 'solved' || statusType === true);
+
         if (diff > 0) {
             const formatted = `+${formatQty(diff)}`;
-            const trendClass = isGoodPositive ? 'db-trend-good-up' : 'db-trend-bad-up';
+            // Solved bertambah: hijau (membaik). Unsolved / New DB bertambah: merah (buruk)
+            const trendClass = isSolved ? 'db-trend-good-up' : 'db-trend-bad-up';
             return `
                 <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
@@ -3523,7 +3526,9 @@ const App = (() => {
             `;
         } else if (diff < 0) {
             const formatted = `${formatQty(diff)}`;
-            const trendClass = isGoodPositive ? 'db-trend-bad-down' : 'db-trend-good-down';
+            // Solved DB dari bulan lalu: selalu warna hijau karena solved menandakan penyelesaian yang membaik
+            // Unsolved / New DB berkurang: warna hijau (karena berkurang = membaik)
+            const trendClass = isSolved ? 'db-trend-good-down' : 'db-trend-good-down';
             return `
                 <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
@@ -3573,9 +3578,9 @@ const App = (() => {
         const trendSolved = document.getElementById('db-trend-solved');
         const trendUnsolved = document.getElementById('db-trend-unsolved');
         const trendNew = document.getElementById('db-trend-new');
-        if (trendSolved) trendSolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_solved, activeItem?.prev_solved, false, true);
-        if (trendUnsolved) trendUnsolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_unsolved, activeItem?.prev_unsolved, false, false);
-        if (trendNew) trendNew.innerHTML = renderStatusTrendBadge(activeItem?.diff_new_db, activeItem?.prev_new_db, false, false);
+        if (trendSolved) trendSolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_solved, activeItem?.prev_solved, false, 'solved');
+        if (trendUnsolved) trendUnsolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_unsolved, activeItem?.prev_unsolved, false, 'unsolved');
+        if (trendNew) trendNew.innerHTML = renderStatusTrendBadge(activeItem?.diff_new_db, activeItem?.prev_new_db, false, 'new_db');
 
         // Sites under value for Status top cards
         const subtextSolved = document.getElementById('db-subtext-solved');
@@ -3613,7 +3618,7 @@ const App = (() => {
             const solvedDeptEl = document.getElementById(`db-solved-${deptKey}`);
             if (solvedDeptEl) solvedDeptEl.textContent = formatQty(item.solved);
             const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${deptKey}`);
-            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, true);
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, 'solved');
             const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${deptKey}`);
             if (sitesSolvedEl) {
                 const sSites = item.solved_sites || 0;
@@ -3624,7 +3629,7 @@ const App = (() => {
             const unsolvedDeptEl = document.getElementById(`db-unsolved-${deptKey}`);
             if (unsolvedDeptEl) unsolvedDeptEl.textContent = formatQty(item.unsolved);
             const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${deptKey}`);
-            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, false);
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, 'unsolved');
             const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${deptKey}`);
             if (sitesUnsolvedEl) {
                 const uSites = item.unsolved_sites || 0;
@@ -3635,7 +3640,7 @@ const App = (() => {
             const newDeptEl = document.getElementById(`db-new-${deptKey}`);
             if (newDeptEl) newDeptEl.textContent = formatQty(item.new_db);
             const trendNewEl = document.getElementById(`db-sub-trend-new-${deptKey}`);
-            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, false);
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, 'new_db');
             const sitesNewEl = document.getElementById(`db-sub-sites-new-${deptKey}`);
             if (sitesNewEl) {
                 const nSites = item.new_db_sites || 0;
@@ -3671,7 +3676,7 @@ const App = (() => {
             const solvedEl = document.getElementById(`db-solved-${key}`);
             if (solvedEl) solvedEl.textContent = formatQty(item.solved);
             const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${key}`);
-            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, true);
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, 'solved');
             const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${key}`);
             if (sitesSolvedEl) {
                 const sSites = item.solved_sites || 0;
@@ -3682,7 +3687,7 @@ const App = (() => {
             const unsolvedEl = document.getElementById(`db-unsolved-${key}`);
             if (unsolvedEl) unsolvedEl.textContent = formatQty(item.unsolved);
             const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${key}`);
-            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, false);
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, 'unsolved');
             const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${key}`);
             if (sitesUnsolvedEl) {
                 const uSites = item.unsolved_sites || 0;
@@ -3693,7 +3698,7 @@ const App = (() => {
             const newEl = document.getElementById(`db-new-${key}`);
             if (newEl) newEl.textContent = formatQty(item.new_db);
             const trendNewEl = document.getElementById(`db-sub-trend-new-${key}`);
-            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, false);
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, 'new_db');
             const sitesNewEl = document.getElementById(`db-sub-sites-new-${key}`);
             if (sitesNewEl) {
                 const nSites = item.new_db_sites || 0;

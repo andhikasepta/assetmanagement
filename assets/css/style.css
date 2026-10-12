@@ -2339,7 +2339,16 @@ th.sortable.desc .sort-indicator {
     padding-left: 1.15rem;
 }
 
-/* Executive Summary Cards Flexible Layout & CRO Wider Card */
+/* Executive Summary Main Container & Cards Layout */
+#card-executive-summary {
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+#card-executive-summary .card-header {
+    border-bottom: 1px solid #cbd5e1;
+}
+
 #achievement-cards {
     display: flex;
     flex-wrap: wrap;
@@ -2351,6 +2360,17 @@ th.sortable.desc .sort-indicator {
 #achievement-cards > .kpi-card-group {
     flex: 1 1 230px;
     min-width: 220px;
+}
+
+/* All Achievement Cards Outer Line Style (matching Summary Achievement) */
+#achievement-cards .kpi-card-split {
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+#achievement-cards .kpi-card-split:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
 }
 
 /* Make CRO and ERO card groups noticeably wider so badges never overlap */
@@ -2423,7 +2443,7 @@ th.sortable.desc .sort-indicator {
     gap: 0.45rem;
     padding: 0.55rem 0.65rem;
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 10px;
 }
 
@@ -2441,17 +2461,17 @@ th.sortable.desc .sort-indicator {
     flex-direction: column;
     justify-content: space-between;
     background: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 0.5rem 0.6rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     transition: all 0.15s ease;
 }
 
 .kpi-subdept-item:hover {
-    border-color: #cbd5e1;
+    border-color: #94a3b8;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
 }
 
 .kpi-subdept-header {
@@ -3461,7 +3481,7 @@ textarea,
     grid-template-columns: minmax(360px, 0.85fr) minmax(0, 2fr);
     gap: 1.25rem;
     margin-top: 1.5rem;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #cbd5e1;
     padding-top: 1.25rem;
     align-items: stretch;
 }
@@ -3518,10 +3538,10 @@ textarea,
 
 #card-executive-db-analysis .kpi-card-split {
     background: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 9px;
     padding: 0.55rem 0.75rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -3530,8 +3550,8 @@ textarea,
 }
 
 #card-executive-db-analysis .kpi-card-split:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    border-color: #94a3b8;
+    box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
 }
 
 #card-executive-db-analysis .kpi-title {
@@ -3555,7 +3575,7 @@ textarea,
     font-size: 26px;
     font-weight: 850;
     line-height: 1.1;
-    color: #0284c7;
+    color: #0f172a;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
 }
@@ -3572,7 +3592,7 @@ textarea,
     gap: 0.35rem;
     padding: 0.45rem 0.5rem;
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 9px;
     flex: 1;
     align-items: stretch;
@@ -3596,18 +3616,18 @@ textarea,
     flex-direction: column;
     justify-content: space-between;
     background: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 7px;
     padding: 0.4rem 0.45rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.015);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     transition: all 0.15s ease;
     min-width: 0;
 }
 
 #card-executive-db-analysis .kpi-subdept-item:hover {
-    border-color: #cbd5e1;
+    border-color: #94a3b8;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
 }
 
 #card-executive-db-analysis .kpi-subdept-header {
@@ -3685,7 +3705,7 @@ textarea,
     margin-top: 1.25rem;
     margin-bottom: 0.75rem;
     padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #cbd5e1;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3716,7 +3736,7 @@ textarea,
     gap: 0.35rem;
     padding: 0.45rem 0.5rem;
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 9px;
     flex: 1;
     align-items: stretch;
@@ -3798,11 +3818,11 @@ textarea,
     border: 1px solid #bbf7d0;
 }
 
-/* If positive metric (like Solved) decreased: RED */
+/* Solved DB metric: warna hijau karena solved selalu menandakan peningkatan/perbaikan */
 .db-trend-indicator.db-trend-bad-down {
-    background-color: #fee2e2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
 }
 
 .db-trend-indicator.db-trend-neutral {
