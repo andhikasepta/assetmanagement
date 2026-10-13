@@ -1,0 +1,60 @@
+# Version Control
+.git/
+.gitignore
+.gitattributes
+
+# Environment & Sensitive Files
+.env
+.env.*
+!.env.example
+
+# Dependency Directories (Installed cleanly inside container via Dockerfile cache)
+vendor/
+node_modules/
+
+# Logs & Temporary Files
+*.log
+logs/
+*.tmp
+*.temp
+tmp/
+temp/
+cache/
+
+# Uploads & User Generated Content
+uploads/*
+!uploads/.gitkeep
+!uploads/.htaccess
+
+# Testing, Scratch, & Debug Scripts
+scratch/
+tests/
+inspect_*.php
+*.out
+*.txt
+
+# Backups & Database Dumps
+*.sql
+*.dump
+*.sqlite
+*.bak
+*.swp
+
+# Docker & Deployment Files (not needed inside web root)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+deployment/
+
+# IDE & OS Metadata
+.idea/
+.vscode/
+.fleet/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.sublime-*
+
+# Documentation & Misc
+README.md
+*.md

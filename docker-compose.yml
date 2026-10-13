@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  app:
+    image: andhikasepta/amora:latest
+    container_name: amora-app
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8082:80"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_NAME: ${APP_NAME:-AMORA - Asset Management & Reconciliation}
+      APP_URL: https://wmsdev.my.id/amora
+      APP_PORT: 8082
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      DB_HOST: 103.123.100.14
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-dashboardasset_db}
+      DB_USER: deutsch
+      DB_PASSWORD: S3pt4@
+      REDIS_HOST: 103.123.100.11
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: password_redis_rahasia
+      APACHE_ALLOW_OVERRIDE: "All"
+      SESSION_TTL: 1200
+      SESSION_EXPIRY: 1200
+      SESSION_SECURE: ${SESSION_SECURE:-false}
+    volumes:
+      - amora-uploads:/var/www/html/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-L", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - wms-network
+
+volumes:
+  amora-uploads:
+    driver: local
+
+networks:
+  wms-network:
+    external: true

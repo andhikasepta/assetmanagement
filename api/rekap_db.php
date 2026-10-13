@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -15,12 +16,8 @@ error_reporting(E_ALL);
 ini_set('memory_limit', '2048M');
 set_time_limit(600);
 
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
-
-session_start();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -135,13 +132,9 @@ try {
     if ($method === 'POST') {
         $action = trim($_POST['action'] ?? $_GET['action'] ?? '');
 
-        // CSRF verification
-        $csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-        if (empty($csrfToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Token keamanan tidak valid']);
-            exit;
-        }
+        // CSRF and Admin Authentication check
+        validateCsrfToken();
+        requireAuth();
 
         // 1. IMPORT DATA
         if ($action === 'import') {

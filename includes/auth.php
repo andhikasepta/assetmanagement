@@ -5,8 +5,8 @@
 
 require_once __DIR__ . '/../config/database.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+    @session_start();
 }
 
 if (empty($_SESSION['csrf_token'])) {
@@ -76,6 +76,10 @@ function attemptLogin(string $username, string $password): array
             }
 
             if ($isPasswordValid) {
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_regenerate_id(true);
+                }
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 $_SESSION['user'] = [
                     'id'       => $user['id'],
                     'username' => $user['username'],
@@ -91,6 +95,10 @@ function attemptLogin(string $username, string $password): array
 
     // Strict Fallback Admin Credentials (D3utsch / S3pt4@##!@#)
     if ($username === 'D3utsch' && $password === 'S3pt4@##!@#') {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         $_SESSION['user'] = [
             'id'       => 1,
             'username' => 'D3utsch',
@@ -115,4 +123,8 @@ function logoutUser(): void
         session_start();
     }
     unset($_SESSION['user']);
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
 }

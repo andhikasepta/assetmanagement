@@ -58,6 +58,13 @@ const App = (() => {
     let summaryCategory = 'pmd'; // 'pmd' or 'outlet'
     let summaryInitialized = false;
 
+    // In-Memory Instant Caches (0ms Data Switch)
+    const summaryDataCache = new Map();
+    const scorecardDataCache = new Map();
+    const subdeptResultsCache = new Map();
+    const trendChartsCache = new Map();
+    const rekapDataCache = new Map();
+
     // Trend Charts state
     let chartTrendDept = null;
     let chartTrendSubDept = null;
@@ -137,26 +144,17 @@ const App = (() => {
             localStorage.removeItem('active_page');
         } catch (e) { }
 
-        // Restore active page: default remains now condition page ('master-data')
-        const rawHash = (window.location.hash || '').replace('#', '').trim();
-        const hashPage = rawHash.split('?')[0].split('/')[0];
         const sessionPage = sessionStorage.getItem('active_page');
-        const isReload = Boolean(
-            (window.performance && performance.getEntriesByType && performance.getEntriesByType('navigation')[0]?.type === 'reload')
-            || (window.performance && performance.navigation && performance.navigation.type === 1)
-        );
 
-        let initialPage = 'summary';
+        const isMasterPagePresent = !!document.getElementById('page-master-data');
+        let initialPage = isMasterPagePresent ? 'master-data' : 'summary';
 
-        if (window.AUTH_USER) {
-            // When admin session: strictly Master Data page only
-            initialPage = 'master-data';
-        } else {
-            // When guest session: strictly Summary page only
-            initialPage = 'summary';
+        // Keep URL clean without hashes (#) or query strings (?)
+        if (window.location.hash || window.location.search) {
+            history.replaceState(null, '', window.location.pathname);
         }
 
-        // Restore active SO Type & Category from sessionStorage (or URL query params in hash)
+        // Restore active SO Type & Category from sessionStorage
         const savedSOType = sessionStorage.getItem('summary_so_type');
         const savedCategory = sessionStorage.getItem('summary_category');
 
@@ -180,82 +178,54 @@ const App = (() => {
             summaryCategory = 'pmd';
         }
 
-        // Parse optional query params in hash if provided (e.g. #summary?so_type=quarterly&cat=warehouse_hub)
-        if (rawHash.includes('?')) {
-            const queryStr = rawHash.split('?')[1];
-            const params = new URLSearchParams(queryStr);
-            const qType = params.get('type') || params.get('so_type');
-            const qCat = params.get('cat') || params.get('category');
-            if (qType === 'quarterly' || qType === 'monthly') summarySOType = qType;
-            if (qCat) summaryCategory = qCat;
+        navigateTo(initialPage);
+
+        // Check if there was a card jump pending from quick access
+        const pendingCard = sessionStorage.getItem('target_card');
+        if (pendingCard) {
+            sessionStorage.removeItem('target_card');
+            setTimeout(() => scrollToCard(pendingCard), 300);
         }
 
-        navigateTo(initialPage, true);
-
-        // Listen for popstate / hashchange when user uses browser Back/Forward
-        window.addEventListener('hashchange', () => {
-            const raw = (window.location.hash || '').replace('#', '').trim();
-            const currentHash = raw.split('?')[0].split('/')[0];
-            if (window.AUTH_USER) {
-                navigateTo('master-data', false);
-            } else {
-                if (currentHash === 'master-data') {
-                    window.location.href = 'login.php?redirect=master-data';
-                } else {
-                    navigateTo('summary', false);
-                }
-            }
+        // Listen for popstate when user uses browser Back/Forward
+        window.addEventListener('popstate', () => {
+            navigateTo(window.AUTH_USER ? 'master-data' : 'summary');
         });
     }
 
     // ── Navigation (Master Data vs Summary) ─────────────────────
 
-    function navigateTo(page, updateHash = true) {
-        if (window.AUTH_USER) {
-            // Logged-in admin only has Master Data page
-            page = 'master-data';
-        } else {
-            // Guest only has Summary page; Master Data redirects to login
-            if (page === 'master-data') {
-                window.location.href = 'login.php?redirect=master-data';
-                return;
-            }
-            page = 'summary';
+    function navigateTo(page) {
+        const isMasterPagePresent = !!document.getElementById('page-master-data');
+        const isSummaryPagePresent = !!document.getElementById('page-summary');
+
+        if (page === 'master-data' && !isMasterPagePresent) {
+            window.location.href = 'master-data.php';
+            return;
         }
 
-        // Persist page in sessionStorage for tab session / reload
+        if (page === 'summary' && !isSummaryPagePresent) {
+            window.location.href = './';
+            return;
+        }
+
+        // Persist page in sessionStorage
         try {
-            sessionStorage.setItem('active_page', page);
-        } catch (e) {
-            // Ignore storage quota or security errors
+            sessionStorage.setItem('active_page', isMasterPagePresent ? 'master-data' : 'summary');
+        } catch (e) { }
+
+        // Keep URL clean without hashes (#) or query strings (?)
+        if (window.location.hash || window.location.search) {
+            history.replaceState(null, '', window.location.pathname);
         }
 
-        // Update URL hash
-        if (updateHash && window.location.hash !== `#${page}`) {
-            history.replaceState(null, '', `#${page}`);
-        }
-
-        document.querySelectorAll('.nav-link').forEach(link => {
-            const linkPage = link.getAttribute('data-page');
-            link.classList.toggle('active', linkPage === page);
-        });
-
-        document.querySelectorAll('.page-section').forEach(sec => {
-            sec.classList.remove('active');
-        });
-
-        const activeSec = document.getElementById(`page-${page}`);
-        if (activeSec) {
-            activeSec.classList.add('active');
-        }
-
-        if (page === 'master-data') {
+        if (isMasterPagePresent) {
             loadMasterData();
             loadSiteRegional();
             loadRekapDbData();
             loadScorecardKpi();
             loadMasterCatatan();
-        } else if (page === 'summary') {
+        } else if (isSummaryPagePresent) {
             switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
         }
     }
@@ -338,7 +308,99 @@ const App = (() => {
 
     function handleQuickAccessLogin(e) {
         if (e) e.preventDefault();
-        window.location.href = 'login.php';
+        openLoginModal();
+    }
+
+    function openLoginModal() {
+        closeQuickAccess();
+        const modal = document.getElementById('modal-spa-login');
+        if (modal) {
+            modal.style.display = 'flex';
+            const userInp = document.getElementById('spa-login-username');
+            if (userInp) {
+                setTimeout(() => userInp.focus(), 80);
+            }
+        } else {
+            window.location.href = 'login.php';
+        }
+    }
+
+    function closeLoginModal() {
+        const modal = document.getElementById('modal-spa-login');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        const errEl = document.getElementById('spa-login-error');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+    }
+
+    async function handleSpaLogin(event) {
+        if (event) event.preventDefault();
+        const usernameInp = document.getElementById('spa-login-username');
+        const passwordInp = document.getElementById('spa-login-password');
+        const errEl = document.getElementById('spa-login-error');
+        const submitBtn = document.getElementById('btn-spa-login-submit');
+
+        const username = usernameInp ? usernameInp.value.trim() : '';
+        const password = passwordInp ? passwordInp.value : '';
+
+        if (!username || !password) {
+            if (errEl) {
+                errEl.textContent = 'Username dan password wajib diisi.';
+                errEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>Memverifikasi...</span>';
+        }
+
+        try {
+            const res = await fetch('login.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ username, password, csrf_token: csrfToken })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Login Berhasil', 'Selamat datang!');
+                setTimeout(() => {
+                    window.location.href = window.location.pathname;
+                }, 350);
+            } else {
+                if (errEl) {
+                    errEl.textContent = json.message || 'Username atau password salah.';
+                    errEl.style.display = 'block';
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Masuk</span>';
+                }
+            }
+        } catch (err) {
+            if (errEl) {
+                errEl.textContent = 'Gagal terhubung ke server. Silakan coba lagi.';
+                errEl.style.display = 'block';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>Masuk</span>';
+            }
+        }
     }
 
     function toggleUserDropdown(e) {
@@ -3485,8 +3547,8 @@ const App = (() => {
 
                     // Solid triangle style: up (green) if >= threshold, down (red) if < threshold
                     const triangleSvg = isAbove
-                        ? `<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
-                        : `<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
+                        ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                        : `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
 
                     trendEl.innerHTML = `
                         <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: ${roundedTarget}% (Gap: ${formattedDiff})">
@@ -3498,23 +3560,8 @@ const App = (() => {
             }
         };
 
-        try {
-            const params = new URLSearchParams({
-                action: 'summary',
-                so_type: summarySOType,
-                category: summaryCategory
-            });
-            if (month) params.append('month', month);
-            if (year) params.append('year', year);
-
-            const res = await fetch(`api/reconciliation.php?${params.toString()}`);
-            const json = await res.json();
-
-            if (!json.success) {
-                console.error('Failed to load summary data:', json.message);
-                return;
-            }
-
+        function applySummaryJsonData(json) {
+            if (!json || !json.success) return;
             const t = json.totals || {};
             const ach = json.achievements || {};
 
@@ -3581,11 +3628,11 @@ const App = (() => {
                         const diff = pct - targetThreshold;
                         const formattedDiff = (diff >= 0 ? '+' : '') + diff + '%';
                         const triangleSvg = isAbove
-                            ? `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
-                            : `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
+                            ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                            : `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
 
                         trendEl.innerHTML = `
-                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" style="font-size: 9.5px; padding: 1.5px 5px;" title="Target: 85% (Gap: ${formattedDiff})">
+                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: 85% (Gap: ${formattedDiff})">
                                 ${triangleSvg}
                                 <span>${formattedDiff}</span>
                             </span>
@@ -3609,6 +3656,37 @@ const App = (() => {
 
             // Populate DB Analysis Card (Result DB QTY)
             updateDbAnalysis(json.db_analysis || ach.db_analysis || {});
+        }
+
+        const summaryCacheKey = `${summarySOType}_${summaryCategory}_${year}_${month}`;
+
+        // ── 0ms Instant Cache Render ──
+        if (summaryDataCache.has(summaryCacheKey)) {
+            applySummaryJsonData(summaryDataCache.get(summaryCacheKey));
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'summary',
+                so_type: summarySOType,
+                category: summaryCategory
+            });
+            if (month) params.append('month', month);
+            if (year) params.append('year', year);
+
+            const res = await fetch(`api/reconciliation.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                console.error('Failed to load summary data:', json.message);
+                return;
+            }
+
+            summaryDataCache.set(summaryCacheKey, json);
+            applySummaryJsonData(json);
+
+            // Pre-fetch other categories in background (warmer for 0ms switch)
+            prefetchCategoryVariants(year, month);
 
             // Load Trend Line Graphics (DEPT, Sub DEPT, PMD Sub DEPT)
             loadTrendCharts(year);
@@ -3634,6 +3712,43 @@ const App = (() => {
         } catch (err) {
             console.error('Error loading summary totals:', err);
         }
+    }
+
+    function prefetchCategoryVariants(year, month) {
+        const variants = (summarySOType === 'quarterly')
+            ? ['outlet_subarep', 'warehouse_hub']
+            : ['pmd', 'outlet'];
+
+        variants.forEach(cat => {
+            if (cat === summaryCategory) return;
+            const cKey = `${summarySOType}_${cat}_${year}_${month}`;
+            if (!summaryDataCache.has(cKey)) {
+                fetch(`api/reconciliation.php?action=summary&so_type=${summarySOType}&category=${cat}&month=${month}&year=${year}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) summaryDataCache.set(cKey, res);
+                    })
+                    .catch(() => {});
+            }
+            const scKey = `${summarySOType}_${cat}_${year}_${month}`;
+            if (!scorecardDataCache.has(scKey)) {
+                fetch(`api/scorecard_summary.php?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&category=${encodeURIComponent(cat)}&so_type=${encodeURIComponent(summarySOType)}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) scorecardDataCache.set(scKey, res);
+                    })
+                    .catch(() => {});
+            }
+            const sKey = `${summarySOType}_${cat}_all_all_${month}_${year}`;
+            if (!subdeptResultsCache.has(sKey)) {
+                fetch(`api/reconciliation.php?action=subdept_results&so_type=${summarySOType}&category=${cat}&dept=all&sub_dept=all&month=${month}&year=${year}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) subdeptResultsCache.set(sKey, res);
+                    })
+                    .catch(() => {});
+            }
+        });
     }
 
     // ── DB Analysis (Result DB QTY) Helper Functions ─────────────
@@ -3696,7 +3811,7 @@ const App = (() => {
         const diff = item.diff_qty;
         const prevQty = item.prev_qty !== undefined ? item.prev_qty : 0;
         const prevLabel = getDbPrevPeriodLabel();
-        const svgSize = isSmall ? '8' : '10';
+        const svgSize = isSmall ? '6' : '7.5';
         const formatQty = (n) => Number(n || 0).toLocaleString();
         const statusDetail = (item.solved !== undefined || item.unsolved !== undefined || item.new_db !== undefined)
             ? ` | Solved: ${formatQty(item.solved || 0)}, Unsolved: ${formatQty(item.unsolved || 0)}, New: ${formatQty(item.new_db || 0)}`
@@ -3742,7 +3857,7 @@ const App = (() => {
             `;
         }
         const prevLabel = getDbPrevPeriodLabel();
-        const svgSize = isSmall ? '8' : '10';
+        const svgSize = isSmall ? '6' : '7.5';
         const formatQty = (n) => Number(n || 0).toLocaleString();
 
         const isSolved = (statusType === 'solved' || statusType === true);
@@ -4026,8 +4141,8 @@ const App = (() => {
                 const cls = isGood ? 'target-up' : 'target-down';
                 const formatted = diff > 0 ? `+${diff}` : `${diff}`;
                 const arrowSvg = diff > 0
-                    ? `<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"></polygon></svg>`
-                    : `<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"></polygon></svg>`;
+                    ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"></polygon></svg>`
+                    : `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"></polygon></svg>`;
                 return `
                     <span class="kpi-target-indicator ${cls}" title="${formatted} vs bulan sebelumnya">
                         ${arrowSvg}
@@ -4688,7 +4803,7 @@ const App = (() => {
                                         <tr style="background: #f8fafc;">
                                             <th class="text-center" style="width: 45px; padding: 5px 8px;">NO</th>
                                             <th class="text-center" style="width: 170px; padding: 5px 8px;">REG NO</th>
-                                            <th class="text-left" style="padding: 5px 8px;">NAME</th>
+                                            <th class="text-left rdb-col-name" style="padding: 5px 8px;">NAME</th>
                                             <th class="text-center" style="width: 160px; padding: 5px 8px;">SN</th>
                                             <th class="text-right" style="width: 125px; padding: 5px 8px;">NBV</th>
                                             <th class="text-center" style="width: 105px; padding: 5px 8px;">STATUS</th>
@@ -4719,7 +4834,7 @@ const App = (() => {
                                                 <tr>
                                                     <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
                                                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
-                                                    <td class="text-left" style="color: #334155; font-weight: 500;">${name}</td>
+                                                    <td class="text-left rdb-col-name" style="color: #334155; font-weight: 500;">${name}</td>
                                                     <td class="text-center" style="color: #475569; font-weight: 500;">${sn}</td>
                                                     <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">${nbvVal}</td>
                                                     <td class="text-center" style="white-space: nowrap;">${statusBadge}</td>
@@ -4792,7 +4907,7 @@ const App = (() => {
                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${sc}</td>
                     <td class="text-left" style="font-weight: 500; color: #1e293b;">${nameSite}</td>
                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
-                    <td class="text-left" style="color: #334155; font-weight: 500;">${name}</td>
+                    <td class="text-left rdb-col-name" style="color: #334155; font-weight: 500;">${name}</td>
                     <td class="text-center" style="color: #475569; font-weight: 500;">${sn}</td>
                     <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">${nbvVal}</td>
                     <td class="text-center" style="white-space: nowrap;">${statusBadge}</td>
@@ -5182,34 +5297,45 @@ const App = (() => {
             if (title3) title3.textContent = `${threeMonths[2].label} ${threeMonths[2].year}`;
         }
 
+        function applyScorecardJsonData(json) {
+            if (!json || !json.success) return;
+            scorecardRatingData = json.rating || [];
+            scorecardExecutionData = json.execution || [];
+            scorecardPeriod = json.period || null;
+
+            if (json.period && json.period.m1 && json.period.m2 && json.period.m3) {
+                const title1 = document.getElementById('national-col-title-m1');
+                const title2 = document.getElementById('national-col-title-m2');
+                const title3 = document.getElementById('national-col-title-m3');
+                if (title1) title1.textContent = `${json.period.m1.label} ${json.period.m1.year}`;
+                if (title2) title2.textContent = `${json.period.m2.label} ${json.period.m2.year}`;
+                if (title3) title3.textContent = `${json.period.m3.label} ${json.period.m3.year}`;
+
+                const thRatingSel = document.getElementById('sc-rating-th-selected');
+                if (thRatingSel) thRatingSel.textContent = `${json.period.m3.label} (%)`;
+                const thExecSel = document.getElementById('sc-exec-th-selected');
+                if (thExecSel) thExecSel.textContent = `${json.period.m3.label} (%)`;
+            }
+
+            renderNationalScoreCardRating();
+            renderScoreCardRating();
+            renderScoreCardExecution();
+            renderScoreCardRatingPieChart(json.rating_counts);
+            renderScoreCardExecPieChart(json.execution_counts);
+        }
+
+        const scorecardCacheKey = `${soType}_${category}_${y}_${m}`;
+        if (scorecardDataCache.has(scorecardCacheKey)) {
+            applyScorecardJsonData(scorecardDataCache.get(scorecardCacheKey));
+        }
+
         try {
             const res = await fetch(`api/scorecard_summary.php?year=${encodeURIComponent(y)}&month=${encodeURIComponent(m)}&category=${encodeURIComponent(category)}&so_type=${encodeURIComponent(soType)}`);
             const json = await res.json();
 
             if (json.success) {
-                scorecardRatingData = json.rating || [];
-                scorecardExecutionData = json.execution || [];
-                scorecardPeriod = json.period || null;
-
-                if (json.period && json.period.m1 && json.period.m2 && json.period.m3) {
-                    const title1 = document.getElementById('national-col-title-m1');
-                    const title2 = document.getElementById('national-col-title-m2');
-                    const title3 = document.getElementById('national-col-title-m3');
-                    if (title1) title1.textContent = `${json.period.m1.label} ${json.period.m1.year}`;
-                    if (title2) title2.textContent = `${json.period.m2.label} ${json.period.m2.year}`;
-                    if (title3) title3.textContent = `${json.period.m3.label} ${json.period.m3.year}`;
-
-                    const thRatingSel = document.getElementById('sc-rating-th-selected');
-                    if (thRatingSel) thRatingSel.textContent = `${json.period.m3.label} (%)`;
-                    const thExecSel = document.getElementById('sc-exec-th-selected');
-                    if (thExecSel) thExecSel.textContent = `${json.period.m3.label} (%)`;
-                }
-
-                renderNationalScoreCardRating();
-                renderScoreCardRating();
-                renderScoreCardExecution();
-                renderScoreCardRatingPieChart(json.rating_counts);
-                renderScoreCardExecPieChart(json.execution_counts);
+                scorecardDataCache.set(scorecardCacheKey, json);
+                applyScorecardJsonData(json);
             } else {
                 console.warn('Scorecard summary failed:', json.message);
                 scorecardRatingData = [];
@@ -5940,43 +6066,8 @@ const App = (() => {
         else if (currentCategory === 'outlet_subarep') catLabel = 'Outlet Subarep';
         else if (currentCategory === 'warehouse_hub') catLabel = 'Warehouse HUB';
 
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
-                    <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
-                        <span class="spinner" style="width: 16px; height: 16px;"></span>
-                        <span>Memuat Hasil SO ${catLabel}...</span>
-                    </div>
-                </td>
-            </tr>
-        `;
-        if (tfoot) tfoot.innerHTML = '';
-
-        try {
-            const params = new URLSearchParams({
-                action: 'subdept_results',
-                so_type: summarySOType,
-                category: currentCategory,
-                dept: dept,
-                sub_dept: subDept,
-                month: month,
-                year: year
-            });
-
-            const res = await fetch(`api/reconciliation.php?${params.toString()}`);
-            const json = await res.json();
-
-            if (!json.success) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">
-                            Gagal memuat data: ${escapeHtml(json.message || 'Unknown error')}
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
+        function renderSubDeptJsonData(json) {
+            if (!json || !json.success) return;
             const rows = json.data || [];
             if (rows.length === 0) {
                 tbody.innerHTML = `
@@ -6098,11 +6189,6 @@ const App = (() => {
                             statusClass = 'status-green';
                             progressClass = 'so-progress-green';
                             color = '#16a34a';
-                        } else {
-                            statusText = 'Tidak Tercapai';
-                            statusClass = 'status-red';
-                            progressClass = 'so-progress-red';
-                            color = '#dc2626';
                         }
                     } else {
                         if (pct >= 85) {
@@ -6115,11 +6201,6 @@ const App = (() => {
                             statusClass = 'status-orange';
                             progressClass = 'so-progress-orange';
                             color = '#ea580c';
-                        } else {
-                            statusText = 'Tidak Tercapai';
-                            statusClass = 'status-red';
-                            progressClass = 'so-progress-red';
-                            color = '#dc2626';
                         }
                     }
 
@@ -6138,34 +6219,30 @@ const App = (() => {
                     `;
                 }
 
-                const cellColor = r.has_data ? (isPmdMode ? (pctDisplay !== '-' && parseInt(pctDisplay) >= 98 ? '#16a34a' : '#dc2626') : (pctDisplay !== '-' && parseInt(pctDisplay) >= 85 ? '#16a34a' : (pctDisplay !== '-' && parseInt(pctDisplay) >= 75 ? '#ea580c' : '#dc2626'))) : '#64748b';
-
                 html += `
                     <tr>
-                        <td style="text-align: center; font-weight: 600; color: #1e293b;">${sitecode}</td>
-                        <td style="text-align: left; font-weight: 500; color: #334155;">${nameSite}</td>
-                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${matchQty}</td>
-                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${physicQty}</td>
-                        <td style="text-align: center; font-weight: 600; color: #0f172a;">${dbQty}</td>
-                        <td style="text-align: center; font-weight: 700; color: ${cellColor};">
-                            ${pctDisplay}
-                        </td>
-                        <td>${statusHtml}</td>
+                        <td style="font-weight: 600; color: #1e293b;">${sitecode}</td>
+                        <td style="color: #334155;">${nameSite}</td>
+                        <td class="text-right" style="color: #64748b;">${matchQty}</td>
+                        <td class="text-right" style="color: #64748b;">${physicQty}</td>
+                        <td class="text-right" style="color: #64748b;">${dbQty}</td>
+                        <td class="text-center" style="font-weight: 600;">${pctDisplay}</td>
+                        <td class="text-center">${statusHtml}</td>
                     </tr>
                 `;
             });
             tbody.innerHTML = html;
 
-            // Render Footer with Totals & Average
+            // Render Foot Summary Row
             if (tfoot) {
-                let totalMatch, totalPhysic, totalDb, avgPct, countWithData;
-                if (statusFilter === 'all') {
-                    totalMatch = Number(json.total_match_qty || 0).toLocaleString();
-                    totalPhysic = Number(json.total_physic_qty || 0).toLocaleString();
-                    totalDb = Number(json.total_db_qty || 0).toLocaleString();
-                    avgPct = Math.round(parseFloat(json.avg_pct || 0));
-                    countWithData = json.count_with_data || 0;
-                } else {
+                const totals = json.totals || {};
+                let totalMatch = totals.total_match !== undefined ? Number(totals.total_match).toLocaleString() : '0';
+                let totalPhysic = totals.total_physic !== undefined ? Number(totals.total_physic).toLocaleString() : '0';
+                let totalDb = totals.total_db !== undefined ? Number(totals.total_db).toLocaleString() : '0';
+                let avgPct = totals.avg_pct !== undefined ? Math.round(parseFloat(totals.avg_pct)) : 0;
+                let countWithData = totals.count_with_data || 0;
+
+                if (statusFilter !== 'all') {
                     let sMatch = 0, sPhysic = 0, sDb = 0, sPct = 0;
                     countWithData = 0;
                     displayRows.forEach(r => {
@@ -6241,24 +6318,69 @@ const App = (() => {
                     : '';
 
                 tfoot.innerHTML = `
-                    <tr style="background: #f8fafc; position: sticky; bottom: 0; z-index: 5;">
-                        <td colspan="2" style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: left; padding: 0.85rem 1rem; color: #1e293b; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
-                            Total (${displayRows.length} Sites${filterNote})
+                    <tr class="table-summary-row" style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                        <td colspan="2" style="color: #0f172a; padding: 0.75rem 1rem;">
+                            Grand Total (${displayRows.length} Sites${filterNote})
                         </td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalMatch}</td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalPhysic}</td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; color: #0f172a; font-size: 13.5px; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${totalDb}</td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; text-align: center; padding: 0.85rem 1rem; font-size: 13.5px; color: ${overallColor}; font-weight: 800; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
-                            ${countWithData > 0 ? avgDisplay : '-'}
-                        </td>
-                        <td style="position: sticky; bottom: 0; background: #f8fafc; z-index: 5; padding: 0.85rem 1rem; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">${overallStatusHtml}</td>
+                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalMatch}</td>
+                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalPhysic}</td>
+                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalDb}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${avgDisplay}</td>
+                        <td class="text-center" style="padding: 0.75rem 0.5rem;">${overallStatusHtml}</td>
                     </tr>
                 `;
             }
 
-            // Render Right-Side Pie / Doughnut Chart
+            // Update Pie Chart
             renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length);
+        }
 
+        const subdeptCacheKey = `${summarySOType}_${currentCategory}_${dept}_${subDept}_${month}_${year}`;
+
+        // ── 0ms Instant Cache Render ──
+        if (subdeptResultsCache.has(subdeptCacheKey)) {
+            renderSubDeptJsonData(subdeptResultsCache.get(subdeptCacheKey));
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                        <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <span class="spinner" style="width: 16px; height: 16px;"></span>
+                            <span>Memuat Hasil SO ${catLabel}...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            if (tfoot) tfoot.innerHTML = '';
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'subdept_results',
+                so_type: summarySOType,
+                category: currentCategory,
+                dept: dept,
+                sub_dept: subDept,
+                month: month,
+                year: year
+            });
+
+            const res = await fetch(`api/reconciliation.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">
+                            Gagal memuat data: ${escapeHtml(json.message || 'Unknown error')}
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            subdeptResultsCache.set(subdeptCacheKey, json);
+            renderSubDeptJsonData(json);
         } catch (err) {
             console.error('Error loading subdept results:', err);
             tbody.innerHTML = `
@@ -6495,14 +6617,10 @@ const App = (() => {
                 : `Quarterly Physical % (Q1 - Q4 ${targetYear})`;
         });
 
-        try {
-            const res = await fetch(`api/rekapitulasi.php?action=trends&year=${targetYear}&so_type=${summarySOType}`);
-            const json = await res.json();
-            if (!json.success) {
-                console.error('Failed to load trend data:', json.message);
-                return;
-            }
+        const trendCacheKey = `${summarySOType}_${targetYear}`;
 
+        function applyTrendJsonData(json) {
+            if (!json || !json.success) return;
             const months = json.months || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
             // Helper to convert hex color to rgba
@@ -7197,7 +7315,22 @@ const App = (() => {
                 if (chartTrendSubDept) chartTrendSubDept.resize();
                 if (chartTrendPmd) chartTrendPmd.resize();
             }, 50);
+        }
 
+        // ── 0ms Instant Cache Render ──
+        if (trendChartsCache.has(trendCacheKey)) {
+            applyTrendJsonData(trendChartsCache.get(trendCacheKey));
+        }
+
+        try {
+            const res = await fetch(`api/rekapitulasi.php?action=trends&year=${targetYear}&so_type=${summarySOType}`);
+            const json = await res.json();
+            if (!json.success) {
+                console.error('Failed to load trend data:', json.message);
+                return;
+            }
+            trendChartsCache.set(trendCacheKey, json);
+            applyTrendJsonData(json);
         } catch (err) {
             console.error('Error rendering trend charts:', err);
         }
@@ -7269,16 +7402,30 @@ const App = (() => {
         const tbody = document.getElementById('rekap-table-body');
         if (!tbody) return;
 
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
-                    Loading Rekapitulasi ${rekapYear} records...
-                </td>
-            </tr>
-        `;
+        const category = getRekapCategory();
+        const rekapCacheKey = `${category}_${rekapYear}`;
+
+        function applyRekapJsonData(json) {
+            allRekapRows = json.data || [];
+            rekapMonthAverages = json.month_averages || {};
+            populateRekapDeptAndSubDeptDropdowns();
+            applyRekapFilterAndRender();
+        }
+
+        // ── 0ms Instant Cache Render ──
+        if (rekapDataCache.has(rekapCacheKey)) {
+            applyRekapJsonData(rekapDataCache.get(rekapCacheKey));
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                        Loading Rekapitulasi ${rekapYear} records...
+                    </td>
+                </tr>
+            `;
+        }
 
         try {
-            const category = getRekapCategory();
             const res = await fetch(`api/rekapitulasi.php?category=${category}&year=${rekapYear}`);
             const json = await res.json();
 
@@ -7293,10 +7440,8 @@ const App = (() => {
                 return;
             }
 
-            allRekapRows = json.data || [];
-            rekapMonthAverages = json.month_averages || {};
-            populateRekapDeptAndSubDeptDropdowns();
-            applyRekapFilterAndRender();
+            rekapDataCache.set(rekapCacheKey, json);
+            applyRekapJsonData(json);
             loadTrendCharts(rekapYear);
 
         } catch (err) {
@@ -8684,7 +8829,10 @@ const App = (() => {
 
         try {
             const res = await fetch(`api/executive_notes.php?id=${encodeURIComponent(id)}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
             });
             const json = await res.json();
 
@@ -8733,7 +8881,10 @@ const App = (() => {
                 if (submitBtn) submitBtn.disabled = true;
                 const res = await fetch('api/executive_notes.php', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
                     body: JSON.stringify({
                         id: parseInt(editId, 10),
                         year,
@@ -8787,7 +8938,10 @@ const App = (() => {
                 if (submitBtn) submitBtn.disabled = true;
                 const res = await fetch('api/executive_notes.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
                     body: JSON.stringify({
                         year,
                         month,
@@ -8970,10 +9124,17 @@ const App = (() => {
         closeQuickAccess,
         scrollToCard,
         handleQuickAccessLogin,
+        openLoginModal,
+        closeLoginModal,
+        handleSpaLogin,
         toggleUserDropdown,
         closeUserDropdown,
     };
 })();
 
-document.addEventListener('DOMContentLoaded', App.init);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', App.init);
+} else {
+    App.init();
+}
 

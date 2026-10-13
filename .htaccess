@@ -1,0 +1,22 @@
+# AMORA Apache Configuration
+Options -Indexes
+Options +FollowSymLinks
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Canonical 301 Redirect: Remove index.php from URL
+    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ +(.*)/index\.php([^\ ]*)\ HTTP/ [NC]
+    RewriteRule ^(.*)index\.php$ %1/ [R=301,L]
+
+    # Block access to sensitive and config files
+    RewriteRule ^(\.git|\.env|composer\.(json|lock)|Dockerfile|docker-compose) - [F,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Security headers
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

@@ -1,0 +1,26 @@
+[Unit]
+Description=AMORA Background Worker Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=deutsch
+Group=deutsch
+WorkingDirectory=/var/www/amora-worker
+ExecStart=/usr/bin/php /var/www/amora-worker/worker.php --daemon
+Restart=always
+RestartSec=5s
+Environment=APP_ENV=production
+Environment=REDIS_HOST=103.123.100.11
+Environment=REDIS_PORT=6379
+Environment=REDIS_PASSWORD=password_redis_rahasia
+Environment=DB_HOST=103.123.100.14
+Environment=DB_PORT=5432
+Environment=DB_NAME=dashboardasset_db
+Environment=DB_USER=deutsch
+Environment=DB_PASSWORD=S3pt4@
+StandardOutput=append:/var/log/amora-worker.log
+StandardError=append:/var/log/amora-worker-error.log
+
+[Install]
+WantedBy=multi-user.target

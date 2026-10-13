@@ -10,15 +10,10 @@
  */
 
 require_once __DIR__ . '/../database/Migrator.php';
+require_once __DIR__ . '/../includes/security.php';
 
-// Security headers
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
-
-// CSRF protection: validate token for state-changing requests
-session_start();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -26,13 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Validate CSRF token
-$csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (empty($csrfToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-    exit;
-}
+// CSRF & Admin Authentication check
+validateCsrfToken();
+requireAuth();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';

@@ -5,13 +5,18 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
 
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Secure all state-changing endpoints
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
+    validateCsrfToken();
+    requireAuth();
+}
 
 try {
     $db = getDbConnection();

@@ -6,14 +6,10 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
-// Security headers
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
-
-session_start();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -26,12 +22,14 @@ try {
             break;
 
         case 'POST':
-            validateCsrf();
+            validateCsrfToken();
+            requireAuth();
             handleCreatePeriod($db);
             break;
 
         case 'DELETE':
-            validateCsrf();
+            validateCsrfToken();
+            requireAuth();
             handleDeletePeriod($db);
             break;
 
@@ -46,16 +44,6 @@ try {
         'success' => false,
         'message' => 'An error occurred while processing the request.',
     ]);
-}
-
-function validateCsrf(): void
-{
-    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    if (empty($csrfToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-        exit;
-    }
 }
 
 /**

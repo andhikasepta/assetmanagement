@@ -998,17 +998,18 @@ table.dataTable tbody tr:hover td {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 2.5px;
     text-align: center;
-    gap: 4px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
+    padding: 0;
     line-height: 1;
     white-space: nowrap;
-    letter-spacing: 0.1px;
+    letter-spacing: 0.05px;
     font-variant-numeric: tabular-nums;
     vertical-align: middle;
+    background: transparent !important;
+    border: none !important;
 }
 
 .kpi-target-indicator span {
@@ -1019,26 +1020,21 @@ table.dataTable tbody tr:hover td {
 }
 
 .kpi-target-indicator svg {
-    display: block;
+    display: inline-block !important;
+    vertical-align: middle;
     flex-shrink: 0;
 }
 
 .kpi-target-indicator.target-up {
-    background-color: #dcfce7;
-    color: #15803d;
-    border: 1px solid #bbf7d0;
+    color: #16a34a;
 }
 
 .kpi-target-indicator.target-down {
-    background-color: #fee2e2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
+    color: #dc2626;
 }
 
 .kpi-target-indicator.target-neutral {
-    background-color: #f1f5f9;
     color: #64748b;
-    border: 1px solid #e2e8f0;
 }
 
 
@@ -2351,33 +2347,66 @@ th.sortable.desc .sort-indicator {
 
 #achievement-cards {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    flex-wrap: nowrap;
+    gap: 1.15rem;
     align-items: stretch;
+    width: 100%;
 }
 
 #achievement-cards > .kpi-card-split,
 #achievement-cards > .kpi-card-group {
-    flex: 1 1 230px;
-    min-width: 220px;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Width for Card Summary Achievement */
+#achievement-cards > #kpi-card-pmd,
+#achievement-cards > #kpi-card-national {
+    flex: 0 0 250px;
+    max-width: 260px;
+    width: 250px;
+}
+
+/* Regional groups: wider allocation for CRO & ERO to fit 4 subdept badges cleanly */
+#achievement-cards > #kpi-group-wro {
+    flex: 1.1 1 0;
+    min-width: 0;
+}
+
+#achievement-cards > #kpi-group-cro,
+#achievement-cards > #kpi-group-ero {
+    flex: 1.6 1 0;
+    min-width: 0;
+}
+
+@media (max-width: 1199px) {
+    #achievement-cards {
+        flex-wrap: wrap;
+    }
+    #achievement-cards > #kpi-card-pmd,
+    #achievement-cards > #kpi-card-national {
+        flex: 1 1 200px;
+        max-width: 100%;
+    }
+    #achievement-cards > #kpi-group-wro,
+    #achievement-cards > #kpi-group-cro,
+    #achievement-cards > #kpi-group-ero {
+        flex: 1 1 280px;
+    }
 }
 
 /* All Achievement Cards Outer Line Style (matching Summary Achievement) */
 #achievement-cards .kpi-card-split {
     border: 1px solid #cbd5e1;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
 }
 
 #achievement-cards .kpi-card-split:hover {
     border-color: #94a3b8;
     box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
-}
-
-/* Make CRO and ERO card groups noticeably wider so badges never overlap */
-#achievement-cards > #kpi-group-cro,
-#achievement-cards > #kpi-group-ero {
-    flex: 1.45 1 350px;
-    min-width: 330px;
 }
 
 /* Summary Achievement Card (Outlet Regional Hero Card - Larger Value to fill height) */
@@ -2421,7 +2450,7 @@ th.sortable.desc .sort-indicator {
 }
 
 #kpi-card-national .kpi-target-indicator {
-    padding: 3px 8px;
+    padding: 0;
     font-size: 11.5px;
 }
 
@@ -2440,8 +2469,8 @@ th.sortable.desc .sort-indicator {
 .kpi-subdept-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
-    gap: 0.45rem;
-    padding: 0.55rem 0.65rem;
+    gap: 0.35rem;
+    padding: 0.45rem 0.45rem;
     background: #f8fafc;
     border: 1px solid #cbd5e1;
     border-radius: 10px;
@@ -2463,9 +2492,11 @@ th.sortable.desc .sort-indicator {
     background: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
-    padding: 0.5rem 0.6rem;
+    padding: 0.4rem 0.35rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     transition: all 0.15s ease;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .kpi-subdept-item:hover {
@@ -2478,16 +2509,20 @@ th.sortable.desc .sort-indicator {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: 2px;
     margin-bottom: 2px;
+    min-width: 0;
 }
 
 .kpi-subdept-name {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 750;
     color: #475569;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .kpi-subdept-header > span:last-child {
@@ -2495,32 +2530,45 @@ th.sortable.desc .sort-indicator {
 }
 
 .kpi-subdept-val {
-    font-size: 14.5px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .kpi-subdept-meta {
-    font-size: 9.5px;
+    font-size: 9px;
     color: #94a3b8;
     margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .kpi-subdept-status {
-    margin-top: 5px;
+    margin-top: 4px;
     display: flex;
     align-items: center;
+    min-width: 0;
+    width: 100%;
 }
 
 .kpi-subdept-status .so-status-badge {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
-    padding: 2px 6px;
+    padding: 1.5px 3px;
     border-radius: 4px;
     line-height: 1.2;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    display: block;
+    text-align: center;
+    letter-spacing: -0.2px;
+    box-sizing: border-box;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2657,7 +2705,7 @@ textarea,
 }
 
 #exec-catatan-table {
-    min-width: 420px;
+    min-width: 540px;
 }
 
 #exec-catatan-table th,
@@ -2674,9 +2722,22 @@ textarea,
     min-width: 850px;
 }
 
+#rekap-db-status-table {
+    min-width: 820px;
+}
+
+#master-catatan-table {
+    min-width: 650px;
+}
+
 #master-opname-table,
-#sr-table {
-    min-width: 920px;
+#sr-table,
+#rekap-db-table {
+    min-width: 880px;
+}
+
+#sm-table-container table {
+    min-width: 720px;
 }
 
 /* Tablet & Mobile Breakpoint (<= 992px) */
@@ -3020,28 +3081,84 @@ textarea,
         gap: 0.5rem !important;
     }
 
-    /* Modals */
+    /* Modals - Mobile Touch & Scroll Accessible */
     .modal-backdrop {
         padding: 0.5rem;
+        align-items: center;
+        z-index: 1000;
     }
 
     .modal-dialog {
-        max-width: 95vw;
-        border-radius: 10px;
-        max-height: 90vh;
+        max-width: 100% !important;
+        width: 100% !important;
+        border-radius: 12px;
+        max-height: 94vh !important;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
 
-    .modal-header,
-    .modal-footer {
+    .modal-header {
         padding: 0.75rem 1rem;
+        flex-shrink: 0;
     }
 
     .modal-body {
-        padding: 0.85rem;
+        padding: 0.85rem 1rem;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        flex: 1 1 auto;
+        max-height: calc(94vh - 120px);
+    }
+
+    .modal-footer {
+        padding: 0.75rem 1rem;
+        flex-shrink: 0;
+        display: flex;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .modal-footer .btn {
+        flex: 1 1 0;
+        min-height: 42px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .drag-drop-zone {
+        padding: 1.25rem 0.85rem;
+        min-height: 90px;
+        touch-action: manipulation;
+    }
+
+    /* All Card Header Action Buttons on Mobile */
+    .card-header > div:last-child {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem !important;
+        width: 100%;
+    }
+
+    .card-header .btn {
+        min-height: 36px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1 1 auto;
+    }
+
+    .card-header select.form-control {
+        min-height: 36px;
+        font-size: 12px;
+        flex: 1 1 auto;
     }
 
     /* Toasts */
@@ -3098,18 +3215,43 @@ textarea,
         grid-template-columns: 1fr !important;
     }
 
-    #card-master-opname .card-header > div:last-child {
+    .card-header > div:last-child {
         width: 100%;
         display: grid !important;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
         gap: 0.4rem !important;
     }
 
-    #card-master-opname .card-header .btn {
-        padding: 0.4rem 0.5rem;
+    .card-header .btn {
+        padding: 0.45rem 0.65rem;
         font-size: 11.5px;
         text-align: center;
         justify-content: center;
+        min-height: 36px;
+    }
+
+    .user-name-text {
+        display: none !important;
+    }
+
+    .user-dropdown-btn {
+        padding: 2px 4px !important;
+        gap: 2px !important;
+    }
+
+    .user-dropdown-btn .chevron-icon {
+        display: none !important;
+    }
+
+    .navbar-brand {
+        font-size: 12px !important;
+        max-width: calc(100vw - 145px) !important;
+    }
+
+    .nav-login-btn {
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        height: 29px !important;
     }
 }
 
@@ -3474,11 +3616,11 @@ textarea,
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Executive Summary: Bottom Row (Catatan dan Evaluasi + DB Analysis)
+   Executive Summary: 2-Column DB Analysis + Full Width Catatan
    ═══════════════════════════════════════════════════════════════════ */
-.executive-bottom-row {
+.executive-db-row {
     display: grid;
-    grid-template-columns: minmax(360px, 0.85fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1.25rem;
     margin-top: 1.5rem;
     border-top: 1px solid #cbd5e1;
@@ -3486,93 +3628,78 @@ textarea,
     align-items: stretch;
 }
 
-#card-executive-catatan,
-#card-executive-db-analysis {
+.executive-db-col {
     display: flex;
     flex-direction: column;
     min-width: 0;
-}
-
-/* ── Result DB Analysis (Card Groups Layout matching Achievement Cards) ── */
-#card-executive-db-analysis .db-analysis-scroll {
-    display: flex;
-    flex-direction: row;
-    gap: 0.65rem;
-    overflow-y: visible;
-    align-items: stretch;
-}
-
-#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-
-#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-}
-
-#card-executive-db-analysis .db-analysis-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-}
-
-#card-executive-db-analysis .kpi-card-group {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-}
-
-#card-executive-db-analysis #db-group-wro {
-    flex: 1.6 1 0;
-}
-
-#card-executive-db-analysis #db-group-cro {
-    flex: 1.7 1 0;
-}
-
-#card-executive-db-analysis #db-group-ero {
-    flex: 1.5 1 0;
-}
-
-#card-executive-db-analysis .kpi-card-split {
     background: #ffffff;
     border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    padding: 0.55rem 0.75rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Result DB Analysis (Left Column: Vertically stacked dept cards) ── */
+#col-result-db-analysis .db-analysis-scroll {
     display: flex;
     flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: visible;
+    margin-top: 0.25rem;
+}
+
+/* Unified Department Card Group in DB Analysis */
+.executive-db-col .kpi-card-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: all 0.15s ease;
+}
+
+.executive-db-col .kpi-card-group:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Header summary card within each group */
+.executive-db-col .kpi-card-split {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.45rem 0.75rem;
+    box-shadow: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     justify-content: space-between;
     min-height: auto;
     transition: all 0.15s ease;
 }
 
-#card-executive-db-analysis .kpi-card-split:hover {
-    border-color: #94a3b8;
-    box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
-}
-
-#card-executive-db-analysis .kpi-title {
-    font-size: 10px;
+.executive-db-col .kpi-title {
+    font-size: 11px;
     font-weight: 750;
     color: #475569;
     letter-spacing: 0.03em;
     text-transform: uppercase;
     margin: 0;
+    white-space: nowrap;
 }
 
-#card-executive-db-analysis .kpi-card-main {
+.executive-db-col .kpi-card-main {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin: 0.2rem 0;
-    gap: 0.35rem;
+    gap: 0.5rem;
+    margin: 0;
 }
 
-#card-executive-db-analysis .kpi-split-value {
-    font-size: 26px;
+.executive-db-col .kpi-split-value {
+    font-size: 20px;
     font-weight: 850;
     line-height: 1.1;
     color: #0f172a;
@@ -3580,66 +3707,72 @@ textarea,
     font-variant-numeric: tabular-nums;
 }
 
-#card-executive-db-analysis .kpi-subtext {
-    font-size: 9.5px;
-    font-weight: 550;
-    color: #64748b;
+.executive-db-col .kpi-card-meta {
     margin: 0;
 }
 
-#card-executive-db-analysis .kpi-subdept-container {
+.executive-db-col .kpi-subtext {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Horizontal Subdepartment Grid inside each Department / Status Group */
+.executive-db-col .kpi-subdept-container {
     display: grid;
-    gap: 0.35rem;
-    padding: 0.45rem 0.5rem;
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    flex: 1;
+    gap: 0.4rem;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     align-items: stretch;
 }
 
-#card-executive-db-analysis #db-group-wro .kpi-subdept-container {
+#col-result-db-analysis #db-group-wro .kpi-subdept-container {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-#card-executive-db-analysis #db-group-cro .kpi-subdept-container,
-#card-executive-db-analysis #db-group-ero .kpi-subdept-container {
+#col-result-db-analysis #db-group-cro .kpi-subdept-container,
+#col-result-db-analysis #db-group-ero .kpi-subdept-container {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-#card-executive-db-analysis #db-group-pmd .kpi-subdept-container {
+#col-result-db-analysis #db-group-pmd .kpi-subdept-container {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-#card-executive-db-analysis .kpi-subdept-item {
+/* Subdepartment Item Card */
+.executive-db-col .kpi-subdept-item {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     background: #ffffff;
     border: 1px solid #cbd5e1;
-    border-radius: 7px;
-    padding: 0.4rem 0.45rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    padding: 0.45rem 0.55rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     transition: all 0.15s ease;
     min-width: 0;
 }
 
-#card-executive-db-analysis .kpi-subdept-item:hover {
+.executive-db-col .kpi-subdept-item:hover {
     border-color: #94a3b8;
     transform: translateY(-1px);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
 }
 
-#card-executive-db-analysis .kpi-subdept-header {
+.executive-db-col .kpi-subdept-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 2px;
-    margin-bottom: 2px;
+    gap: 4px;
+    margin-bottom: 3px;
     min-width: 0;
 }
 
-#card-executive-db-analysis .kpi-subdept-name {
+.executive-db-col .kpi-subdept-name {
     font-size: 10px;
     font-weight: 750;
     color: #475569;
@@ -3649,42 +3782,14 @@ textarea,
     flex-shrink: 1;
 }
 
-#card-executive-db-analysis .db-subdept-trend {
+.executive-db-col .db-subdept-trend {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
 }
 
-#card-executive-db-analysis .db-subdept-trend .db-trend-indicator {
-    font-size: 9px;
-    font-weight: 750;
-    height: 18px;
-    padding: 0 5px;
-    gap: 2.5px;
-    border-radius: 4px;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    white-space: nowrap;
-}
-
-#card-executive-db-analysis .db-subdept-trend .db-trend-indicator svg {
-    width: 7px;
-    height: 7px;
-    display: block;
-    flex-shrink: 0;
-}
-
-#card-executive-db-analysis .db-subdept-trend .db-trend-indicator span {
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-}
-
-#card-executive-db-analysis .kpi-subdept-val {
-    font-size: 14.5px;
+.executive-db-col .kpi-subdept-val {
+    font-size: 15px;
     font-weight: 850;
     color: #0f172a;
     line-height: 1.15;
@@ -3693,75 +3798,81 @@ textarea,
     white-space: nowrap;
 }
 
-#card-executive-db-analysis .kpi-subdept-meta {
-    font-size: 8.5px;
+.executive-db-col .kpi-subdept-meta {
+    font-size: 9px;
     color: #94a3b8;
     line-height: 1;
     white-space: nowrap;
 }
 
-/* ── DB Analysis Status Section Header & Separator Line ── */
-.db-status-section-header {
-    margin-top: 1.25rem;
+/* ── Status Penyelesaian DB (Right Column: Vertically stacked status cards) ── */
+#col-status-db-analysis .db-status-section-header {
+    margin-top: 0;
     margin-bottom: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid #cbd5e1;
+    padding-top: 0;
+    border-top: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
-/* ── DB Analysis Status Card Groups (SOLVED DB, UNSOLVED DB, NEW DB) ── */
 .db-status-groups-container {
     display: flex;
-    flex-direction: row;
-    gap: 0.65rem;
-    align-items: stretch;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-}
-
-.db-status-groups-container > .kpi-card-group {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.75rem;
+    align-items: stretch;
+    margin-top: 0.25rem;
 }
 
 .db-status-groups-container .kpi-subdept-container {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.35rem;
-    padding: 0.45rem 0.5rem;
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    flex: 1;
-    align-items: stretch;
+    gap: 0.4rem;
+    padding: 0;
+    background: transparent;
+    border: none;
 }
 
 .db-status-groups-container .db-status-sub-pmd {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (max-width: 900px) {
-    .db-status-groups-container {
-        flex-direction: column;
-    }
+/* ── Full Width Catatan dan Evaluasi Hasil Stock Opname (Row 3) ── */
+.executive-catatan-row {
+    width: 100%;
+    margin-top: 1.25rem;
 }
 
-@media (max-width: 992px) {
-    .executive-bottom-row {
+#card-executive-catatan {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 1.15rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+#card-executive-catatan #exec-catatan-table {
+    width: 100%;
+    min-width: 600px;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+    .executive-db-row {
         grid-template-columns: 1fr;
-        gap: 1.5rem;
+        gap: 1.25rem;
     }
 }
 
-@media (max-width: 768px) {
-    #card-executive-db-analysis .db-analysis-scroll {
-        flex-direction: column;
+@media (max-width: 640px) {
+    #col-result-db-analysis #db-group-wro .kpi-subdept-container,
+    #col-result-db-analysis #db-group-cro .kpi-subdept-container,
+    #col-result-db-analysis #db-group-ero .kpi-subdept-container,
+    .db-status-groups-container .kpi-subdept-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -3770,22 +3881,24 @@ textarea,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 3.5px;
-    font-size: 11px;
-    font-weight: 750;
-    height: 20px;
-    padding: 0 7px;
-    border-radius: 5px;
+    gap: 2px;
+    font-size: 9.5px;
+    font-weight: 700;
+    height: auto;
+    padding: 0;
     line-height: 1;
     white-space: nowrap;
-    letter-spacing: 0.1px;
+    letter-spacing: 0.05px;
     font-variant-numeric: tabular-nums;
     box-sizing: border-box;
     vertical-align: middle;
+    background: transparent !important;
+    border: none !important;
 }
 
 .db-trend-indicator svg {
-    display: block;
+    display: inline-block !important;
+    vertical-align: middle;
     flex-shrink: 0;
 }
 
@@ -3798,56 +3911,46 @@ textarea,
 /* If DB is MORE than previous period: RED (worse discrepancy) */
 .db-trend-indicator.db-trend-up,
 .db-trend-indicator.db-trend-bad-up {
-    background-color: #fee2e2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
+    color: #dc2626;
 }
 
 /* If DB is LESS than previous period: GREEN (improved discrepancy) */
 .db-trend-indicator.db-trend-down,
 .db-trend-indicator.db-trend-good-down {
-    background-color: #dcfce7;
-    color: #15803d;
-    border: 1px solid #bbf7d0;
+    color: #16a34a;
 }
 
 /* If positive metric (like Solved) increased: GREEN */
 .db-trend-indicator.db-trend-good-up {
-    background-color: #dcfce7;
-    color: #15803d;
-    border: 1px solid #bbf7d0;
+    color: #16a34a;
 }
 
 /* Solved DB metric: warna hijau karena solved selalu menandakan peningkatan/perbaikan */
 .db-trend-indicator.db-trend-bad-down {
-    background-color: #dcfce7;
-    color: #15803d;
-    border: 1px solid #bbf7d0;
+    color: #16a34a;
 }
 
 .db-trend-indicator.db-trend-neutral {
-    background-color: #f1f5f9;
     color: #64748b;
-    border: 1px solid #e2e8f0;
 }
 
-/* Dept header trend badge sizing (besides dept title) - bigger */
+/* Dept header trend badge sizing (besides dept title) */
 .db-dept-trend .db-trend-indicator {
-    font-size: 12px;
-    font-weight: 800;
-    height: 22px;
-    padding: 0 8px;
-    border-radius: 6px;
-    gap: 4px;
+    font-size: 11px;
+    font-weight: 750;
+    height: auto;
+    padding: 0;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 2.5px;
     box-sizing: border-box;
 }
 
 .db-dept-trend .db-trend-indicator svg {
-    display: block;
+    display: inline-block !important;
+    vertical-align: middle;
     flex-shrink: 0;
 }
 
@@ -3859,22 +3962,22 @@ textarea,
 
 /* Subdept-specific trend badge sizing */
 .db-subdept-trend .db-trend-indicator {
-    font-size: 9px;
-    height: 18px;
-    padding: 0 5px;
-    gap: 2.5px;
-    border-radius: 4px;
+    font-size: 8.5px;
+    height: auto;
+    padding: 0;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     box-sizing: border-box;
+    background: transparent !important;
+    border: none !important;
 }
 
 .db-subdept-trend .db-trend-indicator svg {
-    width: 7px;
-    height: 7px;
-    display: block;
+    display: inline-block !important;
+    vertical-align: middle;
     flex-shrink: 0;
 }
 
@@ -3944,6 +4047,17 @@ textarea,
 
 .rdb-site-header:hover {
     background-color: #f1f5f9 !important;
+}
+
+/* Text wrap for column NAME in card Rekapitulasi Status Penyelesaian DB */
+#card-rekap-status-db th.rdb-col-name,
+#card-rekap-status-db td.rdb-col-name {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    min-width: 220px;
+    max-width: 380px;
+    line-height: 1.35;
 }
 
 @keyframes spin {

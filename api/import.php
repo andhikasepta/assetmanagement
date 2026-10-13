@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -15,12 +16,8 @@ error_reporting(E_ALL);
 ini_set('memory_limit', '1024M');
 set_time_limit(300);
 
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
-
-session_start();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -28,13 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Validate CSRF token
-$csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (empty($csrfToken) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfToken)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-    exit;
-}
+// Validate CSRF token & ensure user is logged in
+validateCsrfToken();
+requireAuth();
 
 // Check ZipArchive before attempting to parse xlsx
 if (!class_exists('ZipArchive')) {
@@ -80,9 +73,11 @@ $storedPath = null;
 
 if (!empty($_POST['file_token'])) {
     $token = basename($_POST['file_token']);
-    $candidate = $uploadDir . $token;
-    if (file_exists($candidate) && is_file($candidate)) {
-        $storedPath = $candidate;
+    if (preg_match('/^[a-f0-9]{32}\.(xlsx|xls)$/i', $token)) {
+        $candidate = $uploadDir . $token;
+        if (file_exists($candidate) && is_file($candidate)) {
+            $storedPath = $candidate;
+        }
     }
 }
 

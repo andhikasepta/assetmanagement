@@ -5,11 +5,13 @@
  */
 
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/security.php';
 
-// If already logged in, redirect to master-data
+sendSecurityHeaders();
+
+// If already logged in, redirect cleanly to master-data.php
 if (isLoggedIn()) {
-    $redirect = $_GET['redirect'] ?? 'master-data';
-    header('Location: index.php#' . urlencode($redirect));
+    header('Location: master-data.php');
     exit;
 }
 
@@ -18,22 +20,47 @@ $usernameVal = '';
 $passwordVal = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $usernameVal = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+    $rawInput = file_get_contents('php://input');
+    $isJson = (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) || (!empty($rawInput) && str_starts_with(trim($rawInput), '{'));
+    $data = $isJson ? json_decode($rawInput, true) : $_POST;
 
-    $result = attemptLogin($username, $password);
-    if ($result['success']) {
-        $redirect = $_POST['redirect'] ?? $_GET['redirect'] ?? 'master-data';
-        header('Location: index.php#' . urlencode($redirect));
-        exit;
+    $submittedCsrf = $data['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+    $sessionCsrf = $_SESSION['csrf_token'] ?? '';
+
+    if (empty($submittedCsrf) || empty($sessionCsrf) || !hash_equals($sessionCsrf, $submittedCsrf)) {
+        if ($isJson) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => 'Session expired atau CSRF token tidak valid.']);
+            exit;
+        }
+        $error = 'Session expired atau CSRF token tidak valid.';
     } else {
-        $error = $result['message'] ?? 'Username atau Password salah.';
-        $passwordVal = '';
+        $username = trim($data['username'] ?? '');
+        $password = $data['password'] ?? '';
+        $usernameVal = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+
+        $result = attemptLogin($username, $password);
+        if ($result['success']) {
+            if ($isJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => 'Login berhasil.']);
+                exit;
+            }
+            header('Location: master-data.php');
+            exit;
+        } else {
+            if ($isJson) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => $result['message'] ?? 'Username atau Password salah.']);
+                exit;
+            }
+            $error = $result['message'] ?? 'Username atau Password salah.';
+            $passwordVal = '';
+        }
     }
 }
-
-$redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -252,8 +279,8 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
     <header class="navbar" style="position: sticky; top: 0; z-index: 100;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <!-- Hamburger Button for Quick Access -->
-            <button type="button" class="quick-access-btn" id="btn-quick-access-toggle"
-                onclick="toggleQuickAccess()" title="Quick Access" aria-label="Toggle Quick Access">
+            <button type="button" class="quick-access-btn" id="btn-quick-access-toggle" onclick="toggleQuickAccess()"
+                title="Quick Access" aria-label="Toggle Quick Access">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -261,7 +288,7 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="index.php" class="navbar-brand">
+            <a href="./" class="navbar-brand">
                 Asset Management
             </a>
         </div>
@@ -280,14 +307,14 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
             </button>
         </div>
         <div class="quick-access-body" id="quick-access-nav-list">
-            <a class="quick-access-item" href="index.php#card-executive-summary"><span>Executive Summary</span></a>
-            <a class="quick-access-item" href="index.php#card-executive-catatan"><span>Catatan Dan Evaluasi</span></a>
-            <a class="quick-access-item" href="index.php#card-executive-db-analysis"><span>Result DB Analysis</span></a>
-            <a class="quick-access-item" href="index.php#card-scorecard-summary"><span>Score Card Summary</span></a>
-            <a class="quick-access-item" href="index.php#card-trend-dept-wrapper"><span>Trend Chart</span></a>
-            <a class="quick-access-item" href="index.php#card-hasil-so-subdept"><span>Report SO</span></a>
-            <a class="quick-access-item" href="index.php#card-rekapitulasi"><span>Rekapitulasi</span></a>
-            <a class="quick-access-item" href="index.php#card-site-movements"><span>History &amp; Log</span></a>
+            <a class="quick-access-item" href="./#card-executive-summary"><span>Executive Summary</span></a>
+            <a class="quick-access-item" href="./#card-executive-catatan"><span>Catatan Dan Evaluasi</span></a>
+            <a class="quick-access-item" href="./#card-executive-db-analysis"><span>Result DB Analysis</span></a>
+            <a class="quick-access-item" href="./#card-scorecard-summary"><span>Score Card Summary</span></a>
+            <a class="quick-access-item" href="./#card-trend-dept-wrapper"><span>Trend Chart</span></a>
+            <a class="quick-access-item" href="./#card-hasil-so-subdept"><span>Report SO</span></a>
+            <a class="quick-access-item" href="./#card-rekapitulasi"><span>Rekapitulasi</span></a>
+            <a class="quick-access-item" href="./#card-site-movements"><span>History &amp; Log</span></a>
         </div>
     </aside>
 
@@ -312,7 +339,8 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
                     <?php endif; ?>
 
                     <form method="POST" action="login.php" autocomplete="on">
-                        <input type="hidden" name="redirect" value="<?= $redirectTarget ?>">
+                        <input type="hidden" name="csrf_token"
+                            value="<?= htmlspecialchars(getCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
 
                         <div class="form-group">
                             <label class="form-label" for="input-username">Username</label>
@@ -324,8 +352,8 @@ $redirectTarget = htmlspecialchars($_GET['redirect'] ?? 'master-data', ENT_QUOTE
                         <div class="form-group">
                             <label class="form-label" for="input-password">Password</label>
                             <div class="input-password-wrapper">
-                                <input type="password" id="input-password" name="password" class="form-control"
-                                    value="" placeholder="Masukkan password" required
+                                <input type="password" id="input-password" name="password" class="form-control" value=""
+                                    placeholder="Masukkan password" required
                                     style="padding: 0.6rem 2.4rem 0.6rem 0.8rem; font-size: 13.5px;">
                                 <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility()"
                                     title="Lihat/Sembunyikan Password">

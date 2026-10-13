@@ -5,11 +5,10 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
+sendSecurityHeaders();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -97,14 +96,9 @@ try {
         exit;
     }
 
-    // CSRF check for state-changing requests
-    session_start();
-    $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
-    if (empty($csrfHeader) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfHeader)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-        exit;
-    }
+    // CSRF and Admin Authentication check for state-changing requests
+    validateCsrfToken();
+    requireAuth();
 
     if ($method === 'POST') {
         $action = $_GET['action'] ?? $_POST['action'] ?? '';

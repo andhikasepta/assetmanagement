@@ -5,14 +5,9 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/security.php';
 
-ini_set('display_errors', '0');
-error_reporting(E_ALL);
-
-header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Cache-Control: no-store');
+sendSecurityHeaders();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -113,6 +108,9 @@ try {
     }
 
     if ($method === 'POST') {
+        validateCsrfToken();
+        requireAuth();
+
         $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
         $action = $input['action'] ?? 'update';
 
