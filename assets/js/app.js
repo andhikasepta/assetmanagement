@@ -31,6 +31,12 @@ const App = (() => {
     let srFileToken = null;
     let srLevel1 = 'monthly';  // 'monthly' or 'quarterly'
     let srLevel2 = 'outlet';   // 'outlet' or 'pmd'
+    let srFilterRegional = 'all';
+    let srFilterDept = 'all';
+    let srFilterSubDept = 'all';
+    let srFilterInfo = 'all';
+    let srFilterGroupType = 'all';
+    let srFilterStatus = 'all';
 
     // Rekapitulasi 2026 state
     let rekapYear = 2026;
@@ -775,6 +781,7 @@ const App = (() => {
             }
 
             allSRRows = json.data || [];
+            populateSRFilters();
             applySRFilterAndRender();
         } catch (err) {
             tbody.innerHTML = `
@@ -785,6 +792,205 @@ const App = (() => {
                 </tr>
             `;
         }
+    }
+
+    function populateSRFilters() {
+        populateSRRegionalDropdown();
+        populateSRDeptDropdown();
+        populateSRSubDeptDropdown();
+        populateSRInfoDropdown();
+        populateSRGroupTypeDropdown();
+        populateSRStatusDropdown();
+    }
+
+    function populateSRRegionalDropdown() {
+        const regionalSelect = document.getElementById('sr-filter-regional');
+        if (!regionalSelect) return;
+
+        const regSet = new Set();
+        allSRRows.forEach(r => {
+            const v = (r.regional || '').trim();
+            if (v) regSet.add(v);
+        });
+
+        const curVal = regionalSelect.value || srFilterRegional || 'all';
+        let html = '<option value="all">Semua Regional</option>';
+        Array.from(regSet).sort().forEach(reg => {
+            html += `<option value="${escapeHtml(reg)}">${escapeHtml(reg)}</option>`;
+        });
+        regionalSelect.innerHTML = html;
+
+        if (regSet.has(curVal)) {
+            regionalSelect.value = curVal;
+            srFilterRegional = curVal;
+        } else {
+            regionalSelect.value = 'all';
+            srFilterRegional = 'all';
+        }
+    }
+
+    function populateSRDeptDropdown() {
+        const deptSelect = document.getElementById('sr-filter-dept');
+        if (!deptSelect) return;
+
+        const deptSet = new Set();
+        allSRRows.forEach(r => {
+            if (srFilterRegional === 'all' || (r.regional || '').trim() === srFilterRegional) {
+                const d = (r.dept || '').trim();
+                if (d) deptSet.add(d);
+            }
+        });
+
+        const curVal = deptSelect.value || srFilterDept || 'all';
+        let html = '<option value="all">Semua Dept</option>';
+        Array.from(deptSet).sort().forEach(d => {
+            html += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
+        });
+        deptSelect.innerHTML = html;
+
+        if (deptSet.has(curVal)) {
+            deptSelect.value = curVal;
+            srFilterDept = curVal;
+        } else {
+            deptSelect.value = 'all';
+            srFilterDept = 'all';
+        }
+    }
+
+    function populateSRSubDeptDropdown() {
+        const subDeptSelect = document.getElementById('sr-filter-subdept');
+        if (!subDeptSelect) return;
+
+        const subSet = new Set();
+        allSRRows.forEach(r => {
+            const matchesReg = (srFilterRegional === 'all' || (r.regional || '').trim() === srFilterRegional);
+            const matchesDept = (srFilterDept === 'all' || (r.dept || '').trim() === srFilterDept);
+            if (matchesReg && matchesDept) {
+                const sd = (r.sub_dept || '').trim();
+                if (sd) subSet.add(sd);
+            }
+        });
+
+        const curVal = subDeptSelect.value || srFilterSubDept || 'all';
+        let html = '<option value="all">Semua Sub Dept</option>';
+        Array.from(subSet).sort().forEach(sd => {
+            html += `<option value="${escapeHtml(sd)}">${escapeHtml(sd)}</option>`;
+        });
+        subDeptSelect.innerHTML = html;
+
+        if (subSet.has(curVal)) {
+            subDeptSelect.value = curVal;
+            srFilterSubDept = curVal;
+        } else {
+            subDeptSelect.value = 'all';
+            srFilterSubDept = 'all';
+        }
+    }
+
+    function populateSRInfoDropdown() {
+        const infoSelect = document.getElementById('sr-filter-info');
+        if (!infoSelect) return;
+
+        const infoSet = new Set();
+        allSRRows.forEach(r => {
+            const inf = (r.info || '').trim();
+            if (inf) infoSet.add(inf);
+        });
+
+        const curVal = infoSelect.value || srFilterInfo || 'all';
+        let html = '<option value="all">Semua Info</option>';
+        Array.from(infoSet).sort().forEach(inf => {
+            html += `<option value="${escapeHtml(inf)}">${escapeHtml(inf)}</option>`;
+        });
+        infoSelect.innerHTML = html;
+
+        if (infoSet.has(curVal)) {
+            infoSelect.value = curVal;
+            srFilterInfo = curVal;
+        } else {
+            infoSelect.value = 'all';
+            srFilterInfo = 'all';
+        }
+    }
+
+    function populateSRGroupTypeDropdown() {
+        const gtSelect = document.getElementById('sr-filter-grouptype');
+        if (!gtSelect) return;
+
+        const gtSet = new Set();
+        allSRRows.forEach(r => {
+            const gt = (r.group_type || '').trim().toLowerCase();
+            if (gt) gtSet.add(gt);
+        });
+
+        const curVal = gtSelect.value || srFilterGroupType || 'all';
+        let html = '<option value="all">Semua Group</option>';
+        Array.from(gtSet).sort().forEach(gt => {
+            const label = gt.charAt(0).toUpperCase() + gt.slice(1);
+            html += `<option value="${escapeHtml(gt)}">${label}</option>`;
+        });
+        gtSelect.innerHTML = html;
+
+        if (gtSet.has(curVal)) {
+            gtSelect.value = curVal;
+            srFilterGroupType = curVal;
+        } else {
+            gtSelect.value = 'all';
+            srFilterGroupType = 'all';
+        }
+    }
+
+    function populateSRStatusDropdown() {
+        const statusSelect = document.getElementById('sr-filter-status');
+        if (!statusSelect) return;
+        const curVal = statusSelect.value || srFilterStatus || 'all';
+        statusSelect.value = ['all', 'active', 'inactive'].includes(curVal) ? curVal : 'all';
+        srFilterStatus = statusSelect.value;
+    }
+
+    function onSRRegionalFilterChange() {
+        const sel = document.getElementById('sr-filter-regional');
+        srFilterRegional = sel ? sel.value : 'all';
+        populateSRDeptDropdown();
+        populateSRSubDeptDropdown();
+        srCurrentPage = 1;
+        applySRFilterAndRender();
+    }
+
+    function onSRDeptFilterChange() {
+        const sel = document.getElementById('sr-filter-dept');
+        srFilterDept = sel ? sel.value : 'all';
+        populateSRSubDeptDropdown();
+        srCurrentPage = 1;
+        applySRFilterAndRender();
+    }
+
+    function onSRSubDeptFilterChange() {
+        const sel = document.getElementById('sr-filter-subdept');
+        srFilterSubDept = sel ? sel.value : 'all';
+        srCurrentPage = 1;
+        applySRFilterAndRender();
+    }
+
+    function onSRInfoFilterChange() {
+        const sel = document.getElementById('sr-filter-info');
+        srFilterInfo = sel ? sel.value : 'all';
+        srCurrentPage = 1;
+        applySRFilterAndRender();
+    }
+
+    function onSRGroupTypeFilterChange() {
+        const sel = document.getElementById('sr-filter-grouptype');
+        srFilterGroupType = sel ? sel.value : 'all';
+        srCurrentPage = 1;
+        applySRFilterAndRender();
+    }
+
+    function onSRStatusFilterChange() {
+        const sel = document.getElementById('sr-filter-status');
+        srFilterStatus = sel ? sel.value : 'all';
+        srCurrentPage = 1;
+        applySRFilterAndRender();
     }
 
     function handleSRSearch(query) {
@@ -810,6 +1016,34 @@ const App = (() => {
 
     function applySRFilterAndRender() {
         let rows = allSRRows.slice();
+
+        if (srFilterRegional !== 'all' && srFilterRegional !== '') {
+            rows = rows.filter(r => (r.regional || '').toString().trim() === srFilterRegional);
+        }
+
+        if (srFilterDept !== 'all' && srFilterDept !== '') {
+            rows = rows.filter(r => (r.dept || '').toString().trim() === srFilterDept);
+        }
+
+        if (srFilterSubDept !== 'all' && srFilterSubDept !== '') {
+            rows = rows.filter(r => (r.sub_dept || '').toString().trim() === srFilterSubDept);
+        }
+
+        if (srFilterInfo !== 'all' && srFilterInfo !== '') {
+            rows = rows.filter(r => (r.info || '').toString().trim().toLowerCase() === srFilterInfo.toLowerCase());
+        }
+
+        if (srFilterGroupType !== 'all' && srFilterGroupType !== '') {
+            rows = rows.filter(r => (r.group_type || '').toString().trim().toLowerCase() === srFilterGroupType.toLowerCase());
+        }
+
+        if (srFilterStatus !== 'all' && srFilterStatus !== '') {
+            if (srFilterStatus === 'active') {
+                rows = rows.filter(r => r.is_active !== false && r.is_active !== 0 && r.is_active !== '0' && r.is_active !== 'f');
+            } else if (srFilterStatus === 'inactive') {
+                rows = rows.filter(r => r.is_active === false || r.is_active === 0 || r.is_active === '0' || r.is_active === 'f');
+            }
+        }
 
         if (srSearchQuery) {
             rows = rows.filter(r => {
@@ -1311,9 +1545,10 @@ const App = (() => {
                 const mName = monthNames[rule.effective_month] || rule.effective_month;
                 const isQ = rule.group_type === 'quarterly';
                 const isInactive = rule.group_type === 'inactive';
-                const badgeColor = isInactive ? '#64748b' : (isQ ? '#0284c7' : '#16a34a');
-                const badgeBg = isInactive ? '#f1f5f9' : (isQ ? '#e0f2fe' : '#dcfce7');
-                const border = isInactive ? 'border: 1px solid #cbd5e1;' : '';
+                const isUncounted = rule.group_type === 'uncounted';
+                const badgeColor = isInactive ? '#64748b' : (isUncounted ? '#b45309' : (isQ ? '#0284c7' : '#16a34a'));
+                const badgeBg = isInactive ? '#f1f5f9' : (isUncounted ? '#fef3c7' : (isQ ? '#e0f2fe' : '#dcfce7'));
+                const border = isInactive ? 'border: 1px solid #cbd5e1;' : (isUncounted ? 'border: 1px solid #fde68a;' : '');
 
                 html += `
                     <tr>
@@ -3894,6 +4129,8 @@ const App = (() => {
                 prevBadge = '<span class="badge-status-quarterly">Quarterly</span>';
             } else if (m.prev_status === 'inactive') {
                 prevBadge = '<span class="badge-status-inactive">Inactive</span>';
+            } else if (m.prev_status === 'uncounted') {
+                prevBadge = '<span class="badge-status-uncounted" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">Uncounted</span>';
             } else {
                 prevBadge = '<span class="badge-status-monthly">Monthly</span>';
             }
@@ -3903,6 +4140,8 @@ const App = (() => {
                 currBadge = '<span class="badge-status-quarterly">Quarterly</span>';
             } else if (m.curr_status === 'inactive') {
                 currBadge = '<span class="badge-status-inactive">Inactive</span>';
+            } else if (m.curr_status === 'uncounted') {
+                currBadge = '<span class="badge-status-uncounted" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">Uncounted</span>';
             } else {
                 currBadge = '<span class="badge-status-monthly">Monthly</span>';
             }
@@ -4029,8 +4268,12 @@ const App = (() => {
     let rdbStatusYear = 2026;
     let rdbStatusDept = 'all';
     let rdbStatusSubDept = 'all';
+    let rdbStatusSitecode = 'all';
     let rdbStatusFilterStatusVal = 'all';
     let rdbStatusSearchQuery = '';
+    let rdbStatusSortCol = null;
+    let rdbStatusSortDir = 'asc';
+    let rdbStatusAllSitesList = [];
     let rdbStatusView = 'flat'; // Default: flat table view with pagination
     let rdbStatusExpandedSites = new Set();
     let rdbStatusDebounceTimer = null;
@@ -4067,6 +4310,8 @@ const App = (() => {
 
         if (deptSelect) rdbStatusDept = deptSelect.value;
         if (subDeptSelect) rdbStatusSubDept = subDeptSelect.value;
+        const siteSelect = document.getElementById('rdb-status-filter-sitecode');
+        if (siteSelect) rdbStatusSitecode = siteSelect.value;
         if (statusSelect) rdbStatusFilterStatusVal = statusSelect.value;
         if (searchInput) rdbStatusSearchQuery = searchInput.value.trim();
         if (pageSizeSelect) rdbStatusPageSize = pageSizeSelect.value;
@@ -4099,8 +4344,11 @@ const App = (() => {
                 so_type: currentSoType,
                 dept: rdbStatusDept,
                 sub_dept: rdbStatusSubDept,
+                sitecode: rdbStatusSitecode,
                 status: rdbStatusFilterStatusVal,
                 search: rdbStatusSearchQuery,
+                sort_col: rdbStatusSortCol || '',
+                sort_dir: rdbStatusSortDir,
                 view: rdbStatusView,
                 page: rdbStatusCurrentPage,
                 limit: rdbStatusPageSize
@@ -4195,6 +4443,7 @@ const App = (() => {
 
             // Pagination Controls
             renderRekapDbStatusPagination(paginationControls);
+            updateRekapDbStatusSortIndicators();
 
         } catch (err) {
             console.error('Error loading rekap db status:', err);
@@ -4207,6 +4456,7 @@ const App = (() => {
 
     function populateRekapDbStatusFilters(filterOpts) {
         rdbStatusDeptSubDeptMap = filterOpts.dept_subdept_map || {};
+        rdbStatusAllSitesList = filterOpts.sites || [];
         const deptSelect = document.getElementById('rdb-status-filter-dept');
         if (deptSelect && filterOpts.depts) {
             const curVal = rdbStatusDept || deptSelect.value || 'all';
@@ -4224,6 +4474,7 @@ const App = (() => {
             }
         }
         updateRekapDbSubDeptDropdown();
+        updateRekapDbSitecodeDropdown();
     }
 
     function updateRekapDbSubDeptDropdown() {
@@ -4259,10 +4510,45 @@ const App = (() => {
         }
     }
 
+    function updateRekapDbSitecodeDropdown() {
+        const deptSelect = document.getElementById('rdb-status-filter-dept');
+        const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
+        const siteSelect = document.getElementById('rdb-status-filter-sitecode');
+        if (!siteSelect) return;
+
+        const selectedDept = deptSelect ? deptSelect.value : 'all';
+        const selectedSub = subDeptSelect ? subDeptSelect.value : 'all';
+
+        let matchingSites = rdbStatusAllSitesList.filter(s => {
+            if (selectedDept !== 'all' && selectedDept !== '' && s.dept !== selectedDept) return false;
+            if (selectedSub !== 'all' && selectedSub !== '' && s.sub_dept !== selectedSub) return false;
+            return true;
+        });
+
+        const curSite = rdbStatusSitecode || siteSelect.value || 'all';
+        let html = '<option value="all">Semua Site</option>';
+        matchingSites.forEach(s => {
+            const sc = escapeHtml(s.sitecode);
+            const ns = escapeHtml(s.name_site ? `${s.sitecode} - ${s.name_site}` : s.sitecode);
+            html += `<option value="${sc}">${ns}</option>`;
+        });
+        siteSelect.innerHTML = html;
+
+        const hasCur = matchingSites.some(s => s.sitecode === curSite);
+        if (hasCur) {
+            siteSelect.value = curSite;
+            rdbStatusSitecode = curSite;
+        } else {
+            siteSelect.value = 'all';
+            rdbStatusSitecode = 'all';
+        }
+    }
+
     function onRekapDbStatusDeptChange() {
         const deptSelect = document.getElementById('rdb-status-filter-dept');
         if (deptSelect) rdbStatusDept = deptSelect.value;
         updateRekapDbSubDeptDropdown();
+        updateRekapDbSitecodeDropdown();
         rdbStatusCurrentPage = 1;
         loadRekapDbStatusData();
     }
@@ -4270,8 +4556,47 @@ const App = (() => {
     function onRekapDbStatusSubDeptChange() {
         const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
         if (subDeptSelect) rdbStatusSubDept = subDeptSelect.value;
+        updateRekapDbSitecodeDropdown();
         rdbStatusCurrentPage = 1;
         loadRekapDbStatusData();
+    }
+
+    function onRekapDbStatusSitecodeChange() {
+        const siteSelect = document.getElementById('rdb-status-filter-sitecode');
+        if (siteSelect) rdbStatusSitecode = siteSelect.value;
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function toggleRekapDbStatusSort(col) {
+        if (rdbStatusSortCol === col) {
+            rdbStatusSortDir = rdbStatusSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            rdbStatusSortCol = col;
+            rdbStatusSortDir = 'asc';
+        }
+        rdbStatusCurrentPage = 1;
+        loadRekapDbStatusData();
+    }
+
+    function updateRekapDbStatusSortIndicators() {
+        document.querySelectorAll('#rdb-status-flat-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#rdb-status-flat-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (rdbStatusSortCol) {
+            const activeTh = document.querySelector(`#rdb-status-flat-table th.sortable[onclick*="'${rdbStatusSortCol}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(rdbStatusSortDir);
+            }
+            const activeInd = document.querySelector(`#rdb-status-flat-table .sort-indicator[data-rdb-status-col="${rdbStatusSortCol}"]`);
+            if (activeInd) {
+                activeInd.textContent = rdbStatusSortDir === 'asc' ? '▲' : '▼';
+            }
+        }
     }
 
     function renderRekapDbStatusGrouped(sites, period) {
@@ -4607,6 +4932,94 @@ const App = (() => {
 
         html += `<button class="pagination-btn" ${rdbStatusCurrentPage === rdbStatusTotalPages ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage + 1})">&raquo;</button>`;
         container.innerHTML = html;
+    }
+
+    async function exportRekapDbStatusExcel() {
+        const btn = document.getElementById('btn-rdb-status-export-excel');
+        const origContent = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+                <span>Mengekspor...</span>
+            `;
+        }
+
+        try {
+            const masterMonthEl = document.getElementById('summary-filter-month');
+            const masterYearEl = document.getElementById('summary-filter-year');
+            const deptSelect = document.getElementById('rdb-status-filter-dept');
+            const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
+            const statusSelect = document.getElementById('rdb-status-filter-status');
+            const searchInput = document.getElementById('rdb-status-search-input');
+
+            let yr = rdbStatusYear || (masterYearEl && masterYearEl.value ? parseInt(masterYearEl.value, 10) : 2026);
+            let mo = rdbStatusMonth || (masterMonthEl && masterMonthEl.value && masterMonthEl.value !== '' ? parseInt(masterMonthEl.value, 10) : 2);
+            let cat = summaryCategory || 'pmd';
+            let catLabel = cat === 'pmd' ? 'PMD' : 'Outlet Regional';
+            let soType = summarySOType || 'monthly';
+            let dept = deptSelect ? deptSelect.value : (rdbStatusDept || 'all');
+            let subDept = subDeptSelect ? subDeptSelect.value : (rdbStatusSubDept || 'all');
+            const siteSelect = document.getElementById('rdb-status-filter-sitecode');
+            let sitecode = siteSelect ? siteSelect.value : (rdbStatusSitecode || 'all');
+            let status = statusSelect ? statusSelect.value : (rdbStatusFilterStatusVal || 'all');
+            let search = searchInput ? searchInput.value.trim() : (rdbStatusSearchQuery || '');
+
+            const params = new URLSearchParams({
+                month: mo,
+                year: yr,
+                category: cat,
+                category_label: catLabel,
+                so_type: soType,
+                dept: dept,
+                sub_dept: subDept,
+                sitecode: sitecode,
+                status: status,
+                search: search,
+                sort_col: rdbStatusSortCol || '',
+                sort_dir: rdbStatusSortDir
+            });
+
+            const res = await fetch(`api/export_rekap_db_status.php?${params.toString()}`);
+
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.message || `Export gagal dengan status HTTP ${res.status}`);
+            }
+
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            const safeCat = catLabel.replace(/[^A-Za-z0-9_-]/g, '_');
+            const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            const safeMonth = monthNames[mo] || `Bulan_${mo}`;
+            a.download = `Rekapitulasi_Status_DB_${safeCat}_${safeMonth}_${yr}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+
+            showToast('success', 'Export Berhasil', 'File Excel Rekapitulasi Status DB berhasil diunduh.');
+        } catch (err) {
+            console.error('Error exporting Rekap DB Status Excel:', err);
+            showToast('error', 'Export Gagal', err.message || 'Terjadi kesalahan saat mengekspor Excel.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origContent;
+            }
+        }
     }
 
     // ── Score Card Summary (Rating & SO Execution - Rolling 3 Months) ──
@@ -5454,6 +5867,44 @@ const App = (() => {
         loadSubDeptResults();
     }
 
+    let subdeptSortCol = 'pct';
+    let subdeptSortDir = 'asc';
+    let subdeptCachedData = [];
+
+    function toggleSubdeptResultsSort(col) {
+        if (subdeptSortCol === col) {
+            subdeptSortDir = subdeptSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            subdeptSortCol = col;
+            subdeptSortDir = 'asc';
+        }
+        if (subdeptCachedData && subdeptCachedData.length > 0) {
+            renderSubdeptCachedRows();
+        } else {
+            loadSubDeptResults();
+        }
+    }
+
+    function updateSubdeptResultsSortIndicators() {
+        document.querySelectorAll('.so-subdept-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('.so-subdept-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (subdeptSortCol) {
+            const activeTh = document.querySelector(`.so-subdept-table th.sortable[onclick*="'${subdeptSortCol}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(subdeptSortDir);
+            }
+            const activeInd = document.querySelector(`.so-subdept-table .sort-indicator[data-subdept-col="${subdeptSortCol}"]`);
+            if (activeInd) {
+                activeInd.textContent = subdeptSortDir === 'asc' ? '▲' : '▼';
+            }
+        }
+    }
+
     async function loadSubDeptResults() {
         const deptSelect = document.getElementById('dept-result-filter');
         const subDeptSelect = document.getElementById('subdept-result-filter');
@@ -5582,6 +6033,8 @@ const App = (() => {
             } else if (statusFilter === 'tidak_tercapai') {
                 displayRows = rows.filter(r => !r._isTercapai);
             }
+            subdeptCachedData = displayRows;
+            sortSubdeptRows(displayRows);
 
             // Update Pie Card Subtitle
             const pieSubtitle = document.getElementById('subdept-pie-subtitle');
@@ -5618,6 +6071,7 @@ const App = (() => {
                 return;
             }
 
+            updateSubdeptResultsSortIndicators();
             let html = '';
             displayRows.forEach((r) => {
                 const sitecode = escapeHtml(r.sitecode || '-');
@@ -5828,6 +6282,47 @@ const App = (() => {
         const current = sel.value || 'all';
         const nextVal = (current === targetStatus) ? 'all' : targetStatus;
         sel.value = nextVal;
+        loadSubDeptResults();
+    }
+
+    function sortSubdeptRows(arr) {
+        if (!subdeptSortCol) return;
+        arr.sort((a, b) => {
+            let valA, valB;
+            if (subdeptSortCol === 'sitecode') {
+                valA = (a.sitecode || '').toString();
+                valB = (b.sitecode || '').toString();
+                return subdeptSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else if (subdeptSortCol === 'name_site') {
+                valA = (a.name_site || '').toString();
+                valB = (b.name_site || '').toString();
+                return subdeptSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else if (subdeptSortCol === 'match_qty') {
+                valA = parseFloat(a.match_physic_qty) || 0;
+                valB = parseFloat(b.match_physic_qty) || 0;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'physic_qty') {
+                valA = parseFloat(a.physic_physic_qty) || 0;
+                valB = parseFloat(b.physic_physic_qty) || 0;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'db_qty') {
+                valA = parseFloat(a.db_physic_qty) || 0;
+                valB = parseFloat(b.db_physic_qty) || 0;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'pct') {
+                valA = (a.has_data && a.total_physic_pct !== null && a.total_physic_pct !== undefined) ? parseFloat(a.total_physic_pct) : -1;
+                valB = (b.has_data && b.total_physic_pct !== null && b.total_physic_pct !== undefined) ? parseFloat(b.total_physic_pct) : -1;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'status') {
+                valA = a._isTercapai ? 1 : 0;
+                valB = b._isTercapai ? 1 : 0;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            }
+            return 0;
+        });
+    }
+
+    function renderSubdeptCachedRows() {
         loadSubDeptResults();
     }
 
@@ -7135,6 +7630,83 @@ const App = (() => {
         renderRekapTable();
     }
 
+    async function exportRekapitulasiExcel() {
+        if (!filteredRekapRows || filteredRekapRows.length === 0) {
+            showToast('warning', 'Data Kosong', 'Tidak ada data Rekapitulasi yang dapat diekspor.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-rekap-export-excel');
+        const origContent = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+                <span>Mengekspor...</span>
+            `;
+        }
+
+        try {
+            const catLabel = summaryCategory === 'pmd' ? 'PMD' : 'Outlet Regional';
+            const payload = {
+                year: rekapYear,
+                category: getRekapCategory(),
+                category_label: catLabel,
+                so_type: summarySOType,
+                dept_filter: rekapDeptFilter,
+                subdept_filter: rekapSubDeptFilter,
+                search_query: rekapSearchQuery,
+                rows: filteredRekapRows
+            };
+
+            const res = await fetch('api/export_rekapitulasi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.message || `Export gagal dengan status HTTP ${res.status}`);
+            }
+
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            const safeCat = catLabel.replace(/[^A-Za-z0-9_-]/g, '_');
+            const safeType = summarySOType === 'quarterly' ? 'Quarterly' : 'Monthly';
+            a.download = `Rekapitulasi_SO_${safeCat}_${safeType}_${rekapYear}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+
+            showToast('success', 'Export Berhasil', 'File Excel Rekapitulasi berhasil diunduh.');
+        } catch (err) {
+            console.error('Error exporting Rekapitulasi Excel:', err);
+            showToast('error', 'Export Gagal', err.message || 'Terjadi kesalahan saat mengekspor Excel.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origContent;
+            }
+        }
+    }
+
     // ── Import Modal & Drag-and-Drop ───────────────────────────
 
     function openImportModal() {
@@ -7560,6 +8132,39 @@ const App = (() => {
         'GJO'
     ];
 
+    let execCatatanSortCol = null;
+    let execCatatanSortDir = 'asc';
+
+    function toggleExecCatatanSort(col) {
+        if (execCatatanSortCol === col) {
+            execCatatanSortDir = execCatatanSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            execCatatanSortCol = col;
+            execCatatanSortDir = 'asc';
+        }
+        loadExecutiveNotes();
+    }
+
+    function updateExecCatatanSortIndicators() {
+        document.querySelectorAll('#exec-catatan-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#exec-catatan-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (execCatatanSortCol) {
+            const activeTh = document.querySelector(`#exec-catatan-table th.sortable[onclick*="'${execCatatanSortCol}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(execCatatanSortDir);
+            }
+            const activeInd = document.querySelector(`#exec-catatan-table .sort-indicator[data-ecat-col="${execCatatanSortCol}"]`);
+            if (activeInd) {
+                activeInd.textContent = execCatatanSortDir === 'asc' ? '▲' : '▼';
+            }
+        }
+    }
+
     async function loadExecutiveNotes(year, month) {
         const y = year || document.getElementById('summary-filter-year')?.value || 2026;
         const monthVal = (month !== undefined && month !== null)
@@ -7631,6 +8236,30 @@ const App = (() => {
                 return true;
             });
 
+            if (execCatatanSortCol) {
+                mappedNotes.sort((a, b) => {
+                    let valA, valB;
+                    if (execCatatanSortCol === 'period') {
+                        valA = parseInt(a.month, 10) || 0;
+                        valB = parseInt(b.month, 10) || 0;
+                        return execCatatanSortDir === 'asc' ? valA - valB : valB - valA;
+                    } else if (execCatatanSortCol === 'dept') {
+                        valA = (a.dept || '').toLowerCase();
+                        valB = (b.dept || '').toLowerCase();
+                    } else if (execCatatanSortCol === 'sub_dept') {
+                        valA = (a.sub_dept || '').toLowerCase();
+                        valB = (b.sub_dept || '').toLowerCase();
+                    } else if (execCatatanSortCol === 'keterangan') {
+                        valA = (a.keterangan || '').toLowerCase();
+                        valB = (b.keterangan || '').toLowerCase();
+                    } else {
+                        valA = ''; valB = '';
+                    }
+                    return execCatatanSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                });
+            }
+            updateExecCatatanSortIndicators();
+
             if (mappedNotes.length === 0) {
                 const contextName = curSoType === 'quarterly'
                     ? (summaryCategory === 'warehouse_hub' ? 'Warehouse HUB (Quarterly)' : 'Outlet Subarep (Quarterly)')
@@ -7695,6 +8324,39 @@ const App = (() => {
         }
     }
 
+    let masterCatatanSortCol = null;
+    let masterCatatanSortDir = 'asc';
+
+    function toggleMasterCatatanSort(col) {
+        if (masterCatatanSortCol === col) {
+            masterCatatanSortDir = masterCatatanSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            masterCatatanSortCol = col;
+            masterCatatanSortDir = 'asc';
+        }
+        loadMasterCatatan();
+    }
+
+    function updateMasterCatatanSortIndicators() {
+        document.querySelectorAll('#master-catatan-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#master-catatan-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (masterCatatanSortCol) {
+            const activeTh = document.querySelector(`#master-catatan-table th.sortable[onclick*="'${masterCatatanSortCol}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(masterCatatanSortDir);
+            }
+            const activeInd = document.querySelector(`#master-catatan-table .sort-indicator[data-mcat-col="${masterCatatanSortCol}"]`);
+            if (activeInd) {
+                activeInd.textContent = masterCatatanSortDir === 'asc' ? '▲' : '▼';
+            }
+        }
+    }
+
     async function loadMasterCatatan() {
         const y = document.getElementById('master-catatan-filter-year')?.value || '';
         const m = document.getElementById('master-catatan-filter-month')?.value || '';
@@ -7728,6 +8390,33 @@ const App = (() => {
             }
 
             if (badge) badge.textContent = `${masterCatatanData.length} Data`;
+
+            if (masterCatatanSortCol) {
+                masterCatatanData.sort((a, b) => {
+                    let valA, valB;
+                    if (masterCatatanSortCol === 'so_type') {
+                        valA = (a.so_type || '').toLowerCase();
+                        valB = (b.so_type || '').toLowerCase();
+                    } else if (masterCatatanSortCol === 'period') {
+                        valA = ((parseInt(a.year, 10) || 0) * 100) + (parseInt(a.month, 10) || 0);
+                        valB = ((parseInt(b.year, 10) || 0) * 100) + (parseInt(b.month, 10) || 0);
+                        return masterCatatanSortDir === 'asc' ? valA - valB : valB - valA;
+                    } else if (masterCatatanSortCol === 'dept') {
+                        valA = (a.dept || '').toLowerCase();
+                        valB = (b.dept || '').toLowerCase();
+                    } else if (masterCatatanSortCol === 'sub_dept') {
+                        valA = (a.sub_dept || '').toLowerCase();
+                        valB = (b.sub_dept || '').toLowerCase();
+                    } else if (masterCatatanSortCol === 'keterangan') {
+                        valA = (a.keterangan || '').toLowerCase();
+                        valB = (b.keterangan || '').toLowerCase();
+                    } else {
+                        valA = ''; valB = '';
+                    }
+                    return masterCatatanSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                });
+            }
+            updateMasterCatatanSortIndicators();
 
             if (masterCatatanData.length === 0) {
                 tbody.innerHTML = `
@@ -8154,6 +8843,12 @@ const App = (() => {
         goToSRPage,
         handleSRSearch,
         toggleSRSort,
+        onSRRegionalFilterChange,
+        onSRDeptFilterChange,
+        onSRSubDeptFilterChange,
+        onSRInfoFilterChange,
+        onSRGroupTypeFilterChange,
+        onSRStatusFilterChange,
         deleteSRRecord,
         toggleSRSelection,
         toggleSelectAllSR,
@@ -8174,6 +8869,7 @@ const App = (() => {
         submitSRImport,
         // Rekapitulasi exports
         loadRekapitulasi,
+        exportRekapitulasiExcel,
         onRekapDeptFilterChange,
         onRekapSubDeptFilterChange,
         loadTrendCharts,
@@ -8262,6 +8958,12 @@ const App = (() => {
         changeRekapDbStatusPageSize,
         goToRekapDbStatusPage,
         handleRekapDbStatusSearch,
+        exportRekapDbStatusExcel,
+        onRekapDbStatusSitecodeChange,
+        toggleRekapDbStatusSort,
+        toggleSubdeptResultsSort,
+        toggleMasterCatatanSort,
+        toggleExecCatatanSort,
         // Quick Access & User Dropdown exports
         toggleQuickAccess,
         openQuickAccess,

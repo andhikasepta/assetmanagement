@@ -102,6 +102,10 @@ try {
                     $siteMap[$sc] = $s;
                     if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
                         $baseTypes[$sc] = 'monthly';
+                    } elseif (empty($s['is_active'])) {
+                        $baseTypes[$sc] = 'inactive';
+                    } elseif (isset($s['is_counted']) && empty($s['is_counted'])) {
+                        $baseTypes[$sc] = 'uncounted';
                     } else {
                         $baseTypes[$sc] = strtolower(trim($s['group_type'] ?? 'monthly')) ?: 'monthly';
                     }
@@ -220,12 +224,21 @@ try {
                         } elseif ($currType === 'inactive') {
                             $movementType = 'became_inactive';
                             $description = 'Site Dinonaktifkan (Inactive)';
+                        } elseif ($currType === 'uncounted') {
+                            $movementType = 'became_uncounted';
+                            $description = 'Site Tidak Dihitung (Uncounted)';
                         } elseif ($prevType === 'inactive' && $currType === 'monthly') {
                             $movementType = 'reactivated_monthly';
                             $description = 'Diaktifkan kembali (Monthly)';
                         } elseif ($prevType === 'inactive' && $currType === 'quarterly') {
                             $movementType = 'reactivated_quarterly';
                             $description = 'Diaktifkan kembali (Quarterly)';
+                        } elseif ($prevType === 'uncounted' && $currType === 'monthly') {
+                            $movementType = 'recounted_monthly';
+                            $description = 'Dihitung kembali (Monthly)';
+                        } elseif ($prevType === 'uncounted' && $currType === 'quarterly') {
+                            $movementType = 'recounted_quarterly';
+                            $description = 'Dihitung kembali (Quarterly)';
                         }
 
                         $note = ($hr && !empty($hr['notes'])) ? $hr['notes'] : $description;
@@ -433,7 +446,7 @@ try {
                 $pStmt = $db->prepare("
                     SELECT effective_year, effective_month 
                     FROM site_group_history 
-                    WHERE sitecode = :sc AND group_type != 'inactive'
+                    WHERE sitecode = :sc AND group_type NOT IN ('inactive', 'uncounted')
                     ORDER BY effective_year DESC, effective_month DESC, id DESC 
                     LIMIT 1
                 ");
@@ -482,6 +495,61 @@ try {
             }
         };
 
+        // Helper to sync uncounted rule to site_group_history starting next month of Effective Period
+        $syncSiteCountedRule = function(PDO $db, string $sitecode, bool $isCounted) {
+            if (!$isCounted && $sitecode !== '') {
+                $pStmt = $db->prepare("
+                    SELECT effective_year, effective_month 
+                    FROM site_group_history 
+                    WHERE sitecode = :sc AND group_type NOT IN ('inactive', 'uncounted')
+                    ORDER BY effective_year DESC, effective_month DESC, id DESC 
+                    LIMIT 1
+                ");
+                $pStmt->execute([':sc' => $sitecode]);
+                $lastRule = $pStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($lastRule) {
+                    $effY = (int)$lastRule['effective_year'];
+                    $effM = (int)$lastRule['effective_month'];
+                } else {
+                    $arStmt = $db->prepare("
+                        SELECT period_year, period_month 
+                        FROM asset_reconciliation 
+                        WHERE profile ILIKE :p1 OR profile ILIKE :p2 OR profile ILIKE :p3
+                        ORDER BY period_year DESC, period_month DESC, id DESC 
+                        LIMIT 1
+                    ");
+                    $arStmt->execute([
+                        ':p1' => "% - {$sitecode} - %",
+                        ':p2' => "%-{$sitecode}-%",
+                        ':p3' => "%{$sitecode}%",
+                    ]);
+                    $lastAr = $arStmt->fetch(PDO::FETCH_ASSOC);
+                    $effY = $lastAr ? (int)$lastAr['period_year'] : 2026;
+                    $effM = $lastAr ? (int)$lastAr['period_month'] : 1;
+                }
+
+                // Next month of Effective Period
+                $nextM = $effM + 1;
+                $nextY = $effY;
+                if ($nextM > 12) {
+                    $nextM = 1;
+                    $nextY++;
+                }
+
+                $insRule = $db->prepare("
+                    INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                    VALUES (:sc, 'uncounted', :y, :m, 'Set to Uncounted')
+                    ON CONFLICT (sitecode, effective_year, effective_month)
+                    DO UPDATE SET group_type = 'uncounted', notes = 'Set to Uncounted'
+                ");
+                $insRule->execute([':sc' => $sitecode, ':y' => $nextY, ':m' => $nextM]);
+            } elseif ($isCounted && $sitecode !== '') {
+                $delRule = $db->prepare("DELETE FROM site_group_history WHERE sitecode = :sc AND group_type = 'uncounted'");
+                $delRule->execute([':sc' => $sitecode]);
+            }
+        };
+
         // 2b. Update Active status
         if ($action === 'update_active') {
             $id = (int) ($jsonPayload['id'] ?? $_POST['id'] ?? 0);
@@ -507,6 +575,14 @@ try {
             $id = (int) ($jsonPayload['id'] ?? $_POST['id'] ?? 0);
             $isCounted = filter_var($jsonPayload['is_counted'] ?? $_POST['is_counted'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
+            $scStmt = $db->prepare("SELECT sitecode FROM site_regional WHERE id = :id");
+            $scStmt->execute([':id' => $id]);
+            $sitecode = $scStmt->fetchColumn();
+
+            if ($sitecode) {
+                $syncSiteCountedRule($db, $sitecode, $isCounted);
+            }
+
             $stmt = $db->prepare("UPDATE site_regional SET is_counted = :counted, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
             $stmt->execute([':counted' => $isCounted ? 1 : 0, ':id' => $id]);
 
@@ -522,7 +598,7 @@ try {
             $effMonth = (int) ($jsonPayload['effective_month'] ?? $_POST['effective_month'] ?? 0);
             $notes = trim($jsonPayload['notes'] ?? $_POST['notes'] ?? 'Manual rule');
 
-            if ($sitecode === '' || !in_array($groupType, ['monthly', 'quarterly', 'inactive'], true) || $effYear < 2000 || $effMonth < 1 || $effMonth > 12) {
+            if ($sitecode === '' || !in_array($groupType, ['monthly', 'quarterly', 'inactive', 'uncounted'], true) || $effYear < 2000 || $effMonth < 1 || $effMonth > 12) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'message' => 'Invalid parameters for history rule']);
                 exit;
@@ -536,11 +612,13 @@ try {
             ");
             $stmt->execute([':sc' => $sitecode, ':gt' => $groupType, ':y' => $effYear, ':m' => $effMonth, ':notes' => $notes]);
 
-            // Sync site_regional.is_active status
+            // Sync site_regional status
             if ($groupType === 'inactive') {
                 $db->prepare("UPDATE site_regional SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE sitecode = :sc")->execute([':sc' => $sitecode]);
+            } elseif ($groupType === 'uncounted') {
+                $db->prepare("UPDATE site_regional SET is_counted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE sitecode = :sc")->execute([':sc' => $sitecode]);
             } else {
-                $db->prepare("UPDATE site_regional SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE sitecode = :sc")->execute([':sc' => $sitecode]);
+                $db->prepare("UPDATE site_regional SET is_active = TRUE, is_counted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE sitecode = :sc")->execute([':sc' => $sitecode]);
             }
 
             echo json_encode(['success' => true, 'message' => 'Dynamic period rule saved successfully']);

@@ -133,8 +133,24 @@ try {
 
     // 4. Fetch Sites based on Category & Effective Group Type as of ($year, $month)
     $whereParts = [
-        "COALESCE(is_active, TRUE) = TRUE",
-        "COALESCE(is_counted, TRUE) = TRUE"
+        "(
+            (COALESCE(is_active, TRUE) = TRUE AND COALESCE(is_counted, TRUE) = TRUE)
+            OR EXISTS (
+                SELECT 1 FROM asset_reconciliation ar 
+                WHERE ar.period_year = {$year}
+                  AND (
+                      ar.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                      OR ar.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                      OR ar.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                      OR ar.profile ILIKE '%' || site_regional.sitecode || '%'
+                  )
+            )
+            OR EXISTS (
+                SELECT 1 FROM site_group_history sgh 
+                WHERE UPPER(sgh.sitecode) = UPPER(site_regional.sitecode)
+                  AND sgh.effective_year = {$year}
+            )
+        )"
     ];
 
     if ($category === 'pmd' || $category === 'monthly_pmd') {
@@ -145,7 +161,8 @@ try {
 
     $whereSql = "WHERE " . implode(' AND ', $whereParts);
     $siteStmt = $db->query("
-        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
+        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+               COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
         FROM site_regional
         $whereSql
         ORDER BY regional ASC, dept ASC, sub_dept ASC, sitecode ASC
@@ -175,11 +192,17 @@ try {
         } elseif (isset($historyOverrides[$sc])) {
             $effGroup = $historyOverrides[$sc];
         } else {
-            $effGroup = strtolower(trim($s['group_type'] ?? 'monthly')) ?: 'monthly';
+            if (empty($s['is_active'])) {
+                $effGroup = 'inactive';
+            } elseif (empty($s['is_counted'])) {
+                $effGroup = 'uncounted';
+            } else {
+                $effGroup = strtolower(trim($s['group_type'] ?? 'monthly')) ?: 'monthly';
+            }
         }
 
-        // Exclude inactive periods
-        if ($effGroup === 'inactive') {
+        // Exclude inactive or uncounted periods
+        if ($effGroup === 'inactive' || $effGroup === 'uncounted') {
             continue;
         }
 

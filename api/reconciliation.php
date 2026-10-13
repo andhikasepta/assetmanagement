@@ -31,7 +31,7 @@ try {
             $year = $y ?: (int) date('Y');
             $month = $m ?: (int) date('n');
 
-            $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+            $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
             $map = [];
             $pmdSites = [];
             foreach ($sites as $s) {
@@ -40,7 +40,13 @@ try {
                     $map[$sc] = 'monthly';
                     $pmdSites[$sc] = true;
                 } else {
-                    $map[$sc] = $s['group_type'];
+                    if (empty($s['is_active'])) {
+                        $map[$sc] = 'inactive';
+                    } elseif (empty($s['is_counted'])) {
+                        $map[$sc] = 'uncounted';
+                    } else {
+                        $map[$sc] = $s['group_type'];
+                    }
                 }
             }
 
@@ -126,8 +132,8 @@ try {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
                 $effType = $effectiveMap[$sc] ?? 'monthly';
 
-                // If site is inactive or not counted, do not include in summary calculations
-                if ($effType === 'inactive' || empty($s['is_active']) || empty($s['is_counted'])) {
+                // If site is inactive or not counted in this period, do not include in summary calculations
+                if ($effType === 'inactive' || $effType === 'uncounted') {
                     continue;
                 }
 

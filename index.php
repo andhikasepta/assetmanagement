@@ -386,9 +386,9 @@ $monthNames = [
                         </div>
                     </div>
 
-                    <!-- Table Toolbar: Page Size & Search -->
-                    <div class="table-toolbar">
-                        <div class="table-toolbar-left">
+                    <!-- Table Toolbar: Page Size, Filters & Search -->
+                    <div class="table-toolbar" style="gap: 0.75rem; flex-wrap: wrap;">
+                        <div class="table-toolbar-left" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
                             <label for="sr-page-size">Tampilkan</label>
                             <select id="sr-page-size" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
                                 autocomplete="off" onchange="App.changeSRPageSize(this.value)">
@@ -398,7 +398,49 @@ $monthNames = [
                                 <option value="100">100</option>
                                 <option value="all">Semua</option>
                             </select>
-                            <span>baris per halaman</span>
+                            <span>baris</span>
+
+                            <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 4px;"></span>
+
+                            <label for="sr-filter-regional">REGIONAL</label>
+                            <select id="sr-filter-regional" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRRegionalFilterChange()">
+                                <option value="all" selected>Semua Regional</option>
+                            </select>
+
+                            <label for="sr-filter-dept">DEPT</label>
+                            <select id="sr-filter-dept" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRDeptFilterChange()">
+                                <option value="all" selected>Semua Dept</option>
+                            </select>
+
+                            <label for="sr-filter-subdept">SUB DEPT</label>
+                            <select id="sr-filter-subdept" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRSubDeptFilterChange()">
+                                <option value="all" selected>Semua Sub Dept</option>
+                            </select>
+
+                            <label for="sr-filter-info">INFO</label>
+                            <select id="sr-filter-info" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRInfoFilterChange()">
+                                <option value="all" selected>Semua Info</option>
+                            </select>
+
+                            <label for="sr-filter-grouptype">GROUP TYPE</label>
+                            <select id="sr-filter-grouptype" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRGroupTypeFilterChange()">
+                                <option value="all" selected>Semua Group</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                            </select>
+
+                            <label for="sr-filter-status">STATUS</label>
+                            <select id="sr-filter-status" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
+                                autocomplete="off" onchange="App.onSRStatusFilterChange()">
+                                <option value="all" selected>Semua Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
                         </div>
                         <div class="table-toolbar-right">
                             <input type="text" id="sr-search-input" class="table-search-input" placeholder="Search..."
@@ -490,7 +532,7 @@ $monthNames = [
                     <div class="card-header">
                         <div>
                             <h2 class="card-title">Rekap DB Master Data</h2>
-                            <p class="card-subtitle">Raw Rekap DB Master Data (Sitecode, Reg No, Name, SN, NBV)</p>
+                            <p class="card-subtitle">Raw Rekap data DB (INTAN > Monitoring Detail [filter Result DB])</p>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                             <button class="btn btn-refresh" onclick="App.loadRekapDbData()">
@@ -680,11 +722,25 @@ $monthNames = [
                                 <thead>
                                     <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         <th style="width: 45px; text-align: center;">NO</th>
-                                        <th style="width: 105px; text-align: center;">TIPE SO</th>
-                                        <th style="width: 130px; text-align: center;">PERIODE</th>
-                                        <th style="width: 95px; text-align: center;">DEPT</th>
-                                        <th style="width: 105px; text-align: center;">SUB DEPT</th>
-                                        <th>KETERANGAN</th>
+                                        <th class="sortable text-center" style="width: 105px;"
+                                            onclick="App.toggleMasterCatatanSort('so_type')">
+                                            TIPE SO <span class="sort-indicator" data-mcat-col="so_type">⇅</span>
+                                        </th>
+                                        <th class="sortable text-center" style="width: 130px;"
+                                            onclick="App.toggleMasterCatatanSort('period')">
+                                            PERIODE <span class="sort-indicator" data-mcat-col="period">⇅</span>
+                                        </th>
+                                        <th class="sortable text-center" style="width: 95px;"
+                                            onclick="App.toggleMasterCatatanSort('dept')">
+                                            DEPT <span class="sort-indicator" data-mcat-col="dept">⇅</span>
+                                        </th>
+                                        <th class="sortable text-center" style="width: 105px;"
+                                            onclick="App.toggleMasterCatatanSort('sub_dept')">
+                                            SUB DEPT <span class="sort-indicator" data-mcat-col="sub_dept">⇅</span>
+                                        </th>
+                                        <th class="sortable text-left" onclick="App.toggleMasterCatatanSort('keterangan')">
+                                            KETERANGAN <span class="sort-indicator" data-mcat-col="keterangan">⇅</span>
+                                        </th>
                                         <th style="width: 95px; text-align: center;">ACTION</th>
                                     </tr>
                                 </thead>
@@ -1165,16 +1221,30 @@ $monthNames = [
                                         </div>
                                     </div>
                                 </div>
-                                <div class="table-responsive" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
+                                <div class="table-responsive"
+                                    style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
                                     <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 <th style="width: 38px; text-align: center;">NO</th>
-                                                <th style="width: 85px; text-align: center;" id="exec-catatan-th-period">
-                                                    BULAN</th>
-                                                <th style="width: 65px; text-align: center;">DEPT</th>
-                                                <th style="width: 80px; text-align: center;">SUB DEPT</th>
-                                                <th>KETERANGAN</th>
+                                                <th class="sortable text-center" style="width: 95px;"
+                                                    id="exec-catatan-th-period"
+                                                    onclick="App.toggleExecCatatanSort('period')">
+                                                    BULAN <span class="sort-indicator" data-ecat-col="period">⇅</span>
+                                                </th>
+                                                <th class="sortable text-center" style="width: 75px;"
+                                                    onclick="App.toggleExecCatatanSort('dept')">
+                                                    DEPT <span class="sort-indicator" data-ecat-col="dept">⇅</span>
+                                                </th>
+                                                <th class="sortable text-center" style="width: 90px;"
+                                                    onclick="App.toggleExecCatatanSort('sub_dept')">
+                                                    SUB DEPT <span class="sort-indicator" data-ecat-col="sub_dept">⇅</span>
+                                                </th>
+                                                <th class="sortable text-left"
+                                                    onclick="App.toggleExecCatatanSort('keterangan')">
+                                                    KETERANGAN <span class="sort-indicator"
+                                                        data-ecat-col="keterangan">⇅</span>
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody id="exec-catatan-tbody">
@@ -2129,12 +2199,16 @@ $monthNames = [
                                         <thead>
                                             <tr
                                                 style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
-                                                <th rowspan="2"
+                                                <th rowspan="2" class="sortable"
+                                                    onclick="App.toggleSubdeptResultsSort('sitecode')"
                                                     style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    Site Code</th>
-                                                <th rowspan="2"
+                                                    Site Code <span class="sort-indicator"
+                                                        data-subdept-col="sitecode">⇅</span></th>
+                                                <th rowspan="2" class="sortable"
+                                                    onclick="App.toggleSubdeptResultsSort('name_site')"
                                                     style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    Name Site</th>
+                                                    Name Site <span class="sort-indicator"
+                                                        data-subdept-col="name_site">⇅</span></th>
                                                 <th
                                                     style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     Result Match</th>
@@ -2147,24 +2221,33 @@ $monthNames = [
                                                 <th
                                                     style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     Pencapaian</th>
-                                                <th rowspan="2"
+                                                <th rowspan="2" class="sortable"
+                                                    onclick="App.toggleSubdeptResultsSort('status')"
                                                     style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 190px; min-width: 170px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    Status</th>
+                                                    Status <span class="sort-indicator" data-subdept-col="status">⇅</span>
+                                                </th>
                                             </tr>
                                             <tr
                                                 style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
-                                                <th
-                                                    style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                    Physical (QTY)</th>
-                                                <th
-                                                    style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                    Physical (QTY)</th>
-                                                <th
-                                                    style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                    Physical (QTY)</th>
-                                                <th
-                                                    style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                    %</th>
+                                                <th class="sortable text-center"
+                                                    onclick="App.toggleSubdeptResultsSort('match_qty')"
+                                                    style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                    Physical (QTY) <span class="sort-indicator"
+                                                        data-subdept-col="match_qty">⇅</span></th>
+                                                <th class="sortable text-center"
+                                                    onclick="App.toggleSubdeptResultsSort('physic_qty')"
+                                                    style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                    Physical (QTY) <span class="sort-indicator"
+                                                        data-subdept-col="physic_qty">⇅</span></th>
+                                                <th class="sortable text-center"
+                                                    onclick="App.toggleSubdeptResultsSort('db_qty')"
+                                                    style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                    Physical (QTY) <span class="sort-indicator"
+                                                        data-subdept-col="db_qty">⇅</span></th>
+                                                <th class="sortable text-center"
+                                                    onclick="App.toggleSubdeptResultsSort('pct')"
+                                                    style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                    % <span class="sort-indicator" data-subdept-col="pct">⇅</span></th>
                                             </tr>
                                         </thead>
                                         <tbody id="subdept-results-tbody">
@@ -2237,6 +2320,12 @@ $monthNames = [
                                 <option value="all" selected>Semua Sub Dept</option>
                             </select>
 
+                            <select id="rdb-status-filter-sitecode" class="form-control"
+                                style="width: auto; max-width: 200px; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
+                                autocomplete="off" onchange="App.onRekapDbStatusSitecodeChange()">
+                                <option value="all" selected>Semua Site</option>
+                            </select>
+
                             <select id="rdb-status-filter-status" class="form-control"
                                 style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                                 autocomplete="off" onchange="App.onRekapDbStatusFilterChange()">
@@ -2249,6 +2338,19 @@ $monthNames = [
                             <button class="btn btn-refresh btn-sm" onclick="App.loadRekapDbStatusData()"
                                 style="padding: 5px 12px;">
                                 Refresh
+                            </button>
+
+                            <button class="btn btn-success btn-sm" id="btn-rdb-status-export-excel"
+                                onclick="App.exportRekapDbStatusExcel()"
+                                title="Export data Rekapitulasi Status DB ke Excel (.xlsx)"
+                                style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <span>Export Excel</span>
                             </button>
                         </div>
                     </div>
@@ -2367,15 +2469,45 @@ $monthNames = [
                                     <thead>
                                         <tr>
                                             <th class="text-center align-middle" style="width: 45px;">NO</th>
-                                            <th class="text-center align-middle" style="width: 85px;">DEPT</th>
-                                            <th class="text-center align-middle" style="width: 95px;">SUB DEPT</th>
-                                            <th class="text-center align-middle" style="width: 110px;">SITECODE</th>
-                                            <th class="text-left align-middle" style="min-width: 140px;">NAMA SITE</th>
-                                            <th class="text-center align-middle" style="width: 150px;">REG NO</th>
-                                            <th class="text-left align-middle" style="min-width: 160px;">NAME</th>
-                                            <th class="text-center align-middle" style="width: 140px;">SN</th>
-                                            <th class="text-right align-middle" style="width: 130px;">NBV</th>
-                                            <th class="text-center align-middle" style="width: 105px;">STATUS</th>
+                                            <th class="text-center align-middle sortable" style="width: 85px;"
+                                                onclick="App.toggleRekapDbStatusSort('dept')">
+                                                DEPT <span class="sort-indicator" data-rdb-status-col="dept">⇅</span>
+                                            </th>
+                                            <th class="text-center align-middle sortable" style="width: 95px;"
+                                                onclick="App.toggleRekapDbStatusSort('sub_dept')">
+                                                SUB DEPT <span class="sort-indicator"
+                                                    data-rdb-status-col="sub_dept">⇅</span>
+                                            </th>
+                                            <th class="text-center align-middle sortable" style="width: 110px;"
+                                                onclick="App.toggleRekapDbStatusSort('sitecode')">
+                                                SITECODE <span class="sort-indicator"
+                                                    data-rdb-status-col="sitecode">⇅</span>
+                                            </th>
+                                            <th class="text-left align-middle sortable" style="min-width: 140px;"
+                                                onclick="App.toggleRekapDbStatusSort('name_site')">
+                                                NAMA SITE <span class="sort-indicator"
+                                                    data-rdb-status-col="name_site">⇅</span>
+                                            </th>
+                                            <th class="text-center align-middle sortable" style="width: 150px;"
+                                                onclick="App.toggleRekapDbStatusSort('reg_no')">
+                                                REG NO <span class="sort-indicator" data-rdb-status-col="reg_no">⇅</span>
+                                            </th>
+                                            <th class="text-left align-middle sortable" style="min-width: 160px;"
+                                                onclick="App.toggleRekapDbStatusSort('name')">
+                                                NAME <span class="sort-indicator" data-rdb-status-col="name">⇅</span>
+                                            </th>
+                                            <th class="text-center align-middle sortable" style="width: 140px;"
+                                                onclick="App.toggleRekapDbStatusSort('sn')">
+                                                SN <span class="sort-indicator" data-rdb-status-col="sn">⇅</span>
+                                            </th>
+                                            <th class="text-right align-middle sortable" style="width: 130px;"
+                                                onclick="App.toggleRekapDbStatusSort('nbv')">
+                                                NBV <span class="sort-indicator" data-rdb-status-col="nbv">⇅</span>
+                                            </th>
+                                            <th class="text-center align-middle sortable" style="width: 105px;"
+                                                onclick="App.toggleRekapDbStatusSort('status')">
+                                                STATUS <span class="sort-indicator" data-rdb-status-col="status">⇅</span>
+                                            </th>
                                             <th class="text-left align-middle" style="min-width: 180px;">KETERANGAN</th>
                                         </tr>
                                     </thead>
@@ -2434,6 +2566,17 @@ $monthNames = [
                             </div>
                             <button class="btn btn-secondary" onclick="App.loadRekapitulasi()">
                                 Refresh
+                            </button>
+                            <button class="btn btn-success" id="btn-rekap-export-excel"
+                                onclick="App.exportRekapitulasiExcel()" title="Export data Rekapitulasi ke Excel (.xlsx)"
+                                style="display: inline-flex; align-items: center; gap: 6px;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <span>Export Excel</span>
                             </button>
                         </div>
                     </div>

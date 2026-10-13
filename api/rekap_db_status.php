@@ -47,9 +47,12 @@ try {
     $soType         = trim($_GET['so_type'] ?? 'monthly');
     $deptFilter     = trim($_GET['dept'] ?? 'all');
     $subDeptFilter  = trim($_GET['sub_dept'] ?? 'all');
+    $sitecodeFilter = trim($_GET['sitecode'] ?? 'all');
     $statusFilter   = strtolower(trim($_GET['status'] ?? 'all'));
     $search         = trim($_GET['search'] ?? '');
     $viewMode       = strtolower(trim($_GET['view'] ?? 'flat')); // 'flat' (table view) or 'grouped'
+    $sortCol        = trim($_GET['sort_col'] ?? '');
+    $sortDir        = strtolower(trim($_GET['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
 
     $page       = max(1, (int)($_GET['page'] ?? 1));
     $limitParam = $_GET['limit'] ?? 10;
@@ -63,8 +66,19 @@ try {
     ], true));
 
     $whereCatParts = [
-        "COALESCE(sr.is_active, TRUE) = TRUE",
-        "COALESCE(sr.is_counted, TRUE) = TRUE"
+        "(
+            (COALESCE(sr.is_active, TRUE) = TRUE AND COALESCE(sr.is_counted, TRUE) = TRUE)
+            OR EXISTS (
+                SELECT 1 FROM rekap_db_master rdm
+                WHERE (rdm.period_year = {$currYear} OR rdm.period_year = {$prevYear})
+                  AND UPPER(rdm.sitecode) = UPPER(sr.sitecode)
+            )
+            OR EXISTS (
+                SELECT 1 FROM site_group_history sgh 
+                WHERE UPPER(sgh.sitecode) = UPPER(sr.sitecode)
+                  AND (sgh.effective_year = {$currYear} OR sgh.effective_year = {$prevYear})
+            )
+        )"
     ];
 
     if ($category === 'pmd' || $category === 'monthly_pmd') {
@@ -75,7 +89,8 @@ try {
 
     $whereCatSql = "WHERE " . implode(' AND ', $whereCatParts);
     $siteStmt = $db->query("
-        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type
+        SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+               COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
         FROM site_regional sr
         $whereCatSql
         ORDER BY regional ASC, dept ASC, sub_dept ASC, sitecode ASC
@@ -105,10 +120,16 @@ try {
         } elseif (isset($historyOverrides[$sc])) {
             $effGroup = $historyOverrides[$sc];
         } else {
-            $effGroup = strtolower(trim($s['group_type'] ?? 'monthly')) ?: 'monthly';
+            if (empty($s['is_active'])) {
+                $effGroup = 'inactive';
+            } elseif (empty($s['is_counted'])) {
+                $effGroup = 'uncounted';
+            } else {
+                $effGroup = strtolower(trim($s['group_type'] ?? 'monthly')) ?: 'monthly';
+            }
         }
 
-        if ($effGroup === 'inactive') {
+        if ($effGroup === 'inactive' || $effGroup === 'uncounted') {
             continue;
         }
 
@@ -146,12 +167,15 @@ try {
     $escapedSitecodes = array_map(function($sc) use ($db) { return $db->quote($sc); }, $validSitecodes);
     $inValidSitesSql = !empty($escapedSitecodes) ? implode(',', $escapedSitecodes) : "''";
 
-    // Build filter options (DEPT and SUB DEPT) strictly for this Category's Master Sites
+    // Build filter options (DEPT, SUB DEPT, and SITES) strictly for this Category's Master Sites
     $availableDeptsMap = [];
     $deptSubDeptMap = [];
+    $availableSitesList = [];
     foreach ($categoryMasterSites as $s) {
         $d = trim($s['dept'] ?? '');
         $sd = trim($s['sub_dept'] ?? '');
+        $sc = trim($s['sitecode'] ?? '');
+        $ns = trim($s['name_site'] ?? '');
         if ($d !== '') {
             $availableDeptsMap[$d] = true;
             if (!isset($deptSubDeptMap[$d])) {
@@ -161,12 +185,23 @@ try {
                 $deptSubDeptMap[$d][] = $sd;
             }
         }
+        if ($sc !== '') {
+            $availableSitesList[] = [
+                'sitecode' => $sc,
+                'name_site' => $ns,
+                'dept' => $d,
+                'sub_dept' => $sd,
+            ];
+        }
     }
     $availableDepts = array_keys($availableDeptsMap);
     sort($availableDepts);
     foreach ($deptSubDeptMap as $d => $arr) {
         sort($deptSubDeptMap[$d]);
     }
+    usort($availableSitesList, function($a, $b) {
+        return strcmp($a['sitecode'], $b['sitecode']);
+    });
 
     // CTE Query strictly joining with site_regional within the valid category sitecodes
     // Any sitecode outside this category/SO type is completely filtered out!
@@ -213,7 +248,7 @@ try {
         ':curr_y' => $currYear
     ];
 
-    // Compute Summary Stats following the selected DEPT and SUB DEPT filters
+    // Compute Summary Stats following the selected DEPT, SUB DEPT, and SITECODE filters
     $statsWhere = [];
     $statsParams = $baseParams;
     if ($deptFilter !== 'all' && $deptFilter !== '') {
@@ -223,6 +258,10 @@ try {
     if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
         $statsWhere[] = "sr.sub_dept = :sub_dept";
         $statsParams[':sub_dept'] = $subDeptFilter;
+    }
+    if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
+        $statsWhere[] = "sr.sitecode = :sitecode";
+        $statsParams[':sitecode'] = $sitecodeFilter;
     }
     $statsWhereSql = !empty($statsWhere) ? " WHERE " . implode(" AND ", $statsWhere) : "";
 
@@ -246,10 +285,11 @@ try {
     $statsStmt->execute($statsParams);
     $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Compute total master sites in this Category for the current DEPT/SUB DEPT filter
-    $filteredMasterSites = array_filter($categoryMasterSites, function($s) use ($deptFilter, $subDeptFilter) {
+    // Compute total master sites in this Category for the current DEPT/SUB DEPT/SITECODE filter
+    $filteredMasterSites = array_filter($categoryMasterSites, function($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
         if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter) return false;
         if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter) return false;
+        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter) return false;
         return true;
     });
     $totalMasterSites = count($filteredMasterSites);
@@ -257,7 +297,7 @@ try {
     $stats['total_master_sites'] = $totalMasterSites;
     $stats['sites_display'] = "{$stats['total_sites']}/{$totalMasterSites} Sites";
 
-    // Build WHERE clauses for list items (includes DEPT, SUB DEPT, STATUS, and SEARCH)
+    // Build WHERE clauses for list items (includes DEPT, SUB DEPT, SITECODE, STATUS, and SEARCH)
     $params = $baseParams;
     $whereConditions = [];
     if ($deptFilter !== 'all' && $deptFilter !== '') {
@@ -267,6 +307,10 @@ try {
     if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
         $whereConditions[] = "sr.sub_dept = :sub_dept";
         $params[':sub_dept'] = $subDeptFilter;
+    }
+    if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
+        $whereConditions[] = "sr.sitecode = :sitecode";
+        $params[':sitecode'] = $sitecodeFilter;
     }
     if ($statusFilter !== 'all' && in_array($statusFilter, ['solved', 'unsolved', 'new_db'], true)) {
         $whereConditions[] = "cb.status = :status";
@@ -436,7 +480,8 @@ try {
             'stats' => $stats,
             'filter_options' => [
                 'depts' => $availableDepts,
-                'dept_subdept_map' => $deptSubDeptMap
+                'dept_subdept_map' => $deptSubDeptMap,
+                'sites' => $availableSitesList
             ],
             'data' => $sites,
             'total_sites' => $filteredSiteCount,
@@ -458,6 +503,24 @@ try {
     $countStmt->execute($params);
     $filteredTotal = (int)$countStmt->fetchColumn();
 
+    $allowedSortCols = [
+        'dept' => 'sr.dept',
+        'sub_dept' => 'sr.sub_dept',
+        'sitecode' => 'cb.sitecode',
+        'name_site' => 'sr.name_site',
+        'reg_no' => 'cb.reg_no',
+        'name' => 'cb.name',
+        'sn' => 'cb.sn',
+        'nbv' => 'cb.nbv',
+        'status' => 'cb.status',
+    ];
+
+    $orderBySql = "ORDER BY sr.dept ASC, sr.sub_dept ASC, cb.sitecode ASC, cb.reg_no ASC";
+    if (isset($allowedSortCols[$sortCol])) {
+        $dbCol = $allowedSortCols[$sortCol];
+        $orderBySql = "ORDER BY {$dbCol} {$sortDir}, cb.reg_no ASC";
+    }
+
     $dataSql = $sqlBase . "
         SELECT 
             cb.sitecode,
@@ -475,7 +538,7 @@ try {
         FROM combined cb
         INNER JOIN site_regional sr ON sr.sitecode = cb.sitecode
         $whereSql
-        ORDER BY sr.dept ASC, sr.sub_dept ASC, cb.sitecode ASC, cb.reg_no ASC
+        $orderBySql
         LIMIT :limit OFFSET :offset
     ";
     $dataStmt = $db->prepare($dataSql);
@@ -501,7 +564,8 @@ try {
         'stats' => $stats,
         'filter_options' => [
             'depts' => $availableDepts,
-            'dept_subdept_map' => $deptSubDeptMap
+            'dept_subdept_map' => $deptSubDeptMap,
+            'sites' => $availableSitesList
         ],
         'data' => $items,
         'total' => $filteredTotal,

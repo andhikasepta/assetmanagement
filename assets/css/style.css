@@ -3946,5 +3946,14 @@ textarea,
     background-color: #f1f5f9 !important;
 }
 
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 
 

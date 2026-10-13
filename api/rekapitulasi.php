@@ -10,6 +10,12 @@ require_once __DIR__ . '/../config/database.php';
 ini_set('memory_limit', '512M');
 set_time_limit(120);
 
+$action = trim($_GET['action'] ?? '');
+if ($action === 'export_excel') {
+    require __DIR__ . '/export_rekapitulasi.php';
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -53,7 +59,13 @@ try {
                 $baseTypes[$sc] = 'monthly';
                 $pmdSites[$sc] = true;
             } else {
-                $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+                if (empty($s['is_active'])) {
+                    $baseTypes[$sc] = 'inactive';
+                } elseif (empty($s['is_counted'])) {
+                    $baseTypes[$sc] = 'uncounted';
+                } else {
+                    $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+                }
             }
         }
 
@@ -151,7 +163,7 @@ try {
 
             for ($m = 1; $m <= 12; $m++) {
                 $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
-                if ($eff === 'inactive' || empty($s['is_active']) || empty($s['is_counted']))
+                if ($eff === 'inactive' || $eff === 'uncounted')
                     continue;
                 $isPmd = ($dept === 'PMD' || $cat === 'monthly_pmd');
                 if ($soType === 'quarterly') {
@@ -324,8 +336,24 @@ try {
         )";
     }
 
-    $whereParts[] = "COALESCE(is_active, TRUE) = TRUE";
-    $whereParts[] = "COALESCE(is_counted, TRUE) = TRUE";
+    $whereParts[] = "(
+        (COALESCE(site_regional.is_active, TRUE) = TRUE AND COALESCE(site_regional.is_counted, TRUE) = TRUE)
+        OR EXISTS (
+            SELECT 1 FROM asset_reconciliation ar 
+            WHERE ar.period_year = {$year}
+              AND (
+                  ar.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
+                  OR ar.profile ILIKE '%-' || site_regional.sitecode || '-%'
+                  OR ar.profile ILIKE '% ' || site_regional.sitecode || ' %'
+                  OR ar.profile ILIKE '%' || site_regional.sitecode || '%'
+              )
+        )
+        OR EXISTS (
+            SELECT 1 FROM site_group_history sgh 
+            WHERE UPPER(sgh.sitecode) = UPPER(site_regional.sitecode)
+              AND sgh.effective_year = {$year}
+        )
+    )";
     $whereSql = "WHERE " . implode(' AND ', $whereParts);
 
     $siteStmt = $db->query("
@@ -341,7 +369,15 @@ try {
     $baseTypes = [];
     foreach ($sites as $s) {
         $sc = strtoupper(trim($s['sitecode'] ?? ''));
-        $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+        if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+            $baseTypes[$sc] = 'monthly';
+        } elseif (empty($s['is_active'])) {
+            $baseTypes[$sc] = 'inactive';
+        } elseif (empty($s['is_counted'])) {
+            $baseTypes[$sc] = 'uncounted';
+        } else {
+            $baseTypes[$sc] = $s['group_type'] ?: 'monthly';
+        }
     }
 
     $histStmt = $db->prepare("
@@ -431,14 +467,13 @@ try {
             $val = null;
             $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
 
-            // Determine if this month should be displayed (based on effective type of that period):
-            // - 'inactive' period: never looked up, shown as -
+            // - 'inactive' or 'uncounted' period: never looked up, shown as -
             // - Quarterly view: ONLY quarter-end months (Mar/Q1, Jun/Q2, Sep/Q3, Dec/Q4),
             //   and only if the site is effectively quarterly in that period. Periods when the
             //   site was monthly stay on the Monthly rekap and are '-' here.
             // - Monthly view: only periods where the site is effectively monthly. Periods after
             //   the site switched to quarterly are '-' here and appear on the Quarterly rekap.
-            $canShow = ($eff !== 'inactive');
+            $canShow = ($eff !== 'inactive' && $eff !== 'uncounted');
             if ($canShow && $isQuarterlyCat) {
                 $canShow = in_array($m, [3, 6, 9, 12], true) && $eff === 'quarterly';
             } elseif ($canShow && !$isQuarterlyCat) {
