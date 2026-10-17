@@ -43,6 +43,7 @@ try {
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS group_type VARCHAR(20) DEFAULT 'monthly';
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_counted BOOLEAN DEFAULT TRUE;
+        ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE;
 
         CREATE TABLE IF NOT EXISTS site_group_history (
             id SERIAL PRIMARY KEY,
@@ -356,6 +357,7 @@ try {
                 ) as group_type,
                 COALESCE(sr.is_active, TRUE) as is_active,
                 COALESCE(sr.is_counted, TRUE) as is_counted,
+                COALESCE(sr.is_synced, (SELECT COUNT(*) > 0 FROM site_group_history sgh WHERE sgh.sitecode = sr.sitecode)) as is_synced,
                 (SELECT COUNT(*) FROM site_group_history sgh WHERE sgh.sitecode = sr.sitecode) as history_count
             FROM site_regional sr
             $whereSql
@@ -385,17 +387,25 @@ try {
         if ($action === 'update_info') {
             $id = (int) ($jsonPayload['id'] ?? $_POST['id'] ?? 0);
             $info = trim($jsonPayload['info'] ?? $_POST['info'] ?? '');
-            $allowedInfo = ['Outlet', 'Subarep', 'HUB', 'Under Warehouse'];
+            $allowedInfo = ['Outlet', 'Subarep', 'HUB', 'Under Warehouse', 'HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate'];
             if (!in_array($info, $allowedInfo, true)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Invalid Info value. Allowed: Outlet, Subarep, HUB, Under Warehouse']);
+                echo json_encode(['success' => false, 'message' => 'Invalid Info value. Allowed: Outlet, Subarep, HUB Monthly, HUB Quarterly, IT Coorporate, Under Warehouse, HUB']);
                 exit;
             }
 
-            $stmt = $db->prepare("UPDATE site_regional SET info = :info, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
-            $stmt->execute([':info' => $info, ':id' => $id]);
+            if ($info === 'HUB Quarterly') {
+                $stmt = $db->prepare("UPDATE site_regional SET info = :info, group_type = 'quarterly', updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+                $stmt->execute([':info' => $info, ':id' => $id]);
+            } elseif ($info === 'HUB Monthly' || $info === 'IT Coorporate' || $info === 'IT Corporate') {
+                $stmt = $db->prepare("UPDATE site_regional SET info = :info, group_type = 'monthly', updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+                $stmt->execute([':info' => $info, ':id' => $id]);
+            } else {
+                $stmt = $db->prepare("UPDATE site_regional SET info = :info, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+                $stmt->execute([':info' => $info, ':id' => $id]);
+            }
 
-            echo json_encode(['success' => true, 'message' => 'Info updated successfully']);
+            echo json_encode(['success' => true, 'message' => 'Info updated successfully', 'info' => $info]);
             exit;
         }
 
@@ -584,6 +594,222 @@ try {
             exit;
         }
 
+        // Helper function for profile syncing (used by sync_profile and sync_all_profiles)
+        $executeSyncSite = function($site, $maxYear, $maxMonth, $nextYear, $nextMonth) use ($db) {
+            $sc = strtoupper(trim($site['sitecode'] ?? ''));
+            if ($sc === '') return ['mapped' => 0, 'group_type' => 'monthly'];
+            $isPmd = (strtoupper(trim($site['dept'] ?? '')) === 'PMD');
+
+            // 1. Fetch matching profiles from asset_reconciliation up to max period
+            $profStmt = $db->prepare("
+                SELECT period_year, period_month, profile
+                FROM asset_reconciliation ar
+                WHERE (
+                    ar.profile ILIKE '% - ' || :sc || ' - %'
+                    OR ar.profile ILIKE '%-' || :sc || '-%'
+                    OR ar.profile ILIKE '% ' || :sc || ' %'
+                    OR ar.profile ILIKE '%' || :sc || '%'
+                )
+                AND (ar.period_year < :maxY OR (ar.period_year = :maxY AND ar.period_month <= :maxM))
+                ORDER BY period_year ASC, period_month ASC
+            ");
+            $profStmt->execute([':sc' => $sc, ':maxY' => $maxYear, ':maxM' => $maxMonth]);
+            $profiles = $profStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $periods = [];
+            foreach ($profiles as $p) {
+                $y = (int)$p['period_year'];
+                $m = (int)$p['period_month'];
+                $key = "{$y}-{$m}";
+                if (!isset($periods[$key])) {
+                    $periods[$key] = [
+                        'year' => $y,
+                        'month' => $m,
+                        'is_quarterly' => false,
+                        'profiles' => []
+                    ];
+                }
+                $periods[$key]['profiles'][] = $p['profile'];
+                if (preg_match('/\bQ[1-4]\b/i', $p['profile'])) {
+                    $periods[$key]['is_quarterly'] = true;
+                }
+            }
+
+            $mappedCount = 0;
+            $hasQuarterly = false;
+            $latestType = $site['group_type'] ?? 'monthly';
+
+            if (!$isPmd && !empty($periods)) {
+                $insertHist = $db->prepare("
+                    INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                    VALUES (:sc, :gt, :y, :m, :notes)
+                    ON CONFLICT (sitecode, effective_year, effective_month)
+                    DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
+                ");
+
+                foreach ($periods as $p) {
+                    $gt = $p['is_quarterly'] ? 'quarterly' : 'monthly';
+                    if ($gt === 'quarterly') $hasQuarterly = true;
+                    $latestType = $gt;
+
+                    $insertHist->execute([
+                        ':sc' => $sc,
+                        ':gt' => $gt,
+                        ':y' => $p['year'],
+                        ':m' => $p['month'],
+                        ':notes' => 'Auto-synced from Profile'
+                    ]);
+                    $mappedCount++;
+                }
+            }
+
+            // 2. Remove any stale uncounted rule for periods <= latest uploaded SO period
+            $delStaleUncounted = $db->prepare("
+                DELETE FROM site_group_history
+                WHERE UPPER(sitecode) = :sc
+                  AND group_type = 'uncounted'
+                  AND (effective_year < :maxY OR (effective_year = :maxY AND effective_month <= :maxM))
+            ");
+            $delStaleUncounted->execute([':sc' => $sc, ':maxY' => $maxYear, ':maxM' => $maxMonth]);
+
+            // 3. Set the subsequent period (not yet uploaded) to uncounted
+            $insertNextUncounted = $db->prepare("
+                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                VALUES (:sc, 'uncounted', :nextY, :nextM, 'Pending next period SO Master Data upload')
+                ON CONFLICT (sitecode, effective_year, effective_month)
+                DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
+            ");
+            $insertNextUncounted->execute([
+                ':sc' => $sc,
+                ':nextY' => $nextYear,
+                ':nextM' => $nextMonth
+            ]);
+
+            $targetGt = $isPmd ? 'monthly' : ($hasQuarterly ? 'quarterly' : $latestType);
+
+            $catUpdateSql = ($targetGt === 'quarterly') 
+                ? "category = CASE WHEN category = 'monthly_outlet' THEN 'quarterly' ELSE category END, " 
+                : "";
+
+            $upd = $db->prepare("
+                UPDATE site_regional
+                SET group_type = :gt,
+                    {$catUpdateSql}
+                    is_synced = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+            $upd->execute([':gt' => $targetGt, ':id' => $site['id']]);
+
+            return [
+                'mapped_count' => $mappedCount,
+                'group_type'   => $targetGt
+            ];
+        };
+
+        // 2d. Sync Profile: Single site automatic lookup
+        if ($action === 'sync_profile') {
+            $id = (int) ($jsonPayload['id'] ?? $_POST['id'] ?? 0);
+            $sitecode = strtoupper(trim($jsonPayload['sitecode'] ?? $_POST['sitecode'] ?? ''));
+
+            if ($id <= 0 && $sitecode === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Valid site ID or sitecode required']);
+                exit;
+            }
+
+            if ($sitecode === '' && $id > 0) {
+                $scStmt = $db->prepare("SELECT sitecode FROM site_regional WHERE id = :id");
+                $scStmt->execute([':id' => $id]);
+                $sitecode = strtoupper(trim((string)$scStmt->fetchColumn()));
+            }
+
+            if ($id <= 0 && $sitecode !== '') {
+                $idStmt = $db->prepare("SELECT id FROM site_regional WHERE UPPER(sitecode) = :sc LIMIT 1");
+                $idStmt->execute([':sc' => $sitecode]);
+                $id = (int)$idStmt->fetchColumn();
+            }
+
+            // Check site row
+            $srStmt = $db->prepare("SELECT id, sitecode, dept, group_type, category, is_active FROM site_regional WHERE id = :id");
+            $srStmt->execute([':id' => $id]);
+            $siteRow = $srStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$siteRow) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Site record not found']);
+                exit;
+            }
+
+            // Latest period in asset_reconciliation
+            $maxStmt = $db->query("SELECT period_year, period_month FROM asset_reconciliation ORDER BY period_year DESC, period_month DESC LIMIT 1");
+            $maxRow = $maxStmt->fetch(PDO::FETCH_ASSOC);
+            $maxYear = $maxRow ? (int)$maxRow['period_year'] : (int)date('Y');
+            $maxMonth = $maxRow ? (int)$maxRow['period_month'] : (int)date('n');
+
+            $nextYear = ($maxMonth === 12) ? ($maxYear + 1) : $maxYear;
+            $nextMonth = ($maxMonth === 12) ? 1 : ($maxMonth + 1);
+
+            $res = $executeSyncSite($siteRow, $maxYear, $maxMonth, $nextYear, $nextMonth);
+
+            $message = $res['mapped_count'] > 0 
+                ? "Berhasil sinkronisasi: {$res['mapped_count']} periode profil dipetakan (Group Type: " . ucfirst($res['group_type']) . ", periode {$nextMonth}/{$nextYear} diset Uncounted)"
+                : "Sinkronisasi selesai (Group Type tetap: " . ucfirst($res['group_type']) . ", periode {$nextMonth}/{$nextYear} diset Uncounted)";
+
+            echo json_encode([
+                'success'      => true,
+                'message'      => $message,
+                'mapped_count' => $res['mapped_count'],
+                'group_type'   => $res['group_type'],
+                'is_synced'    => true
+            ]);
+            exit;
+        }
+
+        // 2e. Sync All Profiles: Batch lookup for all sites
+        if ($action === 'sync_all_profiles') {
+            $maxStmt = $db->query("SELECT period_year, period_month FROM asset_reconciliation ORDER BY period_year DESC, period_month DESC LIMIT 1");
+            $maxRow = $maxStmt->fetch(PDO::FETCH_ASSOC);
+            $maxYear = $maxRow ? (int)$maxRow['period_year'] : (int)date('Y');
+            $maxMonth = $maxRow ? (int)$maxRow['period_month'] : (int)date('n');
+
+            $nextYear = ($maxMonth === 12) ? ($maxYear + 1) : $maxYear;
+            $nextMonth = ($maxMonth === 12) ? 1 : ($maxMonth + 1);
+
+            $allSitesStmt = $db->query("SELECT id, sitecode, dept, group_type, category FROM site_regional ORDER BY id ASC");
+            $allSites = $allSitesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $syncedCount = 0;
+            $totalMapped = 0;
+
+            $db->beginTransaction();
+            try {
+                foreach ($allSites as $s) {
+                    $res = $executeSyncSite($s, $maxYear, $maxMonth, $nextYear, $nextMonth);
+                    $syncedCount++;
+                    $totalMapped += $res['mapped_count'];
+                }
+                $db->commit();
+            } catch (Exception $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Gagal sinkronisasi seluruh site: ' . $e->getMessage()]);
+                exit;
+            }
+
+            echo json_encode([
+                'success'       => true,
+                'message'       => "Berhasil sinkronisasi {$syncedCount} site master data sampai periode {$maxMonth}/{$maxYear}. Periode {$nextMonth}/{$nextYear} diset Uncounted.",
+                'total_sites'   => $syncedCount,
+                'total_mapped'  => $totalMapped,
+                'latest_period' => "{$maxMonth}/{$maxYear}",
+                'next_period'   => "{$nextMonth}/{$nextYear}"
+            ]);
+            exit;
+        }
+
         // 3. Add History Rule
         if ($action === 'add_history') {
             $sitecode = trim($jsonPayload['sitecode'] ?? $_POST['sitecode'] ?? '');
@@ -720,7 +946,8 @@ try {
                 for ($i = 0; $i < min(6, count($rows)); $i++) {
                     $maxCols = max($maxCols, count($rows[$i] ?? []));
                     $rowStr = strtolower(implode(' ', array_map('strval', $rows[$i])));
-                    if (str_contains($rowStr, 'regional') || str_contains($rowStr, 'dept') || str_contains($rowStr, 'sitecode') || str_contains($rowStr, 'name site') || str_contains($rowStr, 'sub dept')) {
+                    $cleanRow = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $rowStr));
+                    if (str_contains($cleanRow, 'dept') || str_contains($cleanRow, 'sitecode') || str_contains($cleanRow, 'sitename') || str_contains($cleanRow, 'namesite') || str_contains($cleanRow, 'regional')) {
                         $dataStartIndex = $i + 1;
                     }
                 }
@@ -739,30 +966,43 @@ try {
 
                 $map = [];
                 foreach ($compositeHeaders as $c => $h) {
-                    if (str_contains($h, 'regional') && !isset($map['regional'])) {
-                        $map['regional'] = $c;
-                    } elseif ((str_contains($h, 'sub dept') || str_contains($h, 'sub_dept') || str_contains($h, 'subdept')) && !isset($map['sub_dept'])) {
+                    $clean = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $h));
+                    if ((str_contains($clean, 'subdept') || str_contains($clean, 'subdepartment')) && !isset($map['sub_dept'])) {
                         $map['sub_dept'] = $c;
-                    } elseif (str_contains($h, 'dept') && !str_contains($h, 'sub') && !isset($map['dept'])) {
-                        $map['dept'] = $c;
-                    } elseif ((str_contains($h, 'sitecode') || str_contains($h, 'site code') || str_contains($h, 'site_code')) && !isset($map['sitecode'])) {
+                    } elseif ((str_contains($clean, 'sitecode') || str_contains($clean, 'kodesite') || str_contains($clean, 'siteid')) && !isset($map['sitecode'])) {
                         $map['sitecode'] = $c;
-                    } elseif ((str_contains($h, 'name site') || str_contains($h, 'name_site') || str_contains($h, 'namesite')) && !isset($map['name_site'])) {
+                    } elseif ((str_contains($clean, 'sitename') || str_contains($clean, 'namesite') || str_contains($clean, 'namasite') || (str_contains($clean, 'site') && str_contains($clean, 'name'))) && !isset($map['name_site'])) {
                         $map['name_site'] = $c;
-                    } elseif (str_contains($h, 'info') && !isset($map['info'])) {
+                    } elseif ((str_contains($clean, 'dept') || str_contains($clean, 'department')) && !isset($map['dept'])) {
+                        $map['dept'] = $c;
+                    } elseif (str_contains($clean, 'region') && !isset($map['regional'])) {
+                        $map['regional'] = $c;
+                    } elseif (str_contains($clean, 'info') && !isset($map['info'])) {
                         $map['info'] = $c;
-                    } elseif ((str_contains($h, 'group') || str_contains($h, 'group_type') || str_contains($h, 'group type')) && !isset($map['group_type'])) {
+                    } elseif (str_contains($clean, 'group') && !isset($map['group_type'])) {
                         $map['group_type'] = $c;
-                    } elseif ((str_contains($h, 'active') || str_contains($h, 'is_active') || str_contains($h, 'aktif') || str_contains($h, 'status')) && !isset($map['is_active'])) {
+                    } elseif ((str_contains($clean, 'active') || str_contains($clean, 'isactive') || str_contains($clean, 'aktif') || str_contains($clean, 'status')) && !isset($map['is_active'])) {
                         $map['is_active'] = $c;
                     }
                 }
 
-                if (!isset($map['regional']))  $map['regional']  = 0;
-                if (!isset($map['dept']))      $map['dept']      = 1;
-                if (!isset($map['sub_dept']))   $map['sub_dept']   = 2;
-                if (!isset($map['sitecode']))  $map['sitecode']  = 3;
-                if (!isset($map['name_site'])) $map['name_site'] = 4;
+                // Fallback column positions if headers were not labeled
+                if (!isset($map['sitecode']) || !isset($map['name_site'])) {
+                    if (isset($map['regional'])) {
+                        // 5-column format with regional: Regional, Dept, Sub-Dept, SiteCode, Sitename
+                        if (!isset($map['regional']))  $map['regional']  = 0;
+                        if (!isset($map['dept']))      $map['dept']      = 1;
+                        if (!isset($map['sub_dept']))  $map['sub_dept']  = 2;
+                        if (!isset($map['sitecode']))  $map['sitecode']  = 3;
+                        if (!isset($map['name_site'])) $map['name_site'] = 4;
+                    } else {
+                        // 4-column modern format: Dept, Sub-Dept, SiteCode, Sitename
+                        if (!isset($map['dept']))      $map['dept']      = 0;
+                        if (!isset($map['sub_dept']))  $map['sub_dept']  = 1;
+                        if (!isset($map['sitecode']))  $map['sitecode']  = 2;
+                        if (!isset($map['name_site'])) $map['name_site'] = 3;
+                    }
+                }
 
                 $replaceExisting = isset($_POST['replace_existing']) && $_POST['replace_existing'] === '1';
 
@@ -772,25 +1012,28 @@ try {
                     $db->exec('DELETE FROM site_regional');
                 }
 
-                $findStmt = $db->prepare('SELECT id FROM site_regional WHERE sitecode = :sitecode LIMIT 1');
+                $findStmt = $db->prepare('SELECT id FROM site_regional WHERE UPPER(sitecode) = UPPER(:sitecode) LIMIT 1');
                 $updateStmt = $db->prepare('
                     UPDATE site_regional
                     SET regional = :regional, dept = :dept, sub_dept = :sub_dept, name_site = :name_site, info = :info, group_type = :group_type, is_active = :is_active, updated_at = CURRENT_TIMESTAMP
                     WHERE id = :id
                 ');
                 $insertStmt = $db->prepare('
-                    INSERT INTO site_regional (category, regional, dept, sub_dept, sitecode, name_site, info, group_type, is_active)
-                    VALUES (:category, :regional, :dept, :sub_dept, :sitecode, :name_site, :info, :group_type, :is_active)
+                    INSERT INTO site_regional (category, regional, dept, sub_dept, sitecode, name_site, info, group_type, is_active, is_synced)
+                    VALUES (:category, :regional, :dept, :sub_dept, :sitecode, :name_site, :info, :group_type, :is_active, FALSE)
                 ');
 
                 $importedCount = 0;
                 for ($r = $dataStartIndex; $r < count($rows); $r++) {
                     $row = $rows[$r];
-                    $sitecode = trim((string)($row[$map['sitecode']] ?? ''));
-                    $nameSite = trim((string)($row[$map['name_site']] ?? ''));
-                    $regional = trim((string)($row[$map['regional']] ?? ''));
-                    $dept     = trim((string)($row[$map['dept']] ?? ''));
-                    $subDept  = trim((string)($row[$map['sub_dept']] ?? ''));
+                    $sitecode = isset($map['sitecode']) ? trim((string)($row[$map['sitecode']] ?? '')) : '';
+                    $nameSite = isset($map['name_site']) ? trim((string)($row[$map['name_site']] ?? '')) : '';
+                    $dept     = isset($map['dept']) ? trim((string)($row[$map['dept']] ?? '')) : '';
+                    $subDept  = isset($map['sub_dept']) ? trim((string)($row[$map['sub_dept']] ?? '')) : '';
+                    $regional = isset($map['regional']) ? trim((string)($row[$map['regional']] ?? '')) : '';
+                    if ($regional === '' && $dept !== '') {
+                        $regional = $dept;
+                    }
 
                     if ($sitecode === '' && $nameSite === '') continue;
 
@@ -799,14 +1042,19 @@ try {
                     if (isset($map['info']) && isset($row[$map['info']])) {
                         $rawInfo = trim((string)$row[$map['info']]);
                         $lowerInfo = strtolower($rawInfo);
-                        if (str_contains($lowerInfo, 'subarep') || str_contains($lowerInfo, 'sub arep')) $info = 'Subarep';
+                        if (str_contains($lowerInfo, 'hub monthly') || str_contains($lowerInfo, 'hub-monthly')) $info = 'HUB Monthly';
+                        elseif (str_contains($lowerInfo, 'hub quarterly') || str_contains($lowerInfo, 'hub-quarterly')) $info = 'HUB Quarterly';
+                        elseif (str_contains($lowerInfo, 'coorporate') || str_contains($lowerInfo, 'corporate')) $info = 'IT Coorporate';
+                        elseif (str_contains($lowerInfo, 'subarep') || str_contains($lowerInfo, 'sub arep')) $info = 'Subarep';
                         elseif (str_contains($lowerInfo, 'gudang') || str_contains($lowerInfo, 'warehouse') || str_contains($lowerInfo, 'under')) $info = 'Under Warehouse';
                         elseif (str_contains($lowerInfo, 'hub')) $info = 'HUB';
                         elseif (str_contains($lowerInfo, 'outlet')) $info = 'Outlet';
                     }
                     if (!$info) {
                         $lowerName = strtolower($nameSite);
-                        if (str_contains($lowerName, 'subarep') || str_contains($lowerName, 'sub arep') || str_contains($lowerName, 'sub-arep') || str_contains($lowerName, 'sub outlet') || str_contains($lowerName, 'suboutlet')) {
+                        if (str_contains($lowerName, 'it corporate') || str_contains($lowerName, 'it coorporate') || str_contains($lowerName, 'coorporate') || str_contains($lowerName, 'corporate')) {
+                            $info = 'IT Coorporate';
+                        } elseif (str_contains($lowerName, 'subarep') || str_contains($lowerName, 'sub arep') || str_contains($lowerName, 'sub-arep') || str_contains($lowerName, 'sub outlet') || str_contains($lowerName, 'suboutlet')) {
                             $info = 'Subarep';
                         } elseif (str_contains($lowerName, 'gudang') || str_contains($lowerName, 'warehouse') || str_contains($lowerName, 'under')) {
                             $info = 'Under Warehouse';

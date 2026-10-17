@@ -494,8 +494,9 @@ try {
             $importedCount++;
         }
 
-        // Dynamically record quarterly profile detected in imported period to site_group_history
+        // Automatically lookup profile period and map group type for all sites on upload
         if ($selectedMonth && $selectedYear) {
+            // 1. Record quarterly profiles detected in imported period
             $db->exec("
                 INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
                 SELECT DISTINCT sr.sitecode, 'quarterly', {$selectedYear}, {$selectedMonth}, 'Auto-detected Quarterly Profile'
@@ -510,21 +511,55 @@ try {
                   AND ar.profile ~* '\\mQ[1-4]\\M'
                   AND sr.dept != 'PMD'
                   AND COALESCE(sr.is_active, TRUE) = TRUE
-                  AND NOT EXISTS (
-                      SELECT 1 FROM site_group_history sgh_in 
-                      WHERE sgh_in.sitecode = sr.sitecode 
-                        AND (sgh_in.effective_year < {$selectedYear} OR (sgh_in.effective_year = {$selectedYear} AND sgh_in.effective_month <= {$selectedMonth}))
-                        AND sgh_in.group_type = 'inactive'
-                  )
                 ON CONFLICT (sitecode, effective_year, effective_month)
                 DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
             ");
 
-            // Sync site_regional group_type to 'quarterly' for sites that only have quarterly profiles (no monthly profiles)
+            // 2. Record monthly profiles for non-PMD sites in imported period (where not quarterly)
+            $db->exec("
+                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                SELECT DISTINCT sr.sitecode, 'monthly', {$selectedYear}, {$selectedMonth}, 'Auto-detected Monthly Profile'
+                FROM site_regional sr
+                JOIN asset_reconciliation ar ON (
+                    ar.profile ILIKE '% - ' || sr.sitecode || ' - %'
+                    OR ar.profile ILIKE '%-' || sr.sitecode || '-%'
+                    OR ar.profile ILIKE '% ' || sr.sitecode || ' %'
+                    OR ar.profile ILIKE '%' || sr.sitecode || '%'
+                )
+                WHERE ar.period_year = {$selectedYear} AND ar.period_month = {$selectedMonth}
+                  AND ar.profile !~* '\\mQ[1-4]\\M'
+                  AND sr.dept != 'PMD'
+                  AND COALESCE(sr.is_active, TRUE) = TRUE
+                ON CONFLICT (sitecode, effective_year, effective_month)
+                DO UPDATE SET group_type = CASE WHEN site_group_history.group_type = 'quarterly' THEN 'quarterly' ELSE EXCLUDED.group_type END,
+                              notes = EXCLUDED.notes
+            ");
+
+            // 3. Clear any stale uncounted rule for period <= selected period
+            $db->exec("
+                DELETE FROM site_group_history
+                WHERE group_type = 'uncounted'
+                  AND (effective_year < {$selectedYear} OR (effective_year = {$selectedYear} AND effective_month <= {$selectedMonth}))
+            ");
+
+            // 4. Set subsequent period to uncounted for all active sites
+            $nextYear = ($selectedMonth === 12) ? ($selectedYear + 1) : $selectedYear;
+            $nextMonth = ($selectedMonth === 12) ? 1 : ($selectedMonth + 1);
+            $db->exec("
+                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
+                SELECT sr.sitecode, 'uncounted', {$nextYear}, {$nextMonth}, 'Pending next period SO Master Data upload'
+                FROM site_regional sr
+                WHERE COALESCE(sr.is_active, TRUE) = TRUE
+                ON CONFLICT (sitecode, effective_year, effective_month)
+                DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
+            ");
+
+            // 5. Update site_regional group_type to 'quarterly' for sites with quarterly profile
             $db->exec("
                 UPDATE site_regional
                 SET group_type = 'quarterly',
                     category = CASE WHEN category = 'monthly_outlet' THEN 'quarterly' ELSE category END,
+                    is_synced = TRUE,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE dept != 'PMD'
                   AND EXISTS (
@@ -537,16 +572,13 @@ try {
                       )
                       AND ar.profile ~* '\\mQ[1-4]\\M'
                   )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM asset_reconciliation ar_m
-                      WHERE (
-                          ar_m.profile ILIKE '% - ' || site_regional.sitecode || ' - %'
-                          OR ar_m.profile ILIKE '%-' || site_regional.sitecode || '-%'
-                          OR ar_m.profile ILIKE '% ' || site_regional.sitecode || ' %'
-                          OR ar_m.profile ILIKE '%' || site_regional.sitecode || '%'
-                      )
-                      AND ar_m.profile !~* '\\mQ[1-4]\\M'
-                  )
+            ");
+
+            $db->exec("
+                UPDATE site_regional
+                SET is_synced = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE is_synced IS NOT TRUE
             ");
         }
 

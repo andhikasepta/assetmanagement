@@ -36,7 +36,9 @@ if ($year < 2000 || $year > 2100) {
 $category = trim($payload['category'] ?? $_GET['category'] ?? 'pmd');
 $catLabel = trim($payload['category_label'] ?? $_GET['category_label'] ?? '');
 if (empty($catLabel)) {
-    if (stripos($category, 'pmd') !== false) {
+    if ($category === 'all' || $category === 'all_monthly' || $category === 'all_quarterly') {
+        $catLabel = 'All Summary';
+    } elseif (stripos($category, 'pmd') !== false) {
         $catLabel = 'PMD';
     } elseif (stripos($category, 'warehouse') !== false) {
         $catLabel = 'Warehouse & HUB';
@@ -60,16 +62,30 @@ if (!is_array($rows)) {
         $db = getDbConnection();
 
         $whereParts = [];
-        if ($category === 'pmd' || $category === 'monthly_pmd') {
+        if ($category === 'all' || $category === 'all_monthly' || $category === 'all_quarterly') {
+            if ($isQuarterly || $soType === 'quarterly') {
+                $whereParts[] = "(group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+            } else {
+                $whereParts[] = "(group_type != 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type != 'quarterly'))";
+            }
+        } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
             $whereParts[] = "dept = 'PMD'";
+        } elseif ($category === 'quarterly_tekno' || $category === 'quarterly_warehouse_tekno' || ($category === 'warehouse_tekno' && ($isQuarterly || $soType === 'quarterly'))) {
+            $whereParts[] = "COALESCE(dept, '') != 'PMD' AND name_site ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        } elseif ($category === 'monthly_tekno' || $category === 'monthly_warehouse_tekno' || $category === 'warehouse_tekno') {
+            $whereParts[] = "COALESCE(dept, '') != 'PMD' AND name_site ILIKE '%TEKNO%' AND (group_type != 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type != 'quarterly'))";
         } elseif ($category === 'quarterly_subarep') {
-            $whereParts[] = "dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL) AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+            $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
         } elseif ($category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
-            $whereParts[] = "dept != 'PMD' AND info IN ('Under Warehouse', 'HUB') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+            $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))))";
+        } elseif ($category === 'monthly_warehouse' || $category === 'monthly_warehouse_hub') {
+            $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
+        } elseif ($category === 'monthly_it_coorporate' || $category === 'it_coorporate' || $category === 'monthly_it_corporate' || $category === 'it_corporate') {
+            $whereParts[] = "dept != 'PMD' AND info IN ('IT Coorporate', 'IT Corporate')";
         } elseif ($category === 'quarterly' || $category === 'quarterly_outlet') {
-            $whereParts[] = "dept != 'PMD' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+            $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
         } else {
-            $whereParts[] = "dept != 'PMD' AND (
+            $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB') OR info IS NULL) AND (
                 EXISTS (
                     SELECT 1 FROM asset_reconciliation ar 
                     WHERE ar.period_year = {$year}
@@ -160,7 +176,7 @@ if (!is_array($rows)) {
             }
         }
 
-        $isQuarterlyCat = in_array($category, ['quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub'], true);
+        $isQuarterlyCat = in_array($category, ['quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'], true) || $isQuarterly;
         $recStmt = $db->prepare("
             SELECT id, profile, period_month, period_year, total_physic_actual, total_physic_target, total_physic_pct
             FROM asset_reconciliation
@@ -366,11 +382,14 @@ $sheet->getRowDimension(1)->setRowHeight(18);
 
 // Row 2: Table Column Headers (Basic Excel Grey Style)
 $headerRow = 2;
+$isPmdCategory = ($category === 'pmd' || $category === 'monthly_pmd');
+$deptHeader = $isPmdCategory ? 'DIVISI' : 'DEPT';
+$subDeptHeader = $isPmdCategory ? 'DEPT' : 'SUB DEPT';
+
 $headers = [
     'NO',
-    'REGIONAL',
-    'DEPT',
-    'SUB DEPT',
+    $deptHeader,
+    $subDeptHeader,
     'SITECODE',
     'NAME SITE',
 ];
@@ -447,22 +466,20 @@ $rowCount = count($rows);
 for ($i = 0; $i < $rowCount; $i++) {
     $r = $rows[$i];
     $sheet->setCellValue("A{$currentRow}", $i + 1);
-    $sheet->setCellValue("B{$currentRow}", $r['regional'] ?? '');
-    $sheet->setCellValue("C{$currentRow}", $r['dept'] ?? '');
-    $sheet->setCellValue("D{$currentRow}", $r['sub_dept'] ?? '');
-    $sheet->setCellValue("E{$currentRow}", $r['sitecode'] ?? '');
-    $sheet->setCellValue("F{$currentRow}", $r['name_site'] ?? '');
+    $sheet->setCellValue("B{$currentRow}", $r['dept'] ?? '');
+    $sheet->setCellValue("C{$currentRow}", $r['sub_dept'] ?? '');
+    $sheet->setCellValue("D{$currentRow}", $r['sitecode'] ?? '');
+    $sheet->setCellValue("E{$currentRow}", $r['name_site'] ?? '');
 
     // Left alignments for text, center for codes/dept
     $sheet->getStyle("A{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle("B{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+    $sheet->getStyle("B{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle("C{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle("D{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle("E{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle("F{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+    $sheet->getStyle("E{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
     // Month cells
-    $col = 7;
+    $col = 6;
     $rowMonths = $r['months'] ?? [];
     foreach (array_keys($monthCols) as $m) {
         $cLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
@@ -513,7 +530,7 @@ for ($i = 0; $i < $rowCount; $i++) {
 
 // Summary Row: Average Total Physical %
 $summaryRow = $currentRow;
-$sheet->mergeCells("A{$summaryRow}:F{$summaryRow}");
+$sheet->mergeCells("A{$summaryRow}:E{$summaryRow}");
 $sheet->setCellValue("A{$summaryRow}", "AVERAGE TOTAL PHYSICAL % (" . $rowCount . " SITES)");
 
 $sheet->getStyle("A{$summaryRow}")->applyFromArray([
@@ -529,7 +546,7 @@ $sheet->getStyle("A{$summaryRow}")->applyFromArray([
     ],
 ]);
 
-$col = 7;
+$col = 6;
 foreach (array_keys($monthCols) as $m) {
     $cLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
     $coord = "{$cLetter}{$summaryRow}";
@@ -614,14 +631,13 @@ for ($c = 1; $c <= $lastColIndex; $c++) {
 }
 // Ensure specific minimum column widths
 $sheet->getColumnDimension('A')->setAutoSize(false)->setWidth(7);
-$sheet->getColumnDimension('B')->setWidth(18);
-$sheet->getColumnDimension('C')->setWidth(12);
+$sheet->getColumnDimension('B')->setWidth(12);
+$sheet->getColumnDimension('C')->setWidth(14);
 $sheet->getColumnDimension('D')->setWidth(14);
-$sheet->getColumnDimension('E')->setWidth(14);
-$sheet->getColumnDimension('F')->setWidth(30);
+$sheet->getColumnDimension('E')->setWidth(30);
 
-// Freeze header & identity panes (freeze row 2 and columns A-F)
-$sheet->freezePane('G3');
+// Freeze header & identity panes (freeze row 2 and columns A-E)
+$sheet->freezePane('F3');
 
 // Clean filename
 $safeCat = preg_replace('/[^A-Za-z0-9_-]/', '_', $catLabel);

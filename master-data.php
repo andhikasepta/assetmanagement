@@ -10,10 +10,14 @@ require_once __DIR__ . '/includes/security.php';
 
 sendSecurityHeaders();
 
+// Redirect cleanly to SPA container with clean URL
 if (!isLoggedIn()) {
-    header('Location: login.php');
-    exit;
+    $_SESSION['open_login_modal'] = true;
+} else {
+    $_SESSION['initial_page'] = 'master-data';
 }
+header('Location: ./');
+exit;
 
 $currentUser = getCurrentUser();
 $isLoggedIn = true;
@@ -80,6 +84,9 @@ $monthNames = [
 
         <!-- Navigation Menus: Master Data Admin -->
         <nav class="navbar-menu">
+            <a href="all-summary.php" class="nav-link" id="tab-all-summary">
+                All Summary
+            </a>
             <button class="nav-link active" data-page="master-data" id="tab-master-data">
                 Master Data
             </button>
@@ -327,8 +334,16 @@ $monthNames = [
                             <p class="card-subtitle">All Site master data</p>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                            <button class="btn btn-refresh" onclick="App.loadSiteRegional()">
+                            <button class="btn btn-refresh" onclick="App.loadSiteRegional()" title="Muat ulang tabel">
                                 Refresh
+                            </button>
+                            <button class="btn btn-success" id="btn-sync-all-sites" onclick="App.syncAllSiteProfiles()"
+                                title="Sinkronkan Group Type seluruh site dengan data profil Stock Opname terbaru"
+                                style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                                <span>Sync All</span>
                             </button>
                             <button class="btn btn-danger" id="sr-bulk-delete-btn" style="display: none;"
                                 onclick="App.bulkDeleteSiteRegional()" title="Hapus data terpilih">
@@ -356,13 +371,6 @@ $monthNames = [
                             <span>baris</span>
 
                             <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 4px;"></span>
-
-                            <label for="sr-filter-regional">REGIONAL</label>
-                            <select id="sr-filter-regional" class="form-control"
-                                style="width: auto; padding: 0.25rem 0.5rem;" autocomplete="off"
-                                onchange="App.onSRRegionalFilterChange()">
-                                <option value="all" selected>Semua Regional</option>
-                            </select>
 
                             <label for="sr-filter-dept">DEPT</label>
                             <select id="sr-filter-dept" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;"
@@ -412,11 +420,7 @@ $monthNames = [
                             <table class="reconciliation-table" id="sr-table">
                                 <thead>
                                     <tr>
-                                        <th colspan="4" class="text-center align-middle col-action-group">ACTION</th>
-                                        <th rowspan="2" class="text-center align-middle sortable"
-                                            onclick="App.toggleSRSort('regional')">
-                                            REGIONAL <span class="sort-indicator" data-sr-col="regional">⇅</span>
-                                        </th>
+                                        <th colspan="5" class="text-center align-middle col-action-group">ACTION</th>
                                         <th rowspan="2" class="text-center align-middle sortable"
                                             onclick="App.toggleSRSort('dept')">
                                             DEPT <span class="sort-indicator" data-sr-col="dept">⇅</span>
@@ -462,6 +466,11 @@ $monthNames = [
                                             style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
                                             title="Dihitung dalam Ringkasan / Count in summary">
                                             COUNT
+                                        </th>
+                                        <th class="text-center align-middle col-action-sync"
+                                            style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
+                                            title="Sinkronisasi Group Type Profil">
+                                            SYNC
                                         </th>
                                     </tr>
                                 </thead>
@@ -996,7 +1005,7 @@ $monthNames = [
     <div id="sr-import-modal" class="modal-backdrop">
         <div class="modal-dialog" style="max-width: 540px;">
             <div class="modal-header">
-                <h3 class="modal-title">Impor Data Site Regional</h3>
+                <h3 class="modal-title">Impor Data Site Master</h3>
                 <button class="modal-close-btn" onclick="App.closeSiteRegionalImportModal()">&times;</button>
             </div>
 
@@ -1005,6 +1014,7 @@ $monthNames = [
                 <!-- Drag and Drop Upload Area -->
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label">Unggah File (.xlsx, .xls)</label>
+                    <div style="font-size: 11.5px; color: #64748b; margin-top: 2px; margin-bottom: 6px;">Format header kolom: <strong>Dept</strong> | <strong>Sub-Dept</strong> | <strong>SiteCode</strong> | <strong>Sitename</strong></div>
                     <div id="sr-drag-drop-zone" class="drag-drop-zone"
                         onclick="document.getElementById('sr-import-file-input').click()">
                         <div class="drag-drop-text">Tarik &amp; lepas file Excel di sini</div>
@@ -1220,22 +1230,11 @@ $monthNames = [
 
                     <!-- Dynamic Note Rows Section -->
                     <div>
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                        <div style="margin-bottom: 0.65rem;">
                             <div
                                 style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">
                                 DAFTAR KETERANGAN
                             </div>
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="btn-add-note-row"
-                                onclick="App.addExecutiveNoteRow()"
-                                style="font-size: 11.5px; padding: 3px 9px; display: inline-flex; align-items: center; gap: 4px;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                Tambah Data
-                            </button>
                         </div>
 
                         <!-- Container for row cards -->

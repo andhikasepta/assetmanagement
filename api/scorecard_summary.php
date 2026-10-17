@@ -39,7 +39,7 @@ try {
 
     // 2. Determine whether this request is for Quarterly or Monthly
     $isQuarterly = ($soType === 'quarterly' || in_array($category, [
-        'quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'outlet_subarep', 'warehouse_hub'
+        'quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno', 'outlet_subarep'
     ], true));
 
     // Compute 3 rolling periods back
@@ -153,7 +153,9 @@ try {
         )"
     ];
 
-    if ($category === 'pmd' || $category === 'monthly_pmd') {
+    if ($category === 'all') {
+        // No dept filter for all category
+    } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
         $whereParts[] = "dept = 'PMD'";
     } else {
         $whereParts[] = "dept != 'PMD'";
@@ -206,30 +208,57 @@ try {
             continue;
         }
 
-        if ($isQuarterly) {
-            // Must be effectively quarterly
-            if ($isPmd || $effGroup !== 'quarterly') {
+        $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
+        if ($category === 'all') {
+            if ($isQuarterly) {
+                if ($effGroup !== 'quarterly') {
+                    continue;
+                }
+            } else {
+                if ($effGroup !== 'monthly') {
+                    continue;
+                }
+            }
+        } elseif ($isQuarterly) {
+            if ($isPmd) {
                 continue;
             }
 
             $info = trim($s['info'] ?? '');
-            if ($category === 'warehouse_hub' || $category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
-                if (!in_array($info, ['Under Warehouse', 'HUB'], true)) {
+            if ($category === 'warehouse_tekno' || $category === 'quarterly_tekno' || $category === 'quarterly_warehouse_tekno') {
+                if (!$isTekno || $effGroup !== 'quarterly') {
+                    continue;
+                }
+            } elseif ($category === 'warehouse_hub' || $category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
+                if ($isTekno || ($info !== 'HUB Quarterly' && !($effGroup === 'quarterly' && $info === 'HUB'))) {
                     continue;
                 }
             } else {
                 // outlet_subarep / quarterly_subarep / quarterly_outlet / default quarterly
-                if (!in_array($info, ['Subarep', 'Outlet', ''], true) && !empty($info)) {
+                if ($isTekno || $effGroup !== 'quarterly' || (!in_array($info, ['Subarep', 'Outlet', ''], true) && !empty($info))) {
                     continue;
                 }
             }
         } else {
             // Monthly view
+            $info = trim($s['info'] ?? '');
             if ($category === 'pmd' || $category === 'monthly_pmd') {
                 if (!$isPmd) continue;
+            } elseif ($category === 'warehouse_tekno' || $category === 'monthly_tekno' || $category === 'monthly_warehouse_tekno') {
+                if ($isPmd || !$isTekno || $effGroup !== 'monthly') {
+                    continue;
+                }
+            } elseif ($category === 'warehouse_hub' || $category === 'monthly_warehouse' || $category === 'monthly_warehouse_hub') {
+                if ($isPmd || $isTekno || ($info !== 'HUB Monthly' && !($effGroup === 'monthly' && $info === 'HUB'))) {
+                    continue;
+                }
+            } elseif ($category === 'it_coorporate' || $category === 'it_corporate' || $category === 'monthly_it_coorporate') {
+                if ($isPmd || !in_array($info, ['IT Coorporate', 'IT Corporate'], true)) {
+                    continue;
+                }
             } else {
                 // Non-PMD Outlet Monthly: effective group_type MUST be 'monthly'
-                if ($isPmd || $effGroup !== 'monthly') {
+                if ($isPmd || $isTekno || $effGroup !== 'monthly' || in_array($info, ['HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB'], true)) {
                     continue;
                 }
             }

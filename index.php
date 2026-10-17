@@ -15,7 +15,8 @@ $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $parsedPath = parse_url($requestUri, PHP_URL_PATH);
 if (is_string($parsedPath) && (str_ends_with($parsedPath, '/index.php') || $parsedPath === 'index.php')) {
     $cleanPath = preg_replace('#/index\.php$#', '/', $parsedPath);
-    if ($cleanPath === '') $cleanPath = './';
+    if ($cleanPath === '')
+        $cleanPath = './';
     $queryString = $_SERVER['QUERY_STRING'] ?? '';
     $targetUrl = $cleanPath . ($queryString !== '' ? '?' . $queryString : '');
     header('Location: ' . $targetUrl, true, 301);
@@ -82,100 +83,91 @@ $monthNames = [
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="./" class="navbar-brand">
+            <a href="javascript:void(0)" onclick="App.navigateTo(window.AUTH_USER ? 'all-summary' : 'summary')" class="navbar-brand">
                 Asset Management
             </a>
         </div>
 
-        <!-- Navigation Menus: Summary (Tampilan Utama) & Master Data if logged in -->
-        <nav class="navbar-menu">
-            <button class="nav-link active" data-page="summary" id="tab-summary">
+        <!-- Navigation Menus: Summary, All Summary, Master Data (SPA) -->
+        <nav class="navbar-menu" id="navbar-menu">
+            <button type="button" class="nav-link <?= $isLoggedIn ? '' : 'active' ?>" data-page="summary" id="tab-summary"
+                onclick="App.navigateTo('summary')" style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
                 Summary
             </button>
-            <?php if ($isLoggedIn): ?>
-                <a href="master-data.php" class="nav-link" data-page="master-data" id="tab-master-data">
-                    Master Data
-                </a>
-            <?php endif; ?>
+            <button type="button" class="nav-link <?= $isLoggedIn ? 'active' : '' ?>" data-page="all-summary" id="tab-all-summary"
+                onclick="App.navigateTo('all-summary')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                All Summary
+            </button>
+            <button type="button" class="nav-link" data-page="master-data" id="tab-master-data"
+                onclick="App.navigateTo('master-data')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                Master Data
+            </button>
         </nav>
 
-        <?php if ($isLoggedIn): ?>
-            <!-- Navbar Actions: User Dropdown with Full Name & Logout for Admin -->
-            <div class="navbar-actions">
-                <div class="user-dropdown-container" id="user-dropdown-container">
-                    <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
-                        onclick="App.toggleUserDropdown(event)" title="Detail Akun Admin">
-                        <div class="user-avatar-circle">
-                            <?= strtoupper(substr($currentUser['name'] ?? 'A', 0, 1)) ?>
-                        </div>
-                        <span class="user-name-text">
-                            <?= htmlspecialchars($currentUser['name'] ?? 'Administrator', ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                        <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.2">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-                    <div class="user-dropdown-menu" id="user-dropdown-menu">
-                        <a href="master-data.php" class="user-dropdown-item">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-                            </svg>
-                            <span>Master Data</span>
-                        </a>
-                        <div class="user-dropdown-divider"></div>
-                        <a href="logout.php" class="user-dropdown-item text-danger">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                <polyline points="16 17 21 12 16 7"></polyline>
-                                <line x1="21" y1="12" x2="9" y2="12"></line>
-                            </svg>
-                            <span>Logout</span>
-                        </a>
+        <!-- Navbar Actions: User Profile Dropdown & Public Login Button -->
+        <div class="navbar-actions">
+            <!-- User Dropdown (Admin Session) -->
+            <div class="user-dropdown-container" id="user-dropdown-container"
+                style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
+                    onclick="App.toggleUserDropdown(event)" title="Detail Akun Admin">
+                    <div class="user-avatar-circle" id="user-avatar-text">
+                        A
                     </div>
+                    <span class="user-name-text" id="user-display-name">
+                        ASSET MANAGEMENT ADMINISTRATOR
+                    </span>
+                    <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                <div class="user-dropdown-menu" id="user-dropdown-menu">
+                    <button type="button" onclick="App.logout()" class="user-dropdown-item text-danger"
+                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
                 </div>
             </div>
-        <?php endif; ?>
+        </div>
     </header>
 
-    <!-- Quick Access Drawer & Backdrop (Public View) -->
+    <!-- Quick Access Drawer & Backdrop (Public & Admin View) -->
     <div id="quick-access-backdrop" class="quick-access-backdrop" onclick="App.closeQuickAccess()"></div>
     <aside id="quick-access-drawer" class="quick-access-drawer" aria-label="Quick Access">
         <div class="quick-access-header">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <h3 class="quick-access-title">Quick Access</h3>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <?php if ($isLoggedIn): ?>
-                    <a href="master-data.php" class="btn btn-outline-primary btn-sm"
-                        style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; height: 30px; text-decoration: none;"
-                        title="Master Data">
-                        Master Data
-                    </a>
-                    <a href="logout.php" class="btn btn-danger btn-sm"
-                        style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; height: 30px; text-decoration: none;"
-                        title="Logout">
-                        Logout
-                    </a>
-                <?php else: ?>
-                    <a href="login.php" class="btn btn-primary btn-sm quick-access-login-btn" id="btn-quick-access-login"
-                        style="padding: 4px 12px; font-size: 11.5px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; height: 30px; line-height: 1; text-decoration: none;"
-                        title="Login">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">
+                <h3 class="quick-access-title" style="margin: 0; white-space: nowrap;">Quick Access</h3>
+                <?php if (!$isLoggedIn): ?>
+                    <button type="button" onclick="App.closeQuickAccess(); App.navigateTo('login');"
+                        class="btn-quick-access-login" id="drawer-header-login-btn" title="Masuk ke Halaman Login">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
                             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
                             <polyline points="10 17 15 12 10 7"></polyline>
                             <line x1="15" y1="12" x2="3" y2="12"></line>
                         </svg>
-                        <span>Login</span>
-                    </a>
+                        <span>LOGIN</span>
+                    </button>
                 <?php endif; ?>
-                <button type="button" class="quick-access-close" onclick="App.closeQuickAccess()" title="Tutup"
-                    aria-label="Close">
-                    &times;
-                </button>
             </div>
+            <button type="button" class="quick-access-close" onclick="App.closeQuickAccess()" title="Tutup"
+                aria-label="Close">
+                &times;
+            </button>
+        </div>
+
+
+        <div style="padding: 0.75rem 1rem 0.25rem 1rem;">
+            <div
+                style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
+                Lompat ke Bagian</div>
         </div>
         <div class="quick-access-body" id="quick-access-nav-list">
             <!-- Populated dynamically with links to cards -->
@@ -227,6 +219,18 @@ $monthNames = [
                                     onclick="App.switchSummaryCategory('outlet')">
                                     <span>Outlet Regional</span>
                                 </button>
+                                <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-warehouse-m"
+                                    onclick="App.switchSummaryCategory('warehouse_hub')">
+                                    <span>Warehouse HUB</span>
+                                </button>
+                                <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-tekno-m"
+                                    onclick="App.switchSummaryCategory('warehouse_tekno')">
+                                    <span>Warehouse Tekno</span>
+                                </button>
+                                <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-it"
+                                    onclick="App.switchSummaryCategory('it_coorporate')">
+                                    <span>IT Coorporate</span>
+                                </button>
                             </div>
                             <!-- Quarterly Categories -->
                             <div class="summary-type-slider-wrapper" id="cat-slider-quarterly" style="display: none;">
@@ -237,6 +241,10 @@ $monthNames = [
                                 <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-warehouse"
                                     onclick="App.switchSummaryCategory('warehouse_hub')">
                                     <span>Warehouse HUB</span>
+                                </button>
+                                <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-tekno-q"
+                                    onclick="App.switchSummaryCategory('warehouse_tekno')">
+                                    <span>Warehouse Tekno</span>
                                 </button>
                             </div>
                             <span style="font-size: 11px; color: #94a3b8; margin-left: 2px;" id="summary-cat-status">
@@ -250,8 +258,8 @@ $monthNames = [
                         <div style="display: flex; align-items: center; gap: 0.45rem;">
                             <label for="summary-filter-month"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">BULAN</label>
-                            <select id="summary-filter-month" class="form-control"
-                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;"
+                            <select id="summary-filter-month" class="form-control unified-filter-select"
+                                style="width: auto;"
                                 onchange="App.loadSummaryData()">
                                 <option value="">Semua Bulan</option>
                                 <option value="1">Januari</option>
@@ -271,8 +279,8 @@ $monthNames = [
                         <div style="display: flex; align-items: center; gap: 0.45rem;">
                             <label for="summary-filter-year"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">TAHUN</label>
-                            <select id="summary-filter-year" class="form-control"
-                                style="width: auto; padding: 0.3rem 0.65rem; font-size: 12.5px;"
+                            <select id="summary-filter-year" class="form-control unified-filter-select"
+                                style="width: auto;"
                                 onchange="App.loadSummaryData()">
                                 <option value="2026" selected>2026</option>
                                 <option value="2027">2027</option>
@@ -310,7 +318,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-card-meta">
-                                <div class="kpi-subtext" id="kpi-pmd-subtext">Avg PMD Departement (0 Sites)</div>
+                                <div class="kpi-subtext" id="kpi-pmd-subtext">Avg PMD Divisi (0 Sites)</div>
                             </div>
                         </div>
                         <div class="kpi-card kpi-card-split" id="kpi-card-dno">
@@ -323,7 +331,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-card-meta">
-                                <div class="kpi-subtext" id="kpi-dno-subtext">Avg Sub DEPT DNO (0 Sites)</div>
+                                <div class="kpi-subtext" id="kpi-dno-subtext">Avg DEPT DNO (0 Sites)</div>
                             </div>
                         </div>
                         <div class="kpi-card kpi-card-split" id="kpi-card-dso">
@@ -336,7 +344,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-card-meta">
-                                <div class="kpi-subtext" id="kpi-dso-subtext">Avg Sub DEPT DSO (0 Sites)</div>
+                                <div class="kpi-subtext" id="kpi-dso-subtext">Avg DEPT DSO (0 Sites)</div>
                             </div>
                         </div>
 
@@ -371,7 +379,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-subdept-container">
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-cso">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">CSO</span>
                                         <span id="kpi-subdept-trend-cso"></span>
@@ -380,7 +388,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-cso">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-cso"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-nso">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">NSO</span>
                                         <span id="kpi-subdept-trend-nso"></span>
@@ -389,7 +397,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-nso">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-nso"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-sso">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">SSO</span>
                                         <span id="kpi-subdept-trend-sso"></span>
@@ -417,7 +425,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-subdept-container">
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-cjdo">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">CJDO</span>
                                         <span id="kpi-subdept-trend-cjdo"></span>
@@ -426,7 +434,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-cjdo">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-cjdo"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-eko">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">EKO</span>
                                         <span id="kpi-subdept-trend-eko"></span>
@@ -435,7 +443,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-eko">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-eko"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-wjo">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">WJO</span>
                                         <span id="kpi-subdept-trend-wjo"></span>
@@ -444,7 +452,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-wjo">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-wjo"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-wko">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">WKO</span>
                                         <span id="kpi-subdept-trend-wko"></span>
@@ -472,7 +480,7 @@ $monthNames = [
                                 </div>
                             </div>
                             <div class="kpi-subdept-container">
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-bno">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">BNO</span>
                                         <span id="kpi-subdept-trend-bno"></span>
@@ -481,7 +489,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-bno">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-bno"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-ejo">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">EJO</span>
                                         <span id="kpi-subdept-trend-ejo"></span>
@@ -490,7 +498,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-ejo">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-ejo"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-mpo">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">MPO</span>
                                         <span id="kpi-subdept-trend-mpo"></span>
@@ -499,7 +507,7 @@ $monthNames = [
                                     <div class="kpi-subdept-meta" id="kpi-subdept-meta-mpo">0 Sites</div>
                                     <div class="kpi-subdept-status" id="kpi-subdept-status-mpo"></div>
                                 </div>
-                                <div class="kpi-subdept-item">
+                                <div class="kpi-subdept-item" id="kpi-subdept-item-smo">
                                     <div class="kpi-subdept-header">
                                         <span class="kpi-subdept-name">SMO</span>
                                         <span id="kpi-subdept-trend-smo"></span>
@@ -510,16 +518,133 @@ $monthNames = [
                                 </div>
                             </div>
                         </div>
+
+                        <!-- IT Corporate Cards (Shown only when Category is IT Coorporate) -->
+                        <div class="kpi-card kpi-card-split" id="kpi-card-it-tbs" style="display: none;">
+                            <div class="kpi-title">OUTLET OPTI TBS</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-it-tbs-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-it-tbs-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-it-tbs-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-it-tbs-subtext">50002001384</div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-card-split" id="kpi-card-it-arcadia" style="display: none;">
+                            <div class="kpi-title">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-it-arcadia-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-it-arcadia-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-it-arcadia-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-it-arcadia-subtext">50002003133</div>
+                            </div>
+                        </div>
+
+                        <!-- Warehouse Tekno Monthly Cards (Shown when Category is Warehouse Tekno & SO Type is Monthly) -->
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-gudang" style="display: none;">
+                            <div class="kpi-title" title="GUDANG WAREHOUSE TEKNO">GUDANG WAREHOUSE TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-gudang-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-gudang-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-gudang-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-gudang-subtext">50002003289</div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-khusus" style="display: none;">
+                            <div class="kpi-title" title="PENYIMPANAN PERANGKAT KHUSUS T TEKNO">PENYIMPANAN PERANGKAT KHUSUS T TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-khusus-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-khusus-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-khusus-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-khusus-subtext">50002003307</div>
+                            </div>
+                        </div>
+
+                        <!-- Warehouse Tekno Quarterly Cards (Shown when Category is Warehouse Tekno & SO Type is Quarterly) -->
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-buffer" style="display: none;">
+                            <div class="kpi-title" title="BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO">BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-buffer-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-buffer-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-buffer-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-buffer-subtext">50002003305</div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage2" style="display: none;">
+                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO">STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-storage2-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-storage2-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-storage2-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-storage2-subtext">50002003448</div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage1" style="display: none;">
+                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO">STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-storage1-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-storage1-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-storage1-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-storage1-subtext">50002003922</div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-card-split" id="kpi-card-tekno-persiapan" style="display: none;">
+                            <div class="kpi-title" title="PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO">PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO</div>
+                            <div class="kpi-card-main">
+                                <div class="kpi-split-value" id="kpi-tekno-persiapan-achievement">0%</div>
+                                <div class="kpi-split-badges">
+                                    <div class="kpi-status-box" id="kpi-tekno-persiapan-status"></div>
+                                    <div class="kpi-split-trend" id="kpi-tekno-persiapan-trend"></div>
+                                </div>
+                            </div>
+                            <div class="kpi-card-meta">
+                                <div class="kpi-subtext" id="kpi-tekno-persiapan-subtext">50002003599</div>
+                            </div>
+                        </div>
                     </div>
 
-                                                                <!-- ── DB Analysis Row: Result DB Analysis (Left) + Status Penyelesaian DB (Right) ── -->
+                    <!-- ── DB Analysis Row: Result DB Analysis (Left) + Status Penyelesaian DB (Right) ── -->
                     <div class="executive-db-row" id="card-executive-db-analysis">
 
                         <!-- Left Column: Result DB Analysis (1 Card per Dept Vertikal) -->
                         <div class="executive-db-col" id="col-result-db-analysis">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
                                 <div>
-                                    <h3 style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                    <h3
+                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
                                         Result DB Analysis
                                     </h3>
                                     <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
@@ -528,188 +653,228 @@ $monthNames = [
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                     <span class="db-grand-trend" id="db-grand-trend"></span>
-                                    <span class="so-status-badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                    <span class="so-status-badge"
+                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
                                         Total DB: <span id="db-analysis-grand-total">0</span> QTY
                                     </span>
                                 </div>
                             </div>
 
                             <div id="db-analysis-content" class="db-analysis-scroll">
-<!-- WRO Group: WRO Card + Subdept Cards (CSO, NSO, SSO) -->
-                                    <div class="kpi-card-group" id="db-group-wro">
-                                        <div class="kpi-card kpi-card-split" id="db-card-wro">
-                                            <div class="kpi-title">WRO Result DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-wro" style="color: #0f172a;">0</div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-wro"></span>
-                                                </div>
-                                            </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-wro">Avg DEPT WRO (0/0 Sites)</div>
+                                <!-- WRO Group: WRO Card + Subdept Cards (CSO, NSO, SSO) -->
+                                <div class="kpi-card-group" id="db-group-wro">
+                                    <div class="kpi-card kpi-card-split" id="db-card-wro">
+                                        <div class="kpi-title">WRO Result DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-wro" style="color: #0f172a;">0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-wro"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">CSO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-cso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-cso">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-cso">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">NSO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-nso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-nso">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-nso">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">SSO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-sso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-sso">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-sso">0 Sites</div>
-                                            </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-wro">Avg DEPT WRO (0/0 Sites)</div>
                                         </div>
                                     </div>
+                                    <div class="kpi-subdept-container">
+                                        <div class="kpi-subdept-item" id="db-subdept-item-cso">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">CSO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-cso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-cso">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-cso">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-nso">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">NSO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-nso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-nso">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-nso">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-sso">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">SSO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-sso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-sso">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-sso">0 Sites</div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    <!-- CRO Group: CRO Card + Subdept Cards (CJDO, EKO, WJO, WKO) -->
-                                    <div class="kpi-card-group" id="db-group-cro">
-                                        <div class="kpi-card kpi-card-split" id="db-card-cro">
-                                            <div class="kpi-title">CRO Result DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-cro" style="color: #0f172a;">0</div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-cro"></span>
-                                                </div>
-                                            </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-cro">Avg DEPT CRO (0/0 Sites)</div>
+                                <!-- CRO Group: CRO Card + Subdept Cards (CJDO, EKO, WJO, WKO) -->
+                                <div class="kpi-card-group" id="db-group-cro">
+                                    <div class="kpi-card kpi-card-split" id="db-card-cro">
+                                        <div class="kpi-title">CRO Result DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-cro" style="color: #0f172a;">0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-cro"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">CJDO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-cjdo"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-cjdo">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-cjdo">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">EKO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-eko"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-eko">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-eko">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">WJO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-wjo"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-wjo">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-wjo">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">WKO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-wko"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-wko">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-wko">0 Sites</div>
-                                            </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-cro">Avg DEPT CRO (0/0 Sites)</div>
                                         </div>
                                     </div>
+                                    <div class="kpi-subdept-container">
+                                        <div class="kpi-subdept-item" id="db-subdept-item-cjdo">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">CJDO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-cjdo"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-cjdo">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-cjdo">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-eko">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">EKO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-eko"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-eko">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-eko">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-wjo">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">WJO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-wjo"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-wjo">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-wjo">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-wko">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">WKO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-wko"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-wko">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-wko">0 Sites</div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    <!-- ERO Group: ERO Card + Subdept Cards (BNO, EJO, MPO, SMO) -->
-                                    <div class="kpi-card-group" id="db-group-ero">
-                                        <div class="kpi-card kpi-card-split" id="db-card-ero">
-                                            <div class="kpi-title">ERO Result DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-ero" style="color: #0f172a;">0</div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-ero"></span>
-                                                </div>
-                                            </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-ero">Avg DEPT ERO (0/0 Sites)</div>
+                                <!-- ERO Group: ERO Card + Subdept Cards (BNO, EJO, MPO, SMO) -->
+                                <div class="kpi-card-group" id="db-group-ero">
+                                    <div class="kpi-card kpi-card-split" id="db-card-ero">
+                                        <div class="kpi-title">ERO Result DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-ero" style="color: #0f172a;">0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-ero"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">BNO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-bno"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-bno">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-bno">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">EJO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-ejo"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-ejo">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-ejo">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">MPO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-mpo"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-mpo">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-mpo">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">SMO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-smo"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-smo">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-smo">0 Sites</div>
-                                            </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-ero">Avg DEPT ERO (0/0 Sites)</div>
                                         </div>
                                     </div>
+                                    <div class="kpi-subdept-container">
+                                        <div class="kpi-subdept-item" id="db-subdept-item-bno">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">BNO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-bno"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-bno">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-bno">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-ejo">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">EJO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-ejo"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-ejo">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-ejo">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-mpo">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">MPO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-mpo"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-mpo">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-mpo">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-smo">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">SMO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-smo"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-smo">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-smo">0 Sites</div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    <!-- PMD Group: PMD Card + Subdept Cards (DNO, DSO) -->
-                                    <div class="kpi-card-group" id="db-group-pmd" style="display: none;">
-                                        <div class="kpi-card kpi-card-split" id="db-card-pmd">
-                                            <div class="kpi-title" style="color: #7e22ce;">PMD Result DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-val-pmd" style="color: #0f172a;">0</div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-pmd"></span>
-                                                </div>
-                                            </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-pmd">Avg PMD (0/0 Sites)</div>
+                                <!-- PMD Group: PMD Card + Subdept Cards (DNO, DSO) -->
+                                <div class="kpi-card-group" id="db-group-pmd" style="display: none;">
+                                    <div class="kpi-card kpi-card-split" id="db-card-pmd">
+                                        <div class="kpi-title" style="color: #7e22ce;">PMD Result DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-pmd" style="color: #0f172a;">0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-pmd"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DNO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-dno"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-dno">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-dno">0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DSO</span>
-                                                    <span class="db-subdept-trend" id="db-subdept-trend-dso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-subdept-val-dso">0</div>
-                                                <div class="kpi-subdept-meta" id="db-subdept-meta-dso">0 Sites</div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-pmd">Avg PMD Divisi (0/0 Sites)
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="kpi-subdept-container">
+                                        <div class="kpi-subdept-item" id="db-subdept-item-dno">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DNO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-dno"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-dno">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-dno">0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item" id="db-subdept-item-dso">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DSO</span>
+                                                <span class="db-subdept-trend" id="db-subdept-trend-dso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-subdept-val-dso">0</div>
+                                            <div class="kpi-subdept-meta" id="db-subdept-meta-dso">0 Sites</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- IT Corporate DB Group (2 Sites: OUTLET OPTI TBS & OUTLET OPTI - IT CORPORATE - ARCADIA LT 4) -->
+                                <div class="kpi-card-group" id="db-group-it"
+                                    style="display: none; flex-direction: column; gap: 0.75rem;">
+                                    <div class="kpi-card kpi-card-split" id="db-card-it-tbs">
+                                        <div class="kpi-title">OUTLET OPTI TBS</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-it-tbs" style="color: #0f172a;">0
+                                            </div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-it-tbs"></span>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-it-tbs">50002001384</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-card kpi-card-split" id="db-card-it-arcadia">
+                                        <div class="kpi-title">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-val-it-arcadia" style="color: #0f172a;">
+                                                0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-it-arcadia"></span>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-it-arcadia">50002003133</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Warehouse Tekno DB Group (Tekno Sites Cards) -->
+                                <div class="kpi-card-group" id="db-group-tekno"
+                                    style="display: none; flex-direction: column; gap: 0.75rem;">
+                                    <div id="db-tekno-cards-container"
+                                        style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -717,7 +882,8 @@ $monthNames = [
                         <div class="executive-db-col" id="col-status-db-analysis">
                             <div class="db-status-section-header">
                                 <div>
-                                    <h3 style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                    <h3
+                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
                                         Status Penyelesaian DB
                                     </h3>
                                     <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
@@ -727,248 +893,334 @@ $monthNames = [
                             </div>
 
                             <div class="db-status-groups-container" id="db-status-groups-container">
-<!-- Solved DB Group -->
-                                    <div class="kpi-card-group" id="db-status-group-solved">
-                                        <div class="kpi-card kpi-card-split" id="db-card-solved">
-                                            <div class="kpi-title" style="color: #166534;">SOLVED DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-grand-solved" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-solved"></span>
-                                                </div>
+                                <!-- Solved DB Group -->
+                                <div class="kpi-card-group" id="db-status-group-solved">
+                                    <div class="kpi-card kpi-card-split" id="db-card-solved">
+                                        <div class="kpi-title" style="color: #166534;">SOLVED DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-grand-solved" style="color: #16a34a;">0
                                             </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-solved">0/0 Sites</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-solved"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container db-status-sub-outlet">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">WRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-wro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-solved-wro" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-wro">0/0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">CRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-cro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-solved-cro" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-cro">0/0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">ERO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-ero"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-solved-ero" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-ero">0/0 Sites</div>
-                                            </div>
-                                        </div>
-                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DNO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-dno"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-solved-dno" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-dno">0/0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DSO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-solved-dso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-solved-dso" style="color: #16a34a;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-dso">0/0 Sites</div>
-                                            </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-solved">0/0 Sites</div>
                                         </div>
                                     </div>
-
-                                    <!-- Unsolved DB Group -->
-                                    <div class="kpi-card-group" id="db-status-group-unsolved">
-                                        <div class="kpi-card kpi-card-split" id="db-card-unsolved">
-                                            <div class="kpi-title" style="color: #991b1b;">UNSOLVED DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-grand-unsolved" style="color: #dc2626;">
-                                                    0</div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-unsolved"></span>
-                                                </div>
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-wro"></span>
                                             </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-unsolved">0/0 Sites</div>
+                                            <div class="kpi-subdept-val" id="db-solved-wro" style="color: #16a34a;">0
                                             </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-solved-wro">0/0 Sites</div>
                                         </div>
-                                        <div class="kpi-subdept-container db-status-sub-outlet">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">WRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-wro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-unsolved-wro" style="color: #dc2626;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-wro">0/0 Sites</div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-cro"></span>
                                             </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">CRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-cro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-unsolved-cro" style="color: #dc2626;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-cro">0/0 Sites</div>
+                                            <div class="kpi-subdept-val" id="db-solved-cro" style="color: #16a34a;">0
                                             </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">ERO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-ero"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-unsolved-ero" style="color: #dc2626;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-ero">0/0 Sites</div>
-                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-solved-cro">0/0 Sites</div>
                                         </div>
-                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DNO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-dno"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-unsolved-dno" style="color: #dc2626;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dno">0/0 Sites</div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-ero"></span>
                                             </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DSO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-unsolved-dso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-unsolved-dso" style="color: #dc2626;">0
-                                                </div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dso">0/0 Sites</div>
+                                            <div class="kpi-subdept-val" id="db-solved-ero" style="color: #16a34a;">0
                                             </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-solved-ero">0/0 Sites</div>
                                         </div>
                                     </div>
+                                    <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DNO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-dno"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-solved-dno" style="color: #16a34a;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-solved-dno">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DSO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-dso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-solved-dso" style="color: #16a34a;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-solved-dso">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-it"
+                                        style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-it-tbs"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-solved-it-tbs" style="color: #16a34a;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta">50002001384</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="db-subdept-trend"
+                                                    id="db-sub-trend-solved-it-arcadia"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-solved-it-arcadia"
+                                                style="color: #16a34a;">0</div>
+                                            <div class="kpi-subdept-meta">50002003133</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-tekno"
+                                        id="db-status-sub-tekno-solved"
+                                        style="display: none; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+                                    </div>
+                                </div>
 
-                                    <!-- New DB Group -->
-                                    <div class="kpi-card-group" id="db-status-group-new">
-                                        <div class="kpi-card kpi-card-split" id="db-card-new">
-                                            <div class="kpi-title" style="color: #1e40af;">NEW DB</div>
-                                            <div class="kpi-card-main">
-                                                <div class="kpi-split-value" id="db-grand-new" style="color: #2563eb;">0
-                                                </div>
-                                                <div class="kpi-split-badges">
-                                                    <span class="db-dept-trend" id="db-trend-new"></span>
-                                                </div>
-                                            </div>
-                                            <div class="kpi-card-meta">
-                                                <div class="kpi-subtext" id="db-subtext-new">0/0 Sites</div>
+                                <!-- Unsolved DB Group -->
+                                <div class="kpi-card-group" id="db-status-group-unsolved">
+                                    <div class="kpi-card kpi-card-split" id="db-card-unsolved">
+                                        <div class="kpi-title" style="color: #991b1b;">UNSOLVED DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-grand-unsolved" style="color: #dc2626;">
+                                                0</div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-unsolved"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container db-status-sub-outlet">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">WRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-new-wro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-new-wro" style="color: #2563eb;">0</div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-wro">0/0 Sites</div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-unsolved">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-wro"></span>
                                             </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">CRO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-new-cro"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-new-cro" style="color: #2563eb;">0</div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-cro">0/0 Sites</div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-wro" style="color: #dc2626;">0
                                             </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">ERO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-new-ero"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-new-ero" style="color: #2563eb;">0</div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-ero">0/0 Sites</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-wro">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-cro"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-cro" style="color: #dc2626;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-cro">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-ero"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-ero" style="color: #dc2626;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-ero">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DNO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-dno"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-dno" style="color: #dc2626;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dno">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DSO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-dso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-dso" style="color: #dc2626;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-dso">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-it"
+                                        style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-it-tbs"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-it-tbs"
+                                                style="color: #dc2626;">0</div>
+                                            <div class="kpi-subdept-meta">50002001384</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="db-subdept-trend"
+                                                    id="db-sub-trend-unsolved-it-arcadia"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-unsolved-it-arcadia"
+                                                style="color: #dc2626;">0</div>
+                                            <div class="kpi-subdept-meta">50002003133</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-tekno"
+                                        id="db-status-sub-tekno-unsolved"
+                                        style="display: none; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+                                    </div>
+                                </div>
+
+                                <!-- New DB Group -->
+                                <div class="kpi-card-group" id="db-status-group-new">
+                                    <div class="kpi-card kpi-card-split" id="db-card-new">
+                                        <div class="kpi-title" style="color: #1e40af;">NEW DB</div>
+                                        <div class="kpi-card-main">
+                                            <div class="kpi-split-value" id="db-grand-new" style="color: #2563eb;">0
+                                            </div>
+                                            <div class="kpi-split-badges">
+                                                <span class="db-dept-trend" id="db-trend-new"></span>
                                             </div>
                                         </div>
-                                        <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DNO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-new-dno"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-new-dno" style="color: #2563eb;">0</div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-dno">0/0 Sites</div>
-                                            </div>
-                                            <div class="kpi-subdept-item">
-                                                <div class="kpi-subdept-header">
-                                                    <span class="kpi-subdept-name">DSO</span>
-                                                    <span class="db-subdept-trend" id="db-sub-trend-new-dso"></span>
-                                                </div>
-                                                <div class="kpi-subdept-val" id="db-new-dso" style="color: #2563eb;">0</div>
-                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-dso">0/0 Sites</div>
-                                            </div>
+                                        <div class="kpi-card-meta">
+                                            <div class="kpi-subtext" id="db-subtext-new">0/0 Sites</div>
                                         </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-wro"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-wro" style="color: #2563eb;">0</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-new-wro">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-cro"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-cro" style="color: #2563eb;">0</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-new-cro">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-ero"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-ero" style="color: #2563eb;">0</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-new-ero">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DNO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-dno"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-dno" style="color: #2563eb;">0</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-new-dno">0/0 Sites</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name">DSO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-dso"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-dso" style="color: #2563eb;">0</div>
+                                            <div class="kpi-subdept-meta" id="db-sub-sites-new-dso">0/0 Sites</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-it"
+                                        style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-it-tbs"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-it-tbs" style="color: #2563eb;">0
+                                            </div>
+                                            <div class="kpi-subdept-meta">50002001384</div>
+                                        </div>
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header">
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-it-arcadia"></span>
+                                            </div>
+                                            <div class="kpi-subdept-val" id="db-new-it-arcadia" style="color: #2563eb;">
+                                                0</div>
+                                            <div class="kpi-subdept-meta">50002003133</div>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-subdept-container db-status-sub-tekno" id="db-status-sub-tekno-new"
+                                        style="display: none; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                     </div>
 
-                    <!-- ── Catatan dan Evaluasi Hasil Stock Opname (Full Width di Bawah Kedua Card DB) ── -->
-                    <div class="executive-catatan-row" id="executive-bottom-row">
-                        <div id="card-executive-catatan">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <div>
-                                    <h3 style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                        Catatan dan Evaluasi Hasil Stock Opname
-                                    </h3>
-                                    <div id="exec-catatan-subtitle" style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
-                                        Kesimpulan hasil evaluasi stock opname area
-                                    </div>
+                </div>
+
+                <!-- ── Catatan dan Evaluasi Hasil Stock Opname (Full Width di Bawah Kedua Card DB) ── -->
+                <div class="executive-catatan-row" id="executive-bottom-row">
+                    <div id="card-executive-catatan">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <div>
+                                <h3
+                                    style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                    Catatan dan Evaluasi Hasil Stock Opname
+                                </h3>
+                                <div id="exec-catatan-subtitle"
+                                    style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                    Kesimpulan hasil evaluasi stock opname area
                                 </div>
                             </div>
-                            <div class="table-responsive" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
-                                <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
-                                    <thead>
-                                        <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                            <th style="width: 38px; text-align: center;">NO</th>
-                                            <th class="sortable text-center" style="width: 95px;" id="exec-catatan-th-period" onclick="App.toggleExecCatatanSort('period')">
-                                                BULAN <span class="sort-indicator" data-ecat-col="period">⇅</span>
-                                            </th>
-                                            <th class="sortable text-center" style="width: 75px;" onclick="App.toggleExecCatatanSort('dept')">
-                                                DEPT <span class="sort-indicator" data-ecat-col="dept">⇅</span>
-                                            </th>
-                                            <th class="sortable text-center" style="width: 90px;" onclick="App.toggleExecCatatanSort('sub_dept')">
-                                                SUB DEPT <span class="sort-indicator" data-ecat-col="sub_dept">⇅</span>
-                                            </th>
-                                            <th class="sortable text-left" onclick="App.toggleExecCatatanSort('keterangan')">
-                                                KETERANGAN <span class="sort-indicator" data-ecat-col="keterangan">⇅</span>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="exec-catatan-tbody">
-                                        <tr>
-                                            <td colspan="5" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
-                                                Memuat catatan...
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        </div>
+                        <div class="table-responsive"
+                            style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
+                            <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
+                                <thead>
+                                    <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        <th style="width: 38px; text-align: center;">NO</th>
+                                        <th class="sortable text-center" style="width: 95px;"
+                                            id="exec-catatan-th-period" onclick="App.toggleExecCatatanSort('period')">
+                                            BULAN <span class="sort-indicator" data-ecat-col="period">⇅</span>
+                                        </th>
+                                        <th class="sortable text-center" style="width: 75px;"
+                                            onclick="App.toggleExecCatatanSort('dept')">
+                                            <span id="exec-catatan-th-dept">DIVISI</span> <span class="sort-indicator"
+                                                data-ecat-col="dept">⇅</span>
+                                        </th>
+                                        <th class="sortable text-center" style="width: 90px;"
+                                            onclick="App.toggleExecCatatanSort('sub_dept')">
+                                            <span id="exec-catatan-th-subdept">DEPT</span> <span class="sort-indicator"
+                                                data-ecat-col="sub_dept">⇅</span>
+                                        </th>
+                                        <th class="sortable text-left"
+                                            onclick="App.toggleExecCatatanSort('keterangan')">
+                                            KETERANGAN <span class="sort-indicator" data-ecat-col="keterangan">⇅</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="exec-catatan-tbody">
+                                    <tr>
+                                        <td colspan="5" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
+                                            Memuat catatan...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
 
             <!-- ── Card: Score Card Summary ── -->
@@ -1084,7 +1336,7 @@ $monthNames = [
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 <th class="scorecard-col-no">NO</th>
-                                                <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                <th class="scorecard-col-subdept">DEPT</th>
                                                 <th class="scorecard-col-sitecode">SITE CODE</th>
                                                 <th class="scorecard-col-namesite">NAMA SITE</th>
                                                 <th id="sc-rating-th-selected" class="scorecard-col-month">FISIK %
@@ -1172,7 +1424,7 @@ $monthNames = [
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 <th class="scorecard-col-no">NO</th>
-                                                <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                <th class="scorecard-col-subdept">DEPT</th>
                                                 <th class="scorecard-col-sitecode">SITE CODE</th>
                                                 <th class="scorecard-col-namesite">NAMA SITE</th>
                                                 <th id="sc-exec-th-selected" class="scorecard-col-month">FISIK %
@@ -1255,7 +1507,7 @@ $monthNames = [
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     <th class="scorecard-col-no">NO</th>
-                                                    <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                    <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
                                                     <th class="scorecard-col-namesite">NAMA SITE</th>
                                                     <th class="scorecard-col-month">%</th>
@@ -1293,7 +1545,7 @@ $monthNames = [
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     <th class="scorecard-col-no">NO</th>
-                                                    <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                    <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
                                                     <th class="scorecard-col-namesite">NAMA SITE</th>
                                                     <th class="scorecard-col-month">%</th>
@@ -1331,7 +1583,7 @@ $monthNames = [
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                     <th class="scorecard-col-no">NO</th>
-                                                    <th class="scorecard-col-subdept">SUB DEPT</th>
+                                                    <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
                                                     <th class="scorecard-col-namesite">NAMA SITE</th>
                                                     <th class="scorecard-col-month">%</th>
@@ -1363,7 +1615,7 @@ $monthNames = [
                         <div>
                             <h3 class="card-title" id="trend-dept-title"
                                 style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
-                                Trend Achievement SO Dept (PMD)</h3>
+                                Trend Achievement SO Divisi (PMD)</h3>
                             <p class="card-subtitle trend-chart-subtitle"
                                 style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
                                 Monthly Physical % (Jan - Dec 2026)</p>
@@ -1372,7 +1624,7 @@ $monthNames = [
                             style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
                     </div>
                     <div class="card-body" style="padding: 1rem; position: relative;">
-                        <div style="position: relative; height: 260px; width: 100%;">
+                        <div style="position: relative; height: 330px; width: 100%;">
                             <canvas id="chart-trend-dept"></canvas>
                         </div>
                     </div>
@@ -1387,7 +1639,7 @@ $monthNames = [
                             <div>
                                 <h3 class="card-title"
                                     style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
-                                    Trend Achievement SO PMD Sub Dept</h3>
+                                    Trend Achievement SO PMD Dept</h3>
                                 <p class="card-subtitle trend-chart-subtitle"
                                     style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
                                     Monthly Physical % (Jan - Dec 2026)</p>
@@ -1396,7 +1648,7 @@ $monthNames = [
                                 style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
                         </div>
                         <div class="card-body" style="padding: 1rem; position: relative;">
-                            <div style="position: relative; height: 320px; width: 100%;">
+                            <div style="position: relative; height: 360px; width: 100%;">
                                 <canvas id="chart-trend-pmd"></canvas>
                             </div>
                         </div>
@@ -1407,7 +1659,7 @@ $monthNames = [
                         <div class="card-header"
                             style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <h3 class="card-title"
+                                <h3 class="card-title" id="trend-subdept-title"
                                     style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                     Trend Achievement SO Outlet Regional Sub Dept</h3>
                                 <p class="card-subtitle trend-chart-subtitle" id="trend-subdept-subtitle"
@@ -1419,7 +1671,7 @@ $monthNames = [
                                 Regional</span>
                         </div>
                         <div class="card-body" style="padding: 1rem; position: relative;">
-                            <div style="position: relative; height: 420px; width: 100%;">
+                            <div style="position: relative; height: 460px; width: 100%;">
                                 <canvas id="chart-trend-subdept"></canvas>
                             </div>
                         </div>
@@ -1457,15 +1709,16 @@ $monthNames = [
                                 <option value="WRO">WRO</option>
                             </select>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <label for="subdept-result-filter"
+                        <div style="display: flex; align-items: center; gap: 0.5rem;"
+                            id="subdept-result-filter-container">
+                            <label for="subdept-result-filter" id="label-subdept-result-filter"
                                 style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
-                                SUB DEPT
+                                DEPT
                             </label>
                             <select id="subdept-result-filter" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
                                 onchange="App.loadSubDeptResults()">
-                                <option value="all" selected>Semua Sub Dept</option>
+                                <option value="all" selected>Semua Dept</option>
                                 <option value="DNO">DNO</option>
                                 <option value="DSO">DSO</option>
                             </select>
@@ -1503,7 +1756,7 @@ $monthNames = [
                                                 style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Site Code <span class="sort-indicator"
                                                     data-subdept-col="sitecode">⇅</span></th>
-                                            <th rowspan="2" class="sortable"
+                                            <th rowspan="2" class="sortable col-name-site"
                                                 onclick="App.toggleSubdeptResultsSort('name_site')"
                                                 style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Name Site <span class="sort-indicator"
@@ -1519,8 +1772,11 @@ $monthNames = [
                                                 Result DB</th>
                                             <th
                                                 style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                Total Physical</th>
+                                            <th
+                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Pencapaian</th>
-                                            <th rowspan="2" class="sortable"
+                                            <th rowspan="2" class="sortable col-status"
                                                 onclick="App.toggleSubdeptResultsSort('status')"
                                                 style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 190px; min-width: 170px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Status <span class="sort-indicator" data-subdept-col="status">⇅</span>
@@ -1544,6 +1800,11 @@ $monthNames = [
                                                 Physical (QTY) <span class="sort-indicator"
                                                     data-subdept-col="db_qty">⇅</span></th>
                                             <th class="sortable text-center"
+                                                onclick="App.toggleSubdeptResultsSort('target_qty')"
+                                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                Target (QTY) <span class="sort-indicator"
+                                                    data-subdept-col="target_qty">⇅</span></th>
+                                            <th class="sortable text-center"
                                                 onclick="App.toggleSubdeptResultsSort('pct')"
                                                 style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
                                                 % <span class="sort-indicator" data-subdept-col="pct">⇅</span></th>
@@ -1551,7 +1812,7 @@ $monthNames = [
                                     </thead>
                                     <tbody id="subdept-results-tbody">
                                         <tr>
-                                            <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                                            <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
                                                 Memuat Hasil SO...
                                             </td>
                                         </tr>
@@ -1610,13 +1871,13 @@ $monthNames = [
                         <select id="rdb-status-filter-dept" class="form-control"
                             style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusDeptChange()">
-                            <option value="all" selected>Semua Dept</option>
+                            <option value="all" selected>Semua Divisi</option>
                         </select>
 
                         <select id="rdb-status-filter-subdept" class="form-control"
                             style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusSubDeptChange()">
-                            <option value="all" selected>Semua Sub Dept</option>
+                            <option value="all" selected>Semua Dept</option>
                         </select>
 
                         <select id="rdb-status-filter-sitecode" class="form-control"
@@ -1768,13 +2029,15 @@ $monthNames = [
                                 <thead>
                                     <tr>
                                         <th class="text-center align-middle" style="width: 45px;">NO</th>
-                                        <th class="text-center align-middle sortable" style="width: 85px;"
-                                            onclick="App.toggleRekapDbStatusSort('dept')">
-                                            DEPT <span class="sort-indicator" data-rdb-status-col="dept">⇅</span>
+                                        <th class="text-center align-middle sortable col-rdb-dept" id="rdb-th-dept-col"
+                                            style="width: 85px;" onclick="App.toggleRekapDbStatusSort('dept')">
+                                            <span id="rdb-th-dept">DIVISI</span> <span class="sort-indicator"
+                                                data-rdb-status-col="dept">⇅</span>
                                         </th>
-                                        <th class="text-center align-middle sortable" style="width: 95px;"
+                                        <th class="text-center align-middle sortable col-rdb-subdept"
+                                            id="rdb-th-subdept-col" style="width: 95px;"
                                             onclick="App.toggleRekapDbStatusSort('sub_dept')">
-                                            SUB DEPT <span class="sort-indicator"
+                                            <span id="rdb-th-subdept">DEPT</span> <span class="sort-indicator"
                                                 data-rdb-status-col="sub_dept">⇅</span>
                                         </th>
                                         <th class="text-center align-middle sortable" style="width: 110px;"
@@ -1791,8 +2054,8 @@ $monthNames = [
                                             onclick="App.toggleRekapDbStatusSort('reg_no')">
                                             REG NO <span class="sort-indicator" data-rdb-status-col="reg_no">⇅</span>
                                         </th>
-                                        <th class="text-left align-middle sortable rdb-col-name" style="min-width: 200px;"
-                                            onclick="App.toggleRekapDbStatusSort('name')">
+                                        <th class="text-left align-middle sortable rdb-col-name"
+                                            style="min-width: 200px;" onclick="App.toggleRekapDbStatusSort('name')">
                                             NAME <span class="sort-indicator" data-rdb-status-col="name">⇅</span>
                                         </th>
                                         <th class="text-center align-middle sortable" style="width: 140px;"
@@ -1838,27 +2101,27 @@ $monthNames = [
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;" id="rekap-dept-filter-container">
-                            <label for="rekap-dept-filter"
+                            <label for="rekap-dept-filter" id="label-rekap-dept-filter"
                                 style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
-                                DEPT
+                                DIVISI
                             </label>
                             <select id="rekap-dept-filter" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
                                 onchange="App.onRekapDeptFilterChange()">
-                                <option value="all" selected>Semua DEPT</option>
+                                <option value="all" selected>Semua Divisi</option>
                                 <option value="PMD">PMD</option>
                             </select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;"
                             id="rekap-subdept-filter-container">
-                            <label for="rekap-subdept-filter"
+                            <label for="rekap-subdept-filter" id="label-rekap-subdept-filter"
                                 style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
-                                SUB DEPT
+                                DEPT
                             </label>
                             <select id="rekap-subdept-filter" class="form-control"
                                 style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
                                 onchange="App.onRekapSubDeptFilterChange()">
-                                <option value="all" selected>Semua Sub Dept</option>
+                                <option value="all" selected>Semua Dept</option>
                                 <option value="DNO">DNO</option>
                                 <option value="DSO">DSO</option>
                             </select>
@@ -1919,16 +2182,15 @@ $monthNames = [
                         <table class="reconciliation-table" id="rekap-table">
                             <thead>
                                 <tr>
-                                    <th class="text-center align-middle sortable"
-                                        onclick="App.toggleRekapSort('regional')">
-                                        REGIONAL <span class="sort-indicator" data-rekap-col="regional">⇅</span>
+                                    <th class="text-center align-middle sortable col-rekap-dept" id="rekap-th-dept-col"
+                                        onclick="App.toggleRekapSort('dept')">
+                                        <span id="rekap-th-dept">DIVISI</span> <span class="sort-indicator"
+                                            data-rekap-col="dept">⇅</span>
                                     </th>
-                                    <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('dept')">
-                                        DEPT <span class="sort-indicator" data-rekap-col="dept">⇅</span>
-                                    </th>
-                                    <th class="text-center align-middle sortable"
-                                        onclick="App.toggleRekapSort('sub_dept')">
-                                        SUB DEPT <span class="sort-indicator" data-rekap-col="sub_dept">⇅</span>
+                                    <th class="text-center align-middle sortable col-rekap-subdept"
+                                        id="rekap-th-subdept-col" onclick="App.toggleRekapSort('sub_dept')">
+                                        <span id="rekap-th-subdept">DEPT</span> <span class="sort-indicator"
+                                            data-rekap-col="sub_dept">⇅</span>
                                     </th>
                                     <th class="text-center align-middle sortable"
                                         onclick="App.toggleRekapSort('sitecode')">
@@ -2125,10 +2387,10 @@ $monthNames = [
                     <div id="sm-table-container" style="padding: 1.25rem;">
                         <div
                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                            <input type="search" id="sm-search-input" class="form-control" placeholder="Search..."
+                            <input type="search" id="sm-search-input" class="table-search-input unified-search-input" placeholder="Search..."
                                 oninput="App.filterMovementsTable()" onkeyup="App.filterMovementsTable()"
                                 onsearch="App.filterMovementsTable()"
-                                style="max-width: 320px; font-size: 12px; padding: 0.35rem 0.75rem;">
+                                style="max-width: 320px;">
                             <div style="font-size: 12px; color: #64748b;" id="sm-table-info">
                                 Menampilkan log pergerakan
                             </div>
@@ -2141,7 +2403,7 @@ $monthNames = [
                                         <th style="padding: 8px 10px; width: 45px; text-align: center;">NO</th>
                                         <th style="padding: 8px 10px; width: 120px; text-align: center;">SITE CODE</th>
                                         <th style="padding: 8px 10px;">NAMA SITE</th>
-                                        <th style="padding: 8px 10px;">REGIONAL / SUB DEPT</th>
+                                        <th style="padding: 8px 10px;">DEPT / SUB DEPT</th>
                                         <th style="padding: 8px 10px; text-align: center; min-width: 175px;">LOG HISTORY
                                         </th>
                                         <th style="padding: 8px 10px; text-align: center; width: 120px;">PERIODE EFEKTIF
@@ -2162,6 +2424,15 @@ $monthNames = [
                 </div>
             </div>
         </section>
+
+        <!-- Login Page Section (SPA Clean URL) -->
+        <?php require_once __DIR__ . '/layout/section_login.php'; ?>
+
+        <!-- All Summary Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_all_summary.php'; ?>
+
+        <!-- Master Data Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_master_data.php'; ?>
     </main>
 
     <!-- App Layout Footer -->
@@ -2170,10 +2441,13 @@ $monthNames = [
     <!-- Global Auth Configuration -->
     <script>
         window.AUTH_USER = <?= json_encode($currentUser, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+        window.INITIAL_PAGE = <?= json_encode($_SESSION['initial_page'] ?? ($isLoggedIn ? 'all-summary' : 'summary')) ?>;
+        <?php unset($_SESSION['initial_page']); ?>
     </script>
 
     <!-- Scripts -->
     <script src="assets/js/chart.umd.min.js"></script>
+    <script src="assets/js/all_summary.js?v=<?= filemtime(__DIR__ . '/assets/js/all_summary.js') ?>"></script>
     <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 
 </body>

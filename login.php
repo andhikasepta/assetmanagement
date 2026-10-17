@@ -9,15 +9,21 @@ require_once __DIR__ . '/includes/security.php';
 
 sendSecurityHeaders();
 
-// If already logged in, redirect cleanly to master-data.php
+// If already logged in, redirect to dashboard
 if (isLoggedIn()) {
-    header('Location: master-data.php');
+    header('Location: ./');
+    exit;
+}
+
+// If accessed directly via browser GET, redirect cleanly to SPA container
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $_SESSION['initial_page'] = 'login';
+    header('Location: ./');
     exit;
 }
 
 $error = '';
 $usernameVal = '';
-$passwordVal = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rawInput = file_get_contents('php://input');
@@ -47,7 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['success' => true, 'message' => 'Login berhasil.']);
                 exit;
             }
-            header('Location: master-data.php');
+            $_SESSION['initial_page'] = 'all-summary';
+            header('Location: ./');
             exit;
         } else {
             if ($isJson) {
@@ -68,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Admin - Asset Management</title>
+    <title>Amora-Asset Management Opname Report Analytics</title>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

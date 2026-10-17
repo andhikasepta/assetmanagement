@@ -85,9 +85,9 @@ Tambahkan blok reverse proxy untuk `/amora` mengarah ke `http://103.123.100.12:8
     RewriteEngine On
     RewriteRule ^/amora$ /amora/ [R=301,L]
 
-    ProxyPass /amora/ http://103.123.100.12:8082/ retry=0 timeout=60
+    ProxyPass /amora/ http://103.123.100.12:8082/ retry=0 timeout=300
     ProxyPassReverse /amora/ http://103.123.100.12:8082/
-    ProxyPass /amora http://103.123.100.12:8082 retry=0 timeout=60
+    ProxyPass /amora http://103.123.100.12:8082 retry=0 timeout=300
     ProxyPassReverse /amora http://103.123.100.12:8082
     ProxyPassReverse /amora https://wmsdev.my.id/amora
 ```

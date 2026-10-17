@@ -143,25 +143,57 @@ try {
                 }
 
                 $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
                 $info = trim($s['info'] ?? '');
 
-                if ($type === 'quarterly') {
-                    if (!$isPmd && $effType === 'quarterly') {
-                        if ($category === 'outlet_subarep') {
-                            if (in_array($info, ['Subarep', 'Outlet']) || $info === '') {
-                                $sites[] = $s;
-                            }
-                        } elseif ($category === 'warehouse_hub') {
-                            if (in_array($info, ['Under Warehouse', 'HUB'])) {
-                                $sites[] = $s;
-                            }
-                        } else {
+                if ($category === 'all') {
+                    if ($type === 'quarterly') {
+                        if ($effType === 'quarterly') {
+                            $sites[] = $s;
+                        }
+                    } else {
+                        if ($effType === 'monthly') {
                             $sites[] = $s;
                         }
                     }
+                } elseif ($type === 'quarterly') {
+                    if (!$isPmd) {
+                        if ($category === 'warehouse_tekno') {
+                            if ($isTekno && $effType === 'quarterly') {
+                                $sites[] = $s;
+                            }
+                        } elseif ($category === 'warehouse_hub') {
+                            if (!$isTekno && ($info === 'HUB Quarterly' || ($effType === 'quarterly' && $info === 'HUB'))) {
+                                $sites[] = $s;
+                            }
+                        } else {
+                            if (!$isTekno && $effType === 'quarterly' && (in_array($info, ['Subarep', 'Outlet']) || $info === '')) {
+                                $sites[] = $s;
+                            }
+                        }
+                    }
                 } else {
-                    if ($isPmd || $effType === 'monthly') {
-                        $sites[] = $s;
+                    if ($category === 'pmd') {
+                        if ($isPmd) {
+                            $sites[] = $s;
+                        }
+                    } elseif ($category === 'warehouse_tekno') {
+                        if (!$isPmd && $isTekno && $effType === 'monthly') {
+                            $sites[] = $s;
+                        }
+                    } elseif ($category === 'warehouse_hub') {
+                        if (!$isPmd && !$isTekno && ($info === 'HUB Monthly' || ($effType === 'monthly' && $info === 'HUB'))) {
+                            $sites[] = $s;
+                        }
+                    } elseif ($category === 'it_coorporate' || $category === 'it_corporate') {
+                        if (!$isPmd && in_array($info, ['IT Coorporate', 'IT Corporate'])) {
+                            $sites[] = $s;
+                        }
+                    } else {
+                        // outlet / outlet_regional (default monthly)
+                        if (!$isPmd && !$isTekno && $effType === 'monthly' && !in_array($info, ['HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB'])) {
+                            $sites[] = $s;
+                        }
                     }
                 }
             }
@@ -296,6 +328,19 @@ try {
                         if ($dbQty > 0) $subDeptDbStats[$sub]['sites_with_qty']++;
                     }
                 }
+            }
+
+            $siteAchievements = [];
+            foreach ($sites as $s) {
+                $sc = strtoupper(trim($s['sitecode'] ?? ''));
+                $m = $recByCode[$sc] ?? null;
+                $siteAchievements[$sc] = [
+                    'sitecode' => $sc,
+                    'name_site' => $s['name_site'] ?? '',
+                    'pct' => ($m !== null && $m['pct'] !== null) ? round($m['pct']) : null,
+                    'db_qty' => ($m !== null) ? (int)$m['db_qty'] : 0,
+                    'has_data' => ($m !== null && $m['pct'] !== null),
+                ];
             }
 
             $outletCount = $deptStats['CRO']['count'] + $deptStats['ERO']['count'] + $deptStats['WRO']['count'];
@@ -446,6 +491,7 @@ try {
                     'total_sites' => $subDeptStats['DSO']['total'],
                 ],
                 'sub_depts' => $compiledSubDepts,
+                'sites' => $siteAchievements,
                 'db_analysis' => $dbAnalysis,
             ];
         };
@@ -505,6 +551,38 @@ try {
         // Previous period comparison for DB Analysis (Result DB QTY)
         $effY = $year ?: ($latestPeriod['period_year'] ?? (int) date('Y'));
 
+        // Compute expected fallback previous period (e.g. for baseline periods like Jan monthly or Mar quarterly)
+        $calcPrevM = null;
+        $calcPrevY = null;
+        if ($month) {
+            $isQuarterlySo = ($soType === 'quarterly' || in_array($category, [
+                'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+            ], true));
+            if ($isQuarterlySo) {
+                if ($month <= 3) {
+                    $calcPrevM = 12;
+                    $calcPrevY = (int)$effY - 1;
+                } elseif ($month <= 6) {
+                    $calcPrevM = 3;
+                    $calcPrevY = (int)$effY;
+                } elseif ($month <= 9) {
+                    $calcPrevM = 6;
+                    $calcPrevY = (int)$effY;
+                } else {
+                    $calcPrevM = 9;
+                    $calcPrevY = (int)$effY;
+                }
+            } else {
+                if ($month == 1) {
+                    $calcPrevM = 12;
+                    $calcPrevY = (int)$effY - 1;
+                } else {
+                    $calcPrevM = (int)$month - 1;
+                    $calcPrevY = (int)$effY;
+                }
+            }
+        }
+
         $prevPeriod = null;
         if ($month) {
             // Specific month selected: compare with previous available month
@@ -535,275 +613,433 @@ try {
         if ($prevPeriod) {
             $prevM = !empty($prevPeriod['period_month']) ? (int) $prevPeriod['period_month'] : null;
             $prevY = (int) $prevPeriod['period_year'];
+            $hasPrevious = true;
             $prevAchievements = $getAchievements($db, $prevM, $prevY, $srCategories, $soType, $category);
             $prevDbAnalysis = $prevAchievements['db_analysis'] ?? null;
+        } else {
+            $prevM = $calcPrevM;
+            $prevY = $calcPrevY;
+            $hasPrevious = false;
+            $prevAchievements = null;
+            $prevDbAnalysis = null;
+        }
 
-            if ($prevDbAnalysis && isset($achievements['db_analysis'])) {
-                $dbA = &$achievements['db_analysis'];
-                $dbA['has_previous'] = true;
+        $achievements['has_previous'] = $hasPrevious;
+        if ($hasPrevious && $prevM && $prevY) {
+            $achievements['previous_period'] = [
+                'month' => $prevM,
+                'year' => $prevY,
+            ];
+        }
+
+        $deptKeys = ['national', 'outlet_national', 'cro', 'ero', 'wro', 'pmd', 'dno', 'dso'];
+        foreach ($deptKeys as $dk) {
+            if (isset($achievements[$dk])) {
+                $currPct = ($achievements[$dk]['pct'] !== null) ? (float) $achievements[$dk]['pct'] : null;
+                $prevPct = ($hasPrevious && isset($prevAchievements[$dk]['pct']) && $prevAchievements[$dk]['pct'] !== null)
+                    ? (float) $prevAchievements[$dk]['pct']
+                    : null;
+                $achievements[$dk]['prev_pct'] = $prevPct;
+                $achievements[$dk]['diff_pct'] = ($hasPrevious && $currPct !== null && $prevPct !== null)
+                    ? round($currPct - $prevPct, 2)
+                    : null;
+            }
+        }
+
+        if (isset($achievements['db_analysis'])) {
+            $dbA = &$achievements['db_analysis'];
+            $dbA['has_previous'] = $hasPrevious;
+            if ($hasPrevious && $prevM && $prevY) {
                 $dbA['previous_period'] = [
                     'month' => $prevM,
                     'year' => $prevY,
                 ];
-
-                $deptKeys = ['national', 'outlet_national', 'cro', 'ero', 'wro', 'pmd', 'dno', 'dso'];
-                foreach ($deptKeys as $dk) {
-                    if (isset($dbA[$dk])) {
-                        $currQty = (int) ($dbA[$dk]['qty'] ?? 0);
-                        $prevQty = (int) ($prevDbAnalysis[$dk]['qty'] ?? 0);
-                        $dbA[$dk]['prev_qty'] = $prevQty;
-                        $dbA[$dk]['diff_qty'] = $currQty - $prevQty;
-                    }
+            }
+            foreach ($deptKeys as $dk) {
+                if (isset($dbA[$dk])) {
+                    $currQty = (int) ($dbA[$dk]['qty'] ?? 0);
+                    $prevQty = ($hasPrevious && $prevDbAnalysis) ? (int) ($prevDbAnalysis[$dk]['qty'] ?? 0) : 0;
+                    $dbA[$dk]['prev_qty'] = $prevQty;
+                    $dbA[$dk]['diff_qty'] = $hasPrevious ? ($currQty - $prevQty) : null;
                 }
+            }
 
-                if (isset($dbA['sub_depts']) && is_array($dbA['sub_depts'])) {
-                    foreach ($dbA['sub_depts'] as $sKey => &$sVal) {
-                        $currQty = (int) ($sVal['qty'] ?? 0);
-                        $prevQty = (int) ($prevDbAnalysis['sub_depts'][$sKey]['qty'] ?? 0);
-                        $sVal['prev_qty'] = $prevQty;
-                        $sVal['diff_qty'] = $currQty - $prevQty;
-                    }
-                    unset($sVal);
+            if (isset($dbA['sub_depts']) && is_array($dbA['sub_depts'])) {
+                foreach ($dbA['sub_depts'] as $sKey => &$sVal) {
+                    $currQty = (int) ($sVal['qty'] ?? 0);
+                    $prevQty = ($hasPrevious && $prevDbAnalysis) ? (int) ($prevDbAnalysis['sub_depts'][$sKey]['qty'] ?? 0) : 0;
+                    $sVal['prev_qty'] = $prevQty;
+                    $sVal['diff_qty'] = $hasPrevious ? ($currQty - $prevQty) : null;
                 }
+                unset($sVal);
+            }
 
-                // Compute Solved, Unsolved, New DB counts & site stats comparing current month vs previous month
-                if ($month && $effY && $prevM && $prevY) {
-                    try {
-                        $fetchStatusStats = function($pM, $pY, $cM, $cY) use ($db) {
-                            $sql = "
-                                WITH prev AS (
-                                    SELECT DISTINCT ON (TRIM(r.reg_no)) 
-                                        r.sitecode, TRIM(r.reg_no) as reg_no
-                                    FROM rekap_db_master r
-                                    WHERE r.period_month = :prev_m AND r.period_year = :prev_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
-                                    ORDER BY TRIM(r.reg_no), r.id
-                                ),
-                                curr AS (
-                                    SELECT DISTINCT ON (TRIM(r.reg_no)) 
-                                        r.sitecode, TRIM(r.reg_no) as reg_no
-                                    FROM rekap_db_master r
-                                    WHERE r.period_month = :curr_m AND r.period_year = :curr_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
-                                    ORDER BY TRIM(r.reg_no), r.id
-                                ),
-                                combined AS (
-                                    SELECT 
-                                        COALESCE(c.sitecode, p.sitecode) as sitecode,
-                                        COALESCE(c.reg_no, p.reg_no) as reg_no,
-                                        CASE 
-                                            WHEN p.reg_no IS NOT NULL AND c.reg_no IS NULL THEN 'solved'
-                                            WHEN p.reg_no IS NOT NULL AND c.reg_no IS NOT NULL THEN 'unsolved'
-                                            ELSE 'new_db'
-                                        END as status
-                                    FROM prev p
-                                    FULL OUTER JOIN curr c ON p.reg_no = c.reg_no
-                                )
+            // Site-level DB Analysis (for individual site cards like IT Corporate and Warehouse Tekno)
+            $dbA['sites'] = [];
+            if (isset($achievements['sites']) && is_array($achievements['sites'])) {
+                foreach ($achievements['sites'] as $sc => $sInfo) {
+                    $currQty = (int) ($sInfo['db_qty'] ?? 0);
+                    $prevSite = ($hasPrevious && isset($prevAchievements['sites'][$sc])) ? $prevAchievements['sites'][$sc] : null;
+                    $prevQty = (int) ($prevSite['db_qty'] ?? 0);
+                    $dbA['sites'][$sc] = [
+                        'sitecode' => $sc,
+                        'name_site' => $sInfo['name_site'] ?? '',
+                        'qty' => $currQty,
+                        'prev_qty' => $hasPrevious ? $prevQty : 0,
+                        'diff_qty' => $hasPrevious ? ($currQty - $prevQty) : null,
+                        'solved' => 0,
+                        'unsolved' => 0,
+                        'new_db' => 0,
+                    ];
+                }
+            }
+
+            // Compute Solved, Unsolved, New DB counts & site stats comparing current month vs previous month
+            if ($month && $effY && $prevM && $prevY) {
+                try {
+                    $scopeSiteMap = [];
+                    if (isset($achievements['sites']) && is_array($achievements['sites'])) {
+                        foreach ($achievements['sites'] as $sc => $st) {
+                            $scopeSiteMap[strtoupper(trim((string)$sc))] = true;
+                        }
+                    }
+
+                    $fetchStatusStats = function($pM, $pY, $cM, $cY) use ($db, $scopeSiteMap) {
+                        $sql = "
+                            WITH prev AS (
+                                SELECT DISTINCT ON (TRIM(r.reg_no)) 
+                                    r.sitecode, TRIM(r.reg_no) as reg_no
+                                FROM rekap_db_master r
+                                WHERE r.period_month = :prev_m AND r.period_year = :prev_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
+                                ORDER BY TRIM(r.reg_no), r.id
+                            ),
+                            curr AS (
+                                SELECT DISTINCT ON (TRIM(r.reg_no)) 
+                                    r.sitecode, TRIM(r.reg_no) as reg_no
+                                FROM rekap_db_master r
+                                WHERE r.period_month = :curr_m AND r.period_year = :curr_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
+                                ORDER BY TRIM(r.reg_no), r.id
+                            ),
+                            combined AS (
                                 SELECT 
-                                    sr.dept,
-                                    sr.sub_dept,
-                                    cb.sitecode,
-                                    cb.status
-                                FROM combined cb
-                                INNER JOIN site_regional sr ON sr.sitecode = cb.sitecode
-                            ";
-                            $stmt = $db->prepare($sql);
-                            $stmt->execute([
-                                ':prev_m' => (int)$pM,
-                                ':prev_y' => (int)$pY,
-                                ':curr_m' => (int)$cM,
-                                ':curr_y' => (int)$cY
-                            ]);
-                            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                    COALESCE(c.sitecode, p.sitecode) as sitecode,
+                                    COALESCE(c.reg_no, p.reg_no) as reg_no,
+                                    CASE 
+                                         WHEN p.reg_no IS NOT NULL AND c.reg_no IS NULL THEN 'solved'
+                                         WHEN p.reg_no IS NOT NULL AND c.reg_no IS NOT NULL THEN 'unsolved'
+                                         ELSE 'new_db'
+                                    END as status
+                                FROM prev p
+                                FULL OUTER JOIN curr c ON p.reg_no = c.reg_no
+                            )
+                            SELECT 
+                                sr.dept,
+                                sr.sub_dept,
+                                cb.sitecode,
+                                cb.status
+                            FROM combined cb
+                            INNER JOIN site_regional sr ON sr.sitecode = cb.sitecode
+                        ";
+                        $stmt = $db->prepare($sql);
+                        $stmt->execute([
+                            ':prev_m' => (int)$pM,
+                            ':prev_y' => (int)$pY,
+                            ':curr_m' => (int)$cM,
+                            ':curr_y' => (int)$cY
+                        ]);
+                        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                            $depts = [];
-                            $subDepts = [];
-                            $outlet = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
-                            $pmd = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                        $depts = [];
+                        $subDepts = [];
+                        $outlet = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                        $pmd = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                        $scopeTotal = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                        $siteStats = [];
 
-                            foreach ($rows as $r) {
-                                $d = strtolower(trim($r['dept'] ?? ''));
-                                $sub = strtolower(trim($r['sub_dept'] ?? ''));
-                                $status = $r['status'];
-                                $sc = $r['sitecode'];
+                        foreach ($rows as $r) {
+                            $d = strtolower(trim($r['dept'] ?? ''));
+                            $sub = strtolower(trim($r['sub_dept'] ?? ''));
+                            $status = $r['status'];
+                            $sc = strtoupper(trim($r['sitecode']));
 
-                                if (!isset($depts[$d])) {
-                                    $depts[$d] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
-                                }
-                                $depts[$d][$status]++;
-                                $depts[$d][$status . '_sites'][$sc] = true;
+                            if (!isset($siteStats[$sc])) {
+                                $siteStats[$sc] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0];
+                            }
+                            $siteStats[$sc][$status]++;
 
-                                if ($sub !== '') {
-                                    if (!isset($subDepts[$sub])) {
-                                        $subDepts[$sub] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
-                                    }
-                                    $subDepts[$sub][$status]++;
-                                    $subDepts[$sub][$status . '_sites'][$sc] = true;
-                                }
-
-                                if (in_array(strtoupper($d), ['CRO', 'ERO', 'WRO'])) {
-                                    $outlet[$status]++;
-                                    $outlet[$status . '_sites'][$sc] = true;
-                                }
-                                if (strtoupper($d) === 'PMD') {
-                                    $pmd[$status]++;
-                                    $pmd[$status . '_sites'][$sc] = true;
-                                }
+                            // When scopeSiteMap is populated, only aggregate status for sites belonging to the active category
+                            if (!empty($scopeSiteMap) && !isset($scopeSiteMap[$sc])) {
+                                continue;
                             }
 
-                            $format = function($arr) {
-                                return [
-                                    'solved' => $arr['solved'],
-                                    'unsolved' => $arr['unsolved'],
-                                    'new_db' => $arr['new_db'],
-                                    'solved_sites' => count($arr['solved_sites']),
-                                    'unsolved_sites' => count($arr['unsolved_sites']),
-                                    'new_db_sites' => count($arr['new_db_sites']),
-                                ];
-                            };
+                            $scopeTotal[$status]++;
+                            $scopeTotal[$status . '_sites'][$sc] = true;
 
+                            if (!isset($depts[$d])) {
+                                $depts[$d] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                            }
+                            $depts[$d][$status]++;
+                            $depts[$d][$status . '_sites'][$sc] = true;
+
+                            if ($sub !== '') {
+                                if (!isset($subDepts[$sub])) {
+                                    $subDepts[$sub] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                                }
+                                $subDepts[$sub][$status]++;
+                                $subDepts[$sub][$status . '_sites'][$sc] = true;
+                            }
+
+                            if (in_array(strtoupper($d), ['CRO', 'ERO', 'WRO'])) {
+                                $outlet[$status]++;
+                                $outlet[$status . '_sites'][$sc] = true;
+                            }
+                            if (strtoupper($d) === 'PMD') {
+                                $pmd[$status]++;
+                                $pmd[$status . '_sites'][$sc] = true;
+                            }
+                        }
+
+                        $format = function($arr) {
                             return [
-                                'outlet' => $format($outlet),
-                                'pmd' => $format($pmd),
-                                'depts' => array_map($format, $depts),
-                                'sub_depts' => array_map($format, $subDepts),
+                                'solved' => $arr['solved'],
+                                'unsolved' => $arr['unsolved'],
+                                'new_db' => $arr['new_db'],
+                                'solved_sites' => count($arr['solved_sites']),
+                                'unsolved_sites' => count($arr['unsolved_sites']),
+                                'new_db_sites' => count($arr['new_db_sites']),
                             ];
                         };
 
-                        $currStatus = $fetchStatusStats($prevM, $prevY, $month, $effY);
+                        return [
+                            'scope_total' => $format($scopeTotal),
+                            'outlet' => $format($outlet),
+                            'pmd' => $format($pmd),
+                            'depts' => array_map($format, $depts),
+                            'sub_depts' => array_map($format, $subDepts),
+                            'site_stats' => $siteStats,
+                        ];
+                    };
 
-                        // Find period prior to prevM/prevY for diff comparison
-                        $prevPrevPeriod = null;
-                        if ($prevM && $prevY) {
-                            $ppStmt = $db->prepare("
-                                SELECT DISTINCT period_year, period_month 
-                                FROM asset_reconciliation 
-                                WHERE (period_year < :py OR (period_year = :py AND period_month < :pm))
-                                  AND period_month IS NOT NULL AND period_year IS NOT NULL $latestWhere
-                                ORDER BY period_year DESC, period_month DESC 
-                                LIMIT 1
-                            ");
-                            $ppStmt->execute([':pm' => $prevM, ':py' => $prevY]);
-                            $prevPrevPeriod = $ppStmt->fetch(PDO::FETCH_ASSOC);
-                        }
+                    $currStatus = $fetchStatusStats($prevM, $prevY, $month, $effY);
 
-                        $prevStatus = null;
-                        if ($prevPrevPeriod && !empty($prevPrevPeriod['period_month'])) {
-                            $prevStatus = $fetchStatusStats((int)$prevPrevPeriod['period_month'], (int)$prevPrevPeriod['period_year'], (int)$prevM, (int)$prevY);
-                        }
-
-                        foreach (['cro', 'ero', 'wro', 'pmd'] as $dk) {
-                            if (isset($dbA[$dk])) {
-                                $cDept = $currStatus['depts'][$dk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
-                                $pDept = $prevStatus['depts'][$dk] ?? null;
-
-                                $dbA[$dk]['solved'] = $cDept['solved'];
-                                $dbA[$dk]['unsolved'] = $cDept['unsolved'];
-                                $dbA[$dk]['new_db'] = $cDept['new_db'];
-                                $dbA[$dk]['solved_sites'] = $cDept['solved_sites'];
-                                $dbA[$dk]['unsolved_sites'] = $cDept['unsolved_sites'];
-                                $dbA[$dk]['new_db_sites'] = $cDept['new_db_sites'];
-
-                                if ($pDept) {
-                                    $dbA[$dk]['prev_solved'] = $pDept['solved'];
-                                    $dbA[$dk]['prev_unsolved'] = $pDept['unsolved'];
-                                    $dbA[$dk]['prev_new_db'] = $pDept['new_db'];
-                                    $dbA[$dk]['diff_solved'] = $cDept['solved'] - $pDept['solved'];
-                                    $dbA[$dk]['diff_unsolved'] = $cDept['unsolved'] - $pDept['unsolved'];
-                                    $dbA[$dk]['diff_new_db'] = $cDept['new_db'] - $pDept['new_db'];
-                                }
-                            }
-                        }
-
-                        if (isset($dbA['outlet_national'])) {
-                            $cOut = $currStatus['outlet'];
-                            $pOut = $prevStatus['outlet'] ?? null;
-                            $dbA['outlet_national']['solved'] = $cOut['solved'];
-                            $dbA['outlet_national']['unsolved'] = $cOut['unsolved'];
-                            $dbA['outlet_national']['new_db'] = $cOut['new_db'];
-                            $dbA['outlet_national']['solved_sites'] = $cOut['solved_sites'];
-                            $dbA['outlet_national']['unsolved_sites'] = $cOut['unsolved_sites'];
-                            $dbA['outlet_national']['new_db_sites'] = $cOut['new_db_sites'];
-                            if ($pOut) {
-                                $dbA['outlet_national']['prev_solved'] = $pOut['solved'];
-                                $dbA['outlet_national']['prev_unsolved'] = $pOut['unsolved'];
-                                $dbA['outlet_national']['prev_new_db'] = $pOut['new_db'];
-                                $dbA['outlet_national']['diff_solved'] = $cOut['solved'] - $pOut['solved'];
-                                $dbA['outlet_national']['diff_unsolved'] = $cOut['unsolved'] - $pOut['unsolved'];
-                                $dbA['outlet_national']['diff_new_db'] = $cOut['new_db'] - $pOut['new_db'];
-                            }
-                        }
-
-                        if (isset($dbA['pmd'])) {
-                            $cPmd = $currStatus['pmd'];
-                            $pPmd = $prevStatus['pmd'] ?? null;
-                            $dbA['pmd']['solved_sites'] = $cPmd['solved_sites'];
-                            $dbA['pmd']['unsolved_sites'] = $cPmd['unsolved_sites'];
-                            $dbA['pmd']['new_db_sites'] = $cPmd['new_db_sites'];
-                            if ($pPmd) {
-                                $dbA['pmd']['prev_solved'] = $pPmd['solved'];
-                                $dbA['pmd']['prev_unsolved'] = $pPmd['unsolved'];
-                                $dbA['pmd']['prev_new_db'] = $pPmd['new_db'];
-                                $dbA['pmd']['diff_solved'] = $cPmd['solved'] - $pPmd['solved'];
-                                $dbA['pmd']['diff_unsolved'] = $cPmd['unsolved'] - $pPmd['unsolved'];
-                                $dbA['pmd']['diff_new_db'] = $cPmd['new_db'] - $pPmd['new_db'];
-                            }
-                        }
-
-                        // Sub departments (CSO, NSO, SSO, CJDO, EKO, WJO, WKO, BNO, EJO, MPO, SMO, DNO, DSO)
-                        if (isset($dbA['sub_depts']) && is_array($dbA['sub_depts'])) {
-                            foreach ($dbA['sub_depts'] as $sKey => &$sVal) {
-                                $sk = strtolower($sKey);
-                                $cSub = $currStatus['sub_depts'][$sk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
-                                $pSub = $prevStatus['sub_depts'][$sk] ?? null;
-
-                                $sVal['solved'] = $cSub['solved'];
-                                $sVal['unsolved'] = $cSub['unsolved'];
-                                $sVal['new_db'] = $cSub['new_db'];
-                                $sVal['solved_sites'] = $cSub['solved_sites'];
-                                $sVal['unsolved_sites'] = $cSub['unsolved_sites'];
-                                $sVal['new_db_sites'] = $cSub['new_db_sites'];
-
-                                if ($pSub) {
-                                    $sVal['prev_solved'] = $pSub['solved'];
-                                    $sVal['prev_unsolved'] = $pSub['unsolved'];
-                                    $sVal['prev_new_db'] = $pSub['new_db'];
-                                    $sVal['diff_solved'] = $cSub['solved'] - $pSub['solved'];
-                                    $sVal['diff_unsolved'] = $cSub['unsolved'] - $pSub['unsolved'];
-                                    $sVal['diff_new_db'] = $cSub['new_db'] - $pSub['new_db'];
-                                }
-                            }
-                            unset($sVal);
-                        }
-
-                        // Also populate top-level dno and dso if present
-                        foreach (['dno', 'dso'] as $dsub) {
-                            if (isset($dbA[$dsub])) {
-                                $cSub = $currStatus['sub_depts'][$dsub] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
-                                $pSub = $prevStatus['sub_depts'][$dsub] ?? null;
-                                $dbA[$dsub]['solved'] = $cSub['solved'];
-                                $dbA[$dsub]['unsolved'] = $cSub['unsolved'];
-                                $dbA[$dsub]['new_db'] = $cSub['new_db'];
-                                $dbA[$dsub]['solved_sites'] = $cSub['solved_sites'];
-                                $dbA[$dsub]['unsolved_sites'] = $cSub['unsolved_sites'];
-                                $dbA[$dsub]['new_db_sites'] = $cSub['new_db_sites'];
-                                if ($pSub) {
-                                    $dbA[$dsub]['prev_solved'] = $pSub['solved'];
-                                    $dbA[$dsub]['prev_unsolved'] = $pSub['unsolved'];
-                                    $dbA[$dsub]['prev_new_db'] = $pSub['new_db'];
-                                    $dbA[$dsub]['diff_solved'] = $cSub['solved'] - $pSub['solved'];
-                                    $dbA[$dsub]['diff_unsolved'] = $cSub['unsolved'] - $pSub['unsolved'];
-                                    $dbA[$dsub]['diff_new_db'] = $cSub['new_db'] - $pSub['new_db'];
-                                }
-                            }
-                        }
-                    } catch (Throwable $eStatus) {
-                        // Keep non-blocking
+                    // Find period prior to prevM/prevY for diff comparison
+                    $prevPrevPeriod = null;
+                    if ($hasPrevious && $prevM && $prevY) {
+                        $ppStmt = $db->prepare("
+                            SELECT DISTINCT period_year, period_month 
+                            FROM asset_reconciliation 
+                            WHERE (period_year < :py OR (period_year = :py AND period_month < :pm))
+                              AND period_month IS NOT NULL AND period_year IS NOT NULL $latestWhere
+                            ORDER BY period_year DESC, period_month DESC 
+                            LIMIT 1
+                        ");
+                        $ppStmt->execute([':pm' => $prevM, ':py' => $prevY]);
+                        $prevPrevPeriod = $ppStmt->fetch(PDO::FETCH_ASSOC);
                     }
-                }
 
-                unset($dbA);
+                    $prevStatus = null;
+                    if ($prevPrevPeriod && !empty($prevPrevPeriod['period_month'])) {
+                        $prevStatus = $fetchStatusStats((int)$prevPrevPeriod['period_month'], (int)$prevPrevPeriod['period_year'], (int)$prevM, (int)$prevY);
+                    }
+
+                    foreach (['cro', 'ero', 'wro', 'pmd'] as $dk) {
+                        if (isset($dbA[$dk])) {
+                            $cDept = $currStatus['depts'][$dk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
+                            $pDept = $prevStatus['depts'][$dk] ?? null;
+
+                            $dbA[$dk]['solved'] = $cDept['solved'];
+                            $dbA[$dk]['unsolved'] = $cDept['unsolved'];
+                            $dbA[$dk]['new_db'] = $cDept['new_db'];
+                            $dbA[$dk]['solved_sites'] = $cDept['solved_sites'];
+                            $dbA[$dk]['unsolved_sites'] = $cDept['unsolved_sites'];
+                            $dbA[$dk]['new_db_sites'] = $cDept['new_db_sites'];
+
+                            if ($pDept) {
+                                $dbA[$dk]['prev_solved'] = $pDept['solved'];
+                                $dbA[$dk]['prev_unsolved'] = $pDept['unsolved'];
+                                $dbA[$dk]['prev_new_db'] = $pDept['new_db'];
+                                $dbA[$dk]['diff_solved'] = $cDept['solved'] - $pDept['solved'];
+                                $dbA[$dk]['diff_unsolved'] = $cDept['unsolved'] - $pDept['unsolved'];
+                                $dbA[$dk]['diff_new_db'] = $cDept['new_db'] - $pDept['new_db'];
+                            } else {
+                                $dbA[$dk]['prev_solved'] = null;
+                                $dbA[$dk]['prev_unsolved'] = null;
+                                $dbA[$dk]['prev_new_db'] = null;
+                                $dbA[$dk]['diff_solved'] = null;
+                                $dbA[$dk]['diff_unsolved'] = null;
+                                $dbA[$dk]['diff_new_db'] = null;
+                            }
+                        }
+                    }
+
+                    if (isset($dbA['outlet_national'])) {
+                        $cOut = $currStatus['outlet'];
+                        $pOut = $prevStatus['outlet'] ?? null;
+                        $dbA['outlet_national']['solved'] = $cOut['solved'];
+                        $dbA['outlet_national']['unsolved'] = $cOut['unsolved'];
+                        $dbA['outlet_national']['new_db'] = $cOut['new_db'];
+                        $dbA['outlet_national']['solved_sites'] = $cOut['solved_sites'];
+                        $dbA['outlet_national']['unsolved_sites'] = $cOut['unsolved_sites'];
+                        $dbA['outlet_national']['new_db_sites'] = $cOut['new_db_sites'];
+                        if ($pOut) {
+                            $dbA['outlet_national']['prev_solved'] = $pOut['solved'];
+                            $dbA['outlet_national']['prev_unsolved'] = $pOut['unsolved'];
+                            $dbA['outlet_national']['prev_new_db'] = $pOut['new_db'];
+                            $dbA['outlet_national']['diff_solved'] = $cOut['solved'] - $pOut['solved'];
+                            $dbA['outlet_national']['diff_unsolved'] = $cOut['unsolved'] - $pOut['unsolved'];
+                            $dbA['outlet_national']['diff_new_db'] = $cOut['new_db'] - $pOut['new_db'];
+                        } else {
+                            $dbA['outlet_national']['prev_solved'] = null;
+                            $dbA['outlet_national']['prev_unsolved'] = null;
+                            $dbA['outlet_national']['prev_new_db'] = null;
+                            $dbA['outlet_national']['diff_solved'] = null;
+                            $dbA['outlet_national']['diff_unsolved'] = null;
+                            $dbA['outlet_national']['diff_new_db'] = null;
+                        }
+                    }
+
+                    if (isset($dbA['national'])) {
+                        $cScope = $currStatus['scope_total'] ?? $currStatus['outlet'];
+                        $pScope = $prevStatus['scope_total'] ?? ($prevStatus['outlet'] ?? null);
+                        $dbA['national']['solved'] = $cScope['solved'];
+                        $dbA['national']['unsolved'] = $cScope['unsolved'];
+                        $dbA['national']['new_db'] = $cScope['new_db'];
+                        $dbA['national']['solved_sites'] = $cScope['solved_sites'];
+                        $dbA['national']['unsolved_sites'] = $cScope['unsolved_sites'];
+                        $dbA['national']['new_db_sites'] = $cScope['new_db_sites'];
+                        if ($pScope) {
+                            $dbA['national']['prev_solved'] = $pScope['solved'];
+                            $dbA['national']['prev_unsolved'] = $pScope['unsolved'];
+                            $dbA['national']['prev_new_db'] = $pScope['new_db'];
+                            $dbA['national']['diff_solved'] = $cScope['solved'] - $pScope['solved'];
+                            $dbA['national']['diff_unsolved'] = $cScope['unsolved'] - $pScope['unsolved'];
+                            $dbA['national']['diff_new_db'] = $cScope['new_db'] - $pScope['new_db'];
+                        } else {
+                            $dbA['national']['prev_solved'] = null;
+                            $dbA['national']['prev_unsolved'] = null;
+                            $dbA['national']['prev_new_db'] = null;
+                            $dbA['national']['diff_solved'] = null;
+                            $dbA['national']['diff_unsolved'] = null;
+                            $dbA['national']['diff_new_db'] = null;
+                        }
+                    }
+
+                    if (isset($dbA['sites']) && is_array($dbA['sites'])) {
+                        foreach ($dbA['sites'] as $scKey => &$sEntry) {
+                            $cSite = $currStatus['site_stats'][$scKey] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0];
+                            $pSite = $prevStatus['site_stats'][$scKey] ?? null;
+                            $sEntry['solved'] = $cSite['solved'];
+                            $sEntry['unsolved'] = $cSite['unsolved'];
+                            $sEntry['new_db'] = $cSite['new_db'];
+                            if ($pSite) {
+                                $sEntry['prev_solved'] = $pSite['solved'];
+                                $sEntry['prev_unsolved'] = $pSite['unsolved'];
+                                $sEntry['prev_new_db'] = $pSite['new_db'];
+                                $sEntry['diff_solved'] = $cSite['solved'] - $pSite['solved'];
+                                $sEntry['diff_unsolved'] = $cSite['unsolved'] - $pSite['unsolved'];
+                                $sEntry['diff_new_db'] = $cSite['new_db'] - $pSite['new_db'];
+                            } else {
+                                $sEntry['prev_solved'] = null;
+                                $sEntry['prev_unsolved'] = null;
+                                $sEntry['prev_new_db'] = null;
+                                $sEntry['diff_solved'] = null;
+                                $sEntry['diff_unsolved'] = null;
+                                $sEntry['diff_new_db'] = null;
+                            }
+                        }
+                        unset($sEntry);
+                    }
+
+                    if (isset($dbA['pmd'])) {
+                        $cPmd = $currStatus['pmd'];
+                        $pPmd = $prevStatus['pmd'] ?? null;
+                        $dbA['pmd']['solved_sites'] = $cPmd['solved_sites'];
+                        $dbA['pmd']['unsolved_sites'] = $cPmd['unsolved_sites'];
+                        $dbA['pmd']['new_db_sites'] = $cPmd['new_db_sites'];
+                        if ($pPmd) {
+                            $dbA['pmd']['prev_solved'] = $pPmd['solved'];
+                            $dbA['pmd']['prev_unsolved'] = $pPmd['unsolved'];
+                            $dbA['pmd']['prev_new_db'] = $pPmd['new_db'];
+                            $dbA['pmd']['diff_solved'] = $cPmd['solved'] - $pPmd['solved'];
+                            $dbA['pmd']['diff_unsolved'] = $cPmd['unsolved'] - $pPmd['unsolved'];
+                            $dbA['pmd']['diff_new_db'] = $cPmd['new_db'] - $pPmd['new_db'];
+                        } else {
+                            $dbA['pmd']['prev_solved'] = null;
+                            $dbA['pmd']['prev_unsolved'] = null;
+                            $dbA['pmd']['prev_new_db'] = null;
+                            $dbA['pmd']['diff_solved'] = null;
+                            $dbA['pmd']['diff_unsolved'] = null;
+                            $dbA['pmd']['diff_new_db'] = null;
+                        }
+                    }
+
+                    // Sub departments (CSO, NSO, SSO, CJDO, EKO, WJO, WKO, BNO, EJO, MPO, SMO, DNO, DSO)
+                    if (isset($dbA['sub_depts']) && is_array($dbA['sub_depts'])) {
+                        foreach ($dbA['sub_depts'] as $sKey => &$sVal) {
+                            $sk = strtolower($sKey);
+                            $cSub = $currStatus['sub_depts'][$sk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
+                            $pSub = $prevStatus['sub_depts'][$sk] ?? null;
+
+                            $sVal['solved'] = $cSub['solved'];
+                            $sVal['unsolved'] = $cSub['unsolved'];
+                            $sVal['new_db'] = $cSub['new_db'];
+                            $sVal['solved_sites'] = $cSub['solved_sites'];
+                            $sVal['unsolved_sites'] = $cSub['unsolved_sites'];
+                            $sVal['new_db_sites'] = $cSub['new_db_sites'];
+
+                            if ($pSub) {
+                                $sVal['prev_solved'] = $pSub['solved'];
+                                $sVal['prev_unsolved'] = $pSub['unsolved'];
+                                $sVal['prev_new_db'] = $pSub['new_db'];
+                                $sVal['diff_solved'] = $cSub['solved'] - $pSub['solved'];
+                                $sVal['diff_unsolved'] = $cSub['unsolved'] - $pSub['unsolved'];
+                                $sVal['diff_new_db'] = $cSub['new_db'] - $pSub['new_db'];
+                            } else {
+                                $sVal['prev_solved'] = null;
+                                $sVal['prev_unsolved'] = null;
+                                $sVal['prev_new_db'] = null;
+                                $sVal['diff_solved'] = null;
+                                $sVal['diff_unsolved'] = null;
+                                $sVal['diff_new_db'] = null;
+                            }
+                        }
+                        unset($sVal);
+                    }
+
+                    // Also populate top-level dno and dso if present
+                    foreach (['dno', 'dso'] as $dsub) {
+                        if (isset($dbA[$dsub])) {
+                            $cSub = $currStatus['sub_depts'][$dsub] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
+                            $pSub = $prevStatus['sub_depts'][$dsub] ?? null;
+                            $dbA[$dsub]['solved'] = $cSub['solved'];
+                            $dbA[$dsub]['unsolved'] = $cSub['unsolved'];
+                            $dbA[$dsub]['new_db'] = $cSub['new_db'];
+                            $dbA[$dsub]['solved_sites'] = $cSub['solved_sites'];
+                            $dbA[$dsub]['unsolved_sites'] = $cSub['unsolved_sites'];
+                            $dbA[$dsub]['new_db_sites'] = $cSub['new_db_sites'];
+                            if ($pSub) {
+                                $dbA[$dsub]['prev_solved'] = $pSub['solved'];
+                                $dbA[$dsub]['prev_unsolved'] = $pSub['unsolved'];
+                                $dbA[$dsub]['prev_new_db'] = $pSub['new_db'];
+                                $dbA[$dsub]['diff_solved'] = $cSub['solved'] - $pSub['solved'];
+                                $dbA[$dsub]['diff_unsolved'] = $cSub['unsolved'] - $pSub['unsolved'];
+                                $dbA[$dsub]['diff_new_db'] = $cSub['new_db'] - $pSub['new_db'];
+                            } else {
+                                $dbA[$dsub]['prev_solved'] = null;
+                                $dbA[$dsub]['prev_unsolved'] = null;
+                                $dbA[$dsub]['prev_new_db'] = null;
+                                $dbA[$dsub]['diff_solved'] = null;
+                                $dbA[$dsub]['diff_unsolved'] = null;
+                                $dbA[$dsub]['diff_new_db'] = null;
+                            }
+                        }
+                    }
+                } catch (Throwable $eStatus) {
+                    // Keep non-blocking
+                }
             }
-        } else if (isset($achievements['db_analysis'])) {
-            $achievements['db_analysis']['has_previous'] = false;
+
+            unset($dbA);
         }
 
         // If summary action requested, return without fetching all rows
@@ -831,12 +1067,22 @@ try {
             // 1. Get sites for this dept and/or sub_dept
             $where = [];
             $params = [];
-            if ($category === 'outlet' || $category === 'outlet_regional') {
-                $where[] = "dept != 'PMD'";
+            if ($category === 'all') {
+                // All data mode: no category filter on raw query
+            } elseif ($category === 'outlet' || $category === 'outlet_regional') {
+                $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('Under Warehouse', 'HUB', 'HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate') OR info IS NULL)";
             } elseif ($category === 'outlet_subarep') {
-                $where[] = "dept != 'PMD' AND (info IN ('Subarep', 'Outlet') OR info IS NULL)";
+                $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '')";
             } elseif ($category === 'warehouse_hub') {
-                $where[] = "dept != 'PMD' AND info IN ('Under Warehouse', 'HUB')";
+                if ($soType === 'quarterly') {
+                    $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND group_type = 'quarterly'))";
+                } else {
+                    $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
+                }
+            } elseif ($category === 'warehouse_tekno') {
+                $where[] = "dept != 'PMD' AND name_site ILIKE '%TEKNO%'";
+            } elseif ($category === 'it_coorporate' || $category === 'it_corporate') {
+                $where[] = "dept != 'PMD' AND info IN ('IT Coorporate', 'IT Corporate')";
             } elseif ($category === 'pmd') {
                 $where[] = "dept = 'PMD'";
             }
@@ -873,13 +1119,53 @@ try {
                 }
 
                 $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
-                if ($soType === 'quarterly') {
-                    if (!$isPmd && $eff === 'quarterly') {
-                        $sites[] = $s;
+                $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
+                $info = trim($s['info'] ?? '');
+                if ($category === 'all') {
+                    if ($soType === 'quarterly') {
+                        if ($eff === 'quarterly') {
+                            $sites[] = $s;
+                        }
+                    } else {
+                        if ($eff === 'monthly') {
+                            $sites[] = $s;
+                        }
+                    }
+                } elseif ($soType === 'quarterly') {
+                    if (!$isPmd) {
+                        if ($category === 'warehouse_tekno') {
+                            if ($isTekno && $eff === 'quarterly') {
+                                $sites[] = $s;
+                            }
+                        } elseif ($category === 'warehouse_hub') {
+                            if (!$isTekno && ($info === 'HUB Quarterly' || ($eff === 'quarterly' && $info === 'HUB'))) {
+                                $sites[] = $s;
+                            }
+                        } else {
+                            if (!$isTekno && $eff === 'quarterly' && (in_array($info, ['Subarep', 'Outlet', '']) || empty($info))) {
+                                $sites[] = $s;
+                            }
+                        }
                     }
                 } else {
-                    if ($isPmd || $eff === 'monthly') {
-                        $sites[] = $s;
+                    if ($category === 'pmd') {
+                        if ($isPmd) $sites[] = $s;
+                    } elseif ($category === 'warehouse_tekno') {
+                        if (!$isPmd && $isTekno && $eff === 'monthly') {
+                            $sites[] = $s;
+                        }
+                    } elseif ($category === 'warehouse_hub') {
+                        if (!$isPmd && !$isTekno && ($info === 'HUB Monthly' || ($eff === 'monthly' && $info === 'HUB'))) {
+                            $sites[] = $s;
+                        }
+                    } elseif ($category === 'it_coorporate' || $category === 'it_corporate') {
+                        if (!$isPmd && in_array($info, ['IT Coorporate', 'IT Corporate'])) {
+                            $sites[] = $s;
+                        }
+                    } else {
+                        if (!$isPmd && !$isTekno && $eff === 'monthly' && !in_array($info, ['HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB'])) {
+                            $sites[] = $s;
+                        }
                     }
                 }
             }
@@ -935,6 +1221,7 @@ try {
             $totalMatchQty = 0;
             $totalPhysicQty = 0;
             $totalDbQty = 0;
+            $totalTargetQty = 0;
 
             foreach ($sites as $s) {
                 $sitecode = trim($s['sitecode'] ?? '');
@@ -1006,16 +1293,18 @@ try {
                 $totalMatchQty += $matchQty;
                 $totalPhysicQty += $physicQty;
                 $totalDbQty += $dbQty;
+                $totalTargetQty += $target;
 
                 // Thresholds:
-                // For PMD: >= 98%: Tercapai (green), < 98%: Tidak Tercapai (red)
-                // For Others: >= 85%: Tercapai (green), 75%-85%: Tidak Tercapai (orange), < 75%: Tidak Tercapai (red)
+                // For PMD, Warehouse Tekno, IT Coorporate: >= 98%: Tercapai (green), < 98%: Tidak Tercapai (red)
+                // For Warehouse HUB, Outlet: >= 85%: Tercapai (green), 75%-85%: Tidak Tercapai (orange), < 75%: Tidak Tercapai (red)
                 $isPmdItem = (strtoupper($s['dept'] ?? '') === 'PMD' || strtoupper($dept) === 'PMD');
+                $isTarget98 = ($isPmdItem || $category === 'warehouse_tekno' || $category === 'it_coorporate' || $category === 'it_corporate' || in_array($info, ['IT Coorporate', 'IT Corporate'], true));
                 $statusText = 'Belum Ada Data';
                 $statusClass = 'none';
                 if ($pct !== null) {
                     $evalPct = (float) round($pct);
-                    if ($isPmdItem) {
+                    if ($isTarget98) {
                         if ($evalPct >= 98.0) {
                             $statusText = 'Tercapai';
                             $statusClass = 'green';
@@ -1058,8 +1347,9 @@ try {
             $overallStatus = 'none';
             $overallStatusText = 'Belum Ada Data';
             $isPmdOverall = (strtoupper($dept) === 'PMD');
+            $isTarget98Overall = ($isPmdOverall || $category === 'warehouse_tekno' || $category === 'it_coorporate' || $category === 'it_corporate');
             if ($countWithData > 0) {
-                if ($isPmdOverall) {
+                if ($isTarget98Overall) {
                     if ($avgPct >= 98.0) {
                         $overallStatus = 'green';
                         $overallStatusText = 'Tercapai';
@@ -1092,9 +1382,18 @@ try {
                 'total_match_qty' => $totalMatchQty,
                 'total_physic_qty' => $totalPhysicQty,
                 'total_db_qty' => $totalDbQty,
+                'total_target_qty' => $totalTargetQty,
                 'avg_pct' => $avgPct,
                 'overall_status' => $overallStatus,
                 'overall_status_text' => $overallStatusText,
+                'totals' => [
+                    'total_match' => $totalMatchQty,
+                    'total_physic' => $totalPhysicQty,
+                    'total_db' => $totalDbQty,
+                    'total_target' => $totalTargetQty,
+                    'avg_pct' => $avgPct,
+                    'count_with_data' => $countWithData,
+                ],
                 'data' => $results,
             ]);
             exit;

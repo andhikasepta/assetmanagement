@@ -144,14 +144,28 @@ const App = (() => {
             localStorage.removeItem('active_page');
         } catch (e) { }
 
-        const sessionPage = sessionStorage.getItem('active_page');
+        // Clean URL enforcer: strips any .php, query strings or hash so URL stays wmsdev.my.id/amora/
+        keepCleanUrl();
 
-        const isMasterPagePresent = !!document.getElementById('page-master-data');
-        let initialPage = isMasterPagePresent ? 'master-data' : 'summary';
-
-        // Keep URL clean without hashes (#) or query strings (?)
-        if (window.location.hash || window.location.search) {
-            history.replaceState(null, '', window.location.pathname);
+        let initialPage = window.AUTH_USER ? 'all-summary' : 'summary';
+        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
+            if (window.INITIAL_PAGE === 'login') {
+                initialPage = window.AUTH_USER ? 'all-summary' : 'login';
+            } else {
+                initialPage = (window.INITIAL_PAGE === 'summary' || window.AUTH_USER) ? window.INITIAL_PAGE : 'summary';
+            }
+        } else {
+            const savedPage = sessionStorage.getItem('active_page');
+            if (savedPage && (savedPage === 'all-summary' || savedPage === 'master-data' || savedPage === 'summary' || savedPage === 'login')) {
+                if (savedPage === 'login') {
+                    initialPage = window.AUTH_USER ? 'all-summary' : 'login';
+                } else {
+                    initialPage = (savedPage === 'summary' || window.AUTH_USER) ? savedPage : 'summary';
+                }
+            }
+        }
+        if (window.AUTH_USER && (initialPage === 'summary' || !initialPage)) {
+            initialPage = 'all-summary';
         }
 
         // Restore active SO Type & Category from sessionStorage
@@ -167,7 +181,7 @@ const App = (() => {
             }
         } else if (savedSOType === 'monthly') {
             summarySOType = 'monthly';
-            if (savedCategory === 'pmd' || savedCategory === 'outlet') {
+            if (savedCategory === 'pmd' || savedCategory === 'outlet' || savedCategory === 'warehouse_hub' || savedCategory === 'it_coorporate') {
                 summaryCategory = savedCategory;
             } else {
                 summaryCategory = 'pmd';
@@ -178,7 +192,7 @@ const App = (() => {
             summaryCategory = 'pmd';
         }
 
-        navigateTo(initialPage);
+        navigateTo(initialPage, true);
 
         // Check if there was a card jump pending from quick access
         const pendingCard = sessionStorage.getItem('target_card');
@@ -189,58 +203,134 @@ const App = (() => {
 
         // Listen for popstate when user uses browser Back/Forward
         window.addEventListener('popstate', () => {
-            navigateTo(window.AUTH_USER ? 'master-data' : 'summary');
+            keepCleanUrl();
+            const saved = sessionStorage.getItem('active_page') || 'summary';
+            navigateTo(saved);
         });
     }
 
-    // ── Navigation (Master Data vs Summary) ─────────────────────
+    // ── Keep Clean URL (Removes .php, query string & hash from address bar) ──
+    function keepCleanUrl() {
+        try {
+            let path = window.location.pathname;
+            let cleanPath = path.replace(/(index|login|summary|all-summary|master-data)\.php.*$/i, '');
+            if (!cleanPath.endsWith('/')) {
+                cleanPath += '/';
+            }
+            if (window.location.search || window.location.hash || path !== cleanPath) {
+                history.replaceState(null, '', cleanPath);
+            }
+        } catch (e) { }
+    }
 
-    function navigateTo(page) {
-        const isMasterPagePresent = !!document.getElementById('page-master-data');
-        const isSummaryPagePresent = !!document.getElementById('page-summary');
+    // ── Navigation (SPA Core: Summary vs All Summary vs Master Data) ─────
+    let pendingTargetPage = 'all-summary';
 
-        if (page === 'master-data' && !isMasterPagePresent) {
-            window.location.href = 'master-data.php';
+    function navigateTo(page, isInit = false) {
+        if (!page) page = 'summary';
+
+        // Summary page is removed on session logged in
+        if (page === 'summary' && window.AUTH_USER) {
+            page = 'all-summary';
+        }
+
+        // Protected pages require authenticated session
+        if ((page === 'all-summary' || page === 'master-data') && !window.AUTH_USER) {
+            showToast('info', 'Akses Terbatas', 'Silakan login terlebih dahulu untuk mengakses menu Administrator.');
+            openLoginModal(page);
             return;
         }
 
-        if (page === 'summary' && !isSummaryPagePresent) {
-            window.location.href = './';
-            return;
+        // Hide all page sections
+        document.querySelectorAll('.page-section').forEach(sec => {
+            sec.classList.remove('active');
+            sec.style.display = 'none';
+        });
+
+        // Activate target section
+        const targetSec = document.getElementById('page-' + page);
+        if (targetSec) {
+            targetSec.classList.add('active');
+            targetSec.style.display = 'block';
         }
+
+        // Update Navbar Tabs active state
+        document.querySelectorAll('.navbar-menu .nav-link').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const activeNavTab = document.getElementById('tab-' + page);
+        if (activeNavTab) activeNavTab.classList.add('active');
+
 
         // Persist page in sessionStorage
         try {
-            sessionStorage.setItem('active_page', isMasterPagePresent ? 'master-data' : 'summary');
+            sessionStorage.setItem('active_page', page);
         } catch (e) { }
 
-        // Keep URL clean without hashes (#) or query strings (?)
-        if (window.location.hash || window.location.search) {
-            history.replaceState(null, '', window.location.pathname);
-        }
+        // Keep address bar URL strictly wmsdev.my.id/amora/
+        keepCleanUrl();
 
-        if (isMasterPagePresent) {
+        // Update drawer quick jump links for this active page
+        renderQuickAccessList(page);
+
+        // Page-specific data loaders
+        if (page === 'summary') {
+            if (!summaryInitialized || !isInit) {
+                switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
+                summaryInitialized = true;
+            }
+        } else if (page === 'all-summary') {
+            if (typeof AllSummaryApp !== 'undefined' && typeof AllSummaryApp.init === 'function') {
+                AllSummaryApp.init();
+            }
+        } else if (page === 'master-data') {
             loadMasterData();
             loadSiteRegional();
             loadRekapDbData();
             loadScorecardKpi();
             loadMasterCatatan();
-        } else if (isSummaryPagePresent) {
-            switchSOType(summarySOType || 'monthly', summaryCategory || 'pmd');
+        }
+
+        // Scroll to top on page switch
+        if (!isInit) {
+            window.scrollTo({ top: 0, behavior: 'instant' });
         }
     }
 
     // ── Quick Access Sidebar & Smooth Scroll Navigation ────────
-    const QUICK_ACCESS_ITEMS = [
+    const QUICK_ACCESS_ITEMS_SUMMARY = [
+        { id: 'card-summary-controls', title: 'Filter & Tipe SO' },
         { id: 'card-executive-summary', title: 'Executive Summary' },
-        { id: 'card-executive-catatan', title: 'Catatan Dan Evaluasi' },
+        { id: 'card-executive-catatan', title: 'Catatan & Evaluasi' },
         { id: 'card-executive-db-analysis', title: 'Result DB Analysis' },
         { id: 'card-scorecard-summary', title: 'Score Card Summary' },
-        { id: 'card-trend-dept-wrapper', title: 'Trend Chart' },
-        { id: 'card-hasil-so-subdept', title: 'Report SO' },
+        { id: 'card-trend-dept-wrapper', title: 'Trend Line Chart' },
+        { id: 'card-hasil-so-subdept', title: 'Report Hasil SO' },
         { id: 'card-rekap-status-db', title: 'Status Penyelesaian DB' },
         { id: 'card-rekapitulasi', title: 'Rekapitulasi' },
-        { id: 'card-site-movements', title: 'History & Log' }
+        { id: 'card-site-movements', title: 'Log Pergerakan Site' }
+    ];
+
+    const QUICK_ACCESS_ITEMS_ALL_SUMMARY = [
+        { id: 'card-all-summary-controls', title: 'Filter & SO Type' },
+        { id: 'all-card-executive-summary', title: 'Executive Summary (All)' },
+        { id: 'all-card-executive-db-analysis', title: 'Result DB Analysis (All)' },
+        { id: 'all-card-scorecard-summary', title: 'Score Card Summary (All)' },
+        { id: 'all-card-trend-all-wrapper', title: 'Trend Chart (All Sites)' },
+        { id: 'card-hasil-so-all', title: 'Report Hasil SO (All)' },
+        { id: 'all-card-rekap-status-db', title: 'Status DB (All)' },
+        { id: 'all-card-rekapitulasi', title: 'Rekapitulasi (All)' },
+        { id: 'all-card-site-movements', title: 'Log Pergerakan Site' }
+    ];
+
+    const QUICK_ACCESS_ITEMS_MASTER = [
+        { id: 'card-master-opname', title: 'Stock Opname Raw Data' },
+        { id: 'card-site-regional', title: 'Master Site Regional' },
+        { id: 'card-rekapitulasi-2026', title: 'Master Rekapitulasi 2026' },
+        { id: 'card-master-catatan', title: 'Master Catatan Evaluasi' },
+        { id: 'card-master-rekap-db', title: 'Master Rekap DB' },
+        { id: 'card-scorecard-rating-kpi', title: 'KPI Rating Master' },
+        { id: 'card-scorecard-exec-kpi', title: 'KPI Execution Master' }
     ];
 
     function toggleQuickAccess() {
@@ -253,7 +343,8 @@ const App = (() => {
     }
 
     function openQuickAccess() {
-        renderQuickAccessList();
+        const activePage = sessionStorage.getItem('active_page') || 'summary';
+        renderQuickAccessList(activePage);
         const drawer = document.getElementById('quick-access-drawer');
         const backdrop = document.getElementById('quick-access-backdrop');
         if (drawer) drawer.classList.add('open');
@@ -269,14 +360,21 @@ const App = (() => {
         document.body.style.overflow = '';
     }
 
-    function renderQuickAccessList() {
+    function renderQuickAccessList(page) {
         const container = document.getElementById('quick-access-nav-list');
         if (!container) return;
 
+        let items = QUICK_ACCESS_ITEMS_SUMMARY;
+        if (page === 'all-summary') {
+            items = QUICK_ACCESS_ITEMS_ALL_SUMMARY;
+        } else if (page === 'master-data') {
+            items = QUICK_ACCESS_ITEMS_MASTER;
+        }
+
         let html = '';
-        QUICK_ACCESS_ITEMS.forEach(item => {
+        items.forEach(item => {
             html += `
-                <a class="quick-access-item" href="#${item.id}" onclick="event.preventDefault(); App.scrollToCard('${item.id}');">
+                <a class="quick-access-item" href="javascript:void(0)" onclick="App.scrollToCard('${item.id}');">
                     <span>${escapeHtml(item.title)}</span>
                 </a>
             `;
@@ -286,14 +384,6 @@ const App = (() => {
 
     function scrollToCard(cardId) {
         closeQuickAccess();
-
-        // Ensure we are on summary page where these cards reside
-        const currentPage = document.getElementById('page-summary')?.classList.contains('active')
-            ? 'summary'
-            : 'master-data';
-        if (currentPage !== 'summary') {
-            navigateTo('summary');
-        }
 
         setTimeout(() => {
             const el = document.getElementById(cardId);
@@ -306,101 +396,162 @@ const App = (() => {
         }, 120);
     }
 
-    function handleQuickAccessLogin(e) {
-        if (e) e.preventDefault();
-        openLoginModal();
-    }
-
-    function openLoginModal() {
+    // ── Navigate to Login View (SPA Clean URL) ────────────────
+    function openLoginModal(targetPage) {
+        pendingTargetPage = targetPage;
         closeQuickAccess();
-        const modal = document.getElementById('modal-spa-login');
-        if (modal) {
-            modal.style.display = 'flex';
-            const userInp = document.getElementById('spa-login-username');
-            if (userInp) {
-                setTimeout(() => userInp.focus(), 80);
-            }
-        } else {
-            window.location.href = 'login.php';
-        }
+        navigateTo('login');
     }
 
     function closeLoginModal() {
-        const modal = document.getElementById('modal-spa-login');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-        const errEl = document.getElementById('spa-login-error');
-        if (errEl) {
-            errEl.style.display = 'none';
-            errEl.textContent = '';
-        }
+        const modal = document.getElementById('modal-login');
+        if (modal) modal.style.display = 'none';
+        keepCleanUrl();
     }
 
-    async function handleSpaLogin(event) {
-        if (event) event.preventDefault();
-        const usernameInp = document.getElementById('spa-login-username');
-        const passwordInp = document.getElementById('spa-login-password');
-        const errEl = document.getElementById('spa-login-error');
-        const submitBtn = document.getElementById('btn-spa-login-submit');
+    function toggleLoginPassword() {
+        const passInput = document.getElementById('login-page-password') || document.getElementById('login-modal-password');
+        const eyeIcon = document.getElementById('login-page-eye-icon') || document.getElementById('login-modal-eye-icon');
+        if (!passInput) return;
 
-        const username = usernameInp ? usernameInp.value.trim() : '';
-        const password = passwordInp ? passwordInp.value : '';
+        if (passInput.type === 'password') {
+            passInput.type = 'text';
+            if (eyeIcon) eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+        } else {
+            passInput.type = 'password';
+            if (eyeIcon) eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        }
+    }
+    const toggleLoginModalPassword = toggleLoginPassword;
+
+    async function submitLogin(event) {
+        if (event) event.preventDefault();
+
+        const userInput = document.getElementById('login-page-username') || document.getElementById('login-modal-username');
+        const passInput = document.getElementById('login-page-password') || document.getElementById('login-modal-password');
+        const alertEl = document.getElementById('login-page-alert') || document.getElementById('login-modal-alert');
+        const alertMsg = document.getElementById('login-page-alert-msg') || document.getElementById('login-modal-alert-msg');
+        const submitBtn = document.getElementById('login-page-submit-btn') || document.getElementById('login-modal-submit-btn');
+        const submitText = document.getElementById('login-page-submit-text') || document.getElementById('login-modal-submit-text');
+        const spinner = document.getElementById('login-page-spinner') || document.getElementById('login-modal-spinner');
+        const csrfInp = document.getElementById('login-page-csrf') || document.getElementById('login-modal-csrf');
+
+        const username = userInput ? userInput.value.trim() : '';
+        const password = passInput ? passInput.value : '';
+        const activeCsrf = csrfInp ? csrfInp.value : csrfToken;
 
         if (!username || !password) {
-            if (errEl) {
-                errEl.textContent = 'Username dan password wajib diisi.';
-                errEl.style.display = 'block';
+            if (alertEl && alertMsg) {
+                alertMsg.textContent = 'Username dan password wajib diisi.';
+                alertEl.style.display = 'block';
             }
             return;
         }
 
-        if (errEl) {
-            errEl.style.display = 'none';
-            errEl.textContent = '';
-        }
-
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span>Memverifikasi...</span>';
-        }
+        if (alertEl) alertEl.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+        if (submitText) submitText.textContent = 'Memverifikasi...';
+        if (spinner) spinner.style.display = 'inline-block';
 
         try {
             const res = await fetch('login.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
+                    'X-CSRF-TOKEN': activeCsrf
                 },
-                body: JSON.stringify({ username, password, csrf_token: csrfToken })
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                    csrf_token: activeCsrf
+                })
             });
 
             const json = await res.json();
             if (json.success) {
-                showToast('success', 'Login Berhasil', 'Selamat datang!');
-                setTimeout(() => {
-                    window.location.href = window.location.pathname;
-                }, 350);
+                // Update client session state
+                window.AUTH_USER = {
+                    name: username,
+                    role: 'admin'
+                };
+
+                // Update Navbar UI
+                const tabSummary = document.getElementById('tab-summary');
+                const tabAllSummary = document.getElementById('tab-all-summary');
+                const tabMasterData = document.getElementById('tab-master-data');
+                const userDropdown = document.getElementById('user-dropdown-container');
+                const btnNavLogin = document.getElementById('btn-navbar-login');
+                const userDisplayName = document.getElementById('user-display-name');
+                const userAvatarText = document.getElementById('user-avatar-text');
+
+                if (tabSummary) tabSummary.style.display = 'none';
+                if (tabAllSummary) tabAllSummary.style.display = 'inline-flex';
+                if (tabMasterData) tabMasterData.style.display = 'inline-flex';
+                if (userDropdown) userDropdown.style.display = 'inline-block';
+                if (btnNavLogin) btnNavLogin.style.display = 'none';
+                if (userDisplayName) userDisplayName.textContent = 'ASSET MANAGEMENT ADMINISTRATOR';
+                if (userAvatarText) userAvatarText.textContent = 'A';
+
+                // Update Quick Access Drawer Header Login button
+                const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
+                if (drawerHeaderLogin) drawerHeaderLogin.style.display = 'none';
+
+                closeLoginModal();
+                showToast('success', 'Login Berhasil', 'Selamat datang, Administrator!');
+
+                // Switch to requested target page or all-summary
+                navigateTo(pendingTargetPage && pendingTargetPage !== 'summary' ? pendingTargetPage : 'all-summary');
             } else {
-                if (errEl) {
-                    errEl.textContent = json.message || 'Username atau password salah.';
-                    errEl.style.display = 'block';
-                }
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<span>Masuk</span>';
+                if (alertEl && alertMsg) {
+                    alertMsg.textContent = json.message || 'Username atau password tidak sesuai.';
+                    alertEl.style.display = 'block';
                 }
             }
         } catch (err) {
-            if (errEl) {
-                errEl.textContent = 'Gagal terhubung ke server. Silakan coba lagi.';
-                errEl.style.display = 'block';
+            console.error('Login error:', err);
+            if (alertEl && alertMsg) {
+                alertMsg.textContent = 'Terjadi kesalahan jaringan. Silakan coba kembali.';
+                alertEl.style.display = 'block';
             }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>Masuk</span>';
-            }
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitText) submitText.textContent = 'Masuk ke Sistem';
+            if (spinner) spinner.style.display = 'none';
+            keepCleanUrl();
         }
+    }
+
+    async function logout() {
+        closeUserDropdown();
+        closeQuickAccess();
+
+        try {
+            await fetch('logout.php', { method: 'POST' });
+        } catch (e) { }
+
+        // Clear local auth session state
+        window.AUTH_USER = null;
+
+        // Update Navbar UI
+        const tabSummary = document.getElementById('tab-summary');
+        const tabAllSummary = document.getElementById('tab-all-summary');
+        const tabMasterData = document.getElementById('tab-master-data');
+        const userDropdown = document.getElementById('user-dropdown-container');
+        const btnNavLogin = document.getElementById('btn-navbar-login');
+
+        if (tabSummary) tabSummary.style.display = 'inline-flex';
+        if (tabAllSummary) tabAllSummary.style.display = 'none';
+        if (tabMasterData) tabMasterData.style.display = 'none';
+        if (userDropdown) userDropdown.style.display = 'none';
+        if (btnNavLogin) btnNavLogin.style.display = 'inline-flex';
+
+        // Update Quick Access Drawer Header Login button
+        const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
+        if (drawerHeaderLogin) drawerHeaderLogin.style.display = 'inline-flex';
+
+        showToast('info', 'Logout', 'Anda telah berhasil logout.');
+        navigateTo('summary');
+        keepCleanUrl();
     }
 
     function toggleUserDropdown(e) {
@@ -1196,6 +1347,7 @@ const App = (() => {
             const histCount = row.history_count || 0;
             const isActive = row.is_active !== false && row.is_active !== 0 && row.is_active !== '0';
             const isCounted = row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0';
+            const isSynced = row.is_synced === true || row.is_synced === 1 || row.is_synced === '1' || row.is_synced === 't';
             html += `
                 <tr class="${isChecked ? 'row-selected' : ''}">
                     <td class="text-center col-action-select">
@@ -1221,7 +1373,21 @@ const App = (() => {
                             title="${!isActive ? 'Site harus aktif terlebih dahulu' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik')}"
                             style="cursor: ${!isActive ? 'not-allowed' : 'pointer'}; width: 16px; height: 16px; accent-color: #16a34a; opacity: ${!isActive ? '0.45' : '1'};">
                     </td>
-                    <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.regional || '')}</td>
+                    <td class="text-center col-action-sync" id="sr-sync-cell-${row.id}" style="padding: 3px 6px;">
+                        ${!isSynced ? `
+                            <button class="btn btn-primary btn-sm btn-sync-profile" id="sr-sync-btn-${row.id}"
+                                onclick="App.syncSiteProfile(${row.id}, '${escapeHtml(row.sitecode || '')}', this)"
+                                title="Sinkronisasi Group Type tiap periode dari Profil Rekonsiliasi"
+                                style="padding: 2px 7px; font-size: 11px; font-weight: 600; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                <span>Sync</span>
+                            </button>
+                        ` : ''}
+                    </td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.dept || '')}</td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.sub_dept || '')}</td>
                     <td class="text-center" style="white-space: nowrap;">
@@ -1231,11 +1397,13 @@ const App = (() => {
                     <td class="text-center" style="white-space: nowrap;">
                         <select class="form-control form-control-sm sr-table-select"
                             onchange="App.updateSRInfo(${row.id}, this.value, this)"
-                            style="min-width: 125px;">
+                            style="min-width: 135px;">
                             <option value="Outlet" ${currentInfo === 'Outlet' ? 'selected' : ''}>Outlet</option>
                             <option value="Subarep" ${currentInfo === 'Subarep' ? 'selected' : ''}>Subarep</option>
-                            <option value="HUB" ${currentInfo === 'HUB' ? 'selected' : ''}>HUB</option>
-                            <option value="Under Warehouse" ${currentInfo === 'Under Warehouse' ? 'selected' : ''}>Under Warehouse</option>
+                            <option value="HUB Monthly" ${currentInfo === 'HUB Monthly' ? 'selected' : ''}>HUB Monthly</option>
+                            <option value="HUB Quarterly" ${currentInfo === 'HUB Quarterly' ? 'selected' : ''}>HUB Quarterly</option>
+                            <option value="IT Coorporate" ${currentInfo === 'IT Coorporate' ? 'selected' : ''}>IT Coorporate</option>
+                            ${(currentInfo === 'HUB' || currentInfo === 'Under Warehouse') ? `<option value="${escapeHtml(currentInfo)}" selected>${escapeHtml(currentInfo)}</option>` : ''}
                         </select>
                     </td>
                     <td class="text-center" style="white-space: nowrap;">
@@ -1455,12 +1623,21 @@ const App = (() => {
             const json = await res.json();
             if (json.success) {
                 const row = allSRRows.find(r => r.id == id);
-                if (row) row.info = info;
+                if (row) {
+                    row.info = info;
+                    if (info === 'HUB Quarterly') {
+                        row.group_type = 'quarterly';
+                    } else if (info === 'HUB Monthly' || info === 'IT Coorporate' || info === 'IT Corporate') {
+                        row.group_type = 'monthly';
+                    }
+                }
                 if (selectEl) {
                     selectEl.classList.add('is-saved');
                     setTimeout(() => selectEl.classList.remove('is-saved'), 1200);
                 }
+                applySRFilterAndRender();
                 showToast('success', 'Info Diperbarui', `Diperbarui menjadi ${info}`);
+                if (typeof loadSummaryData === 'function') loadSummaryData();
             } else {
                 showToast('error', 'Gagal Memperbarui', json.message || 'Gagal memperbarui info');
             }
@@ -1565,6 +1742,96 @@ const App = (() => {
         } catch (err) {
             if (checkboxEl) checkboxEl.checked = !isCounted;
             showToast('error', 'Kesalahan Jaringan', err.message);
+        }
+    }
+
+    async function syncSiteProfile(id, sitecode, btnEl) {
+        if (!id || !sitecode) return;
+
+        const originalHtml = btnEl ? btnEl.innerHTML : '';
+        if (btnEl) {
+            btnEl.disabled = true;
+            btnEl.innerHTML = '<span style="display:inline-block;animation:spin 0.75s linear infinite;">⟳</span> Sync...';
+        }
+
+        try {
+            const res = await fetch('api/site_regional.php?action=sync_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ id: Number(id), sitecode: sitecode })
+            });
+            const json = await res.json();
+            if (json.success) {
+                const row = allSRRows.find(r => Number(r.id) === Number(id));
+                if (row) {
+                    row.is_synced = true;
+                    if (json.group_type) row.group_type = json.group_type;
+                    if (json.mapped_count) row.history_count = (row.history_count || 0) + json.mapped_count;
+                }
+                if (btnEl) {
+                    btnEl.style.background = '#16a34a';
+                    btnEl.innerHTML = '✓ Synced';
+                    setTimeout(() => {
+                        const cell = document.getElementById(`sr-sync-cell-${id}`);
+                        if (cell) cell.innerHTML = '';
+                        renderSRTable();
+                    }, 500);
+                } else {
+                    renderSRTable();
+                }
+                showToast('success', 'Sinkronisasi Berhasil', json.message || `Site ${sitecode} berhasil disinkronkan`);
+                if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
+            } else {
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.innerHTML = originalHtml;
+                }
+                showToast('error', 'Gagal Sinkronisasi', json.message || 'Gagal menyinkronkan profil');
+            }
+        } catch (err) {
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.innerHTML = originalHtml;
+            }
+            showToast('error', 'Kesalahan Jaringan', err.message);
+        }
+    }
+
+    async function syncAllSiteProfiles() {
+        const btn = document.getElementById('btn-sync-all-sites');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display:inline-block;animation:spin 0.75s linear infinite;">⟳</span> Sync All...';
+        }
+
+        try {
+            const res = await fetch('api/site_regional.php?action=sync_all_profiles', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({})
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Sinkronisasi Berhasil', json.message || 'Semua site master data berhasil disinkronkan');
+                await loadSiteRegional();
+                if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
+            } else {
+                showToast('error', 'Gagal Sinkronisasi', json.message || 'Gagal menyinkronkan seluruh site');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan Jaringan', err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     }
 
@@ -3153,16 +3420,16 @@ const App = (() => {
         if (summarySOType === 'quarterly') {
             if (catSliderMonthly) catSliderMonthly.style.display = 'none';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'inline-flex';
-            if (!nextCat || (nextCat !== 'outlet_subarep' && nextCat !== 'warehouse_hub')) {
+            if (!nextCat || (nextCat !== 'outlet_subarep' && nextCat !== 'warehouse_hub' && nextCat !== 'warehouse_tekno')) {
                 const savedQCat = sessionStorage.getItem('summary_category_quarterly');
-                nextCat = (savedQCat === 'warehouse_hub') ? 'warehouse_hub' : 'outlet_subarep';
+                nextCat = ['warehouse_hub', 'warehouse_tekno'].includes(savedQCat) ? savedQCat : 'outlet_subarep';
             }
         } else {
             if (catSliderMonthly) catSliderMonthly.style.display = 'inline-flex';
             if (catSliderQuarterly) catSliderQuarterly.style.display = 'none';
-            if (!nextCat || (nextCat !== 'pmd' && nextCat !== 'outlet')) {
+            if (!nextCat || (nextCat !== 'pmd' && nextCat !== 'outlet' && nextCat !== 'warehouse_hub' && nextCat !== 'warehouse_tekno' && nextCat !== 'it_coorporate')) {
                 const savedMCat = sessionStorage.getItem('summary_category_monthly');
-                nextCat = (savedMCat === 'outlet') ? 'outlet' : 'pmd';
+                nextCat = (savedMCat && ['outlet', 'warehouse_hub', 'warehouse_tekno', 'it_coorporate'].includes(savedMCat)) ? savedMCat : 'pmd';
             }
         }
 
@@ -3170,12 +3437,18 @@ const App = (() => {
     }
 
     function switchSummaryCategory(cat) {
-        if (cat === 'outlet_subarep' || cat === 'warehouse_hub') {
-            summarySOType = 'quarterly';
-            try { sessionStorage.setItem('summary_category_quarterly', cat); } catch (e) { }
-        } else if (cat === 'pmd' || cat === 'outlet') {
-            summarySOType = 'monthly';
-            try { sessionStorage.setItem('summary_category_monthly', cat); } catch (e) { }
+        if (summarySOType === 'quarterly') {
+            if (cat === 'outlet_subarep' || cat === 'warehouse_hub' || cat === 'warehouse_tekno') {
+                try { sessionStorage.setItem('summary_category_quarterly', cat); } catch (e) { }
+            } else {
+                cat = 'outlet_subarep';
+            }
+        } else {
+            if (cat === 'pmd' || cat === 'outlet' || cat === 'warehouse_hub' || cat === 'warehouse_tekno' || cat === 'it_coorporate') {
+                try { sessionStorage.setItem('summary_category_monthly', cat); } catch (e) { }
+            } else {
+                cat = 'pmd';
+            }
         }
         summaryCategory = cat;
 
@@ -3187,17 +3460,25 @@ const App = (() => {
         // 1. Sync button states for Monthly Category tabs
         const btnOutlet = document.getElementById('btn-summary-cat-outlet');
         const btnPmd = document.getElementById('btn-summary-cat-pmd');
+        const btnWarehouseM = document.getElementById('btn-summary-cat-warehouse-m');
+        const btnTeknoM = document.getElementById('btn-summary-cat-tekno-m');
+        const btnIt = document.getElementById('btn-summary-cat-it');
         if (btnOutlet && btnPmd) {
             btnOutlet.classList.toggle('active', cat === 'outlet');
             btnPmd.classList.toggle('active', cat === 'pmd');
+            if (btnWarehouseM) btnWarehouseM.classList.toggle('active', cat === 'warehouse_hub');
+            if (btnTeknoM) btnTeknoM.classList.toggle('active', cat === 'warehouse_tekno');
+            if (btnIt) btnIt.classList.toggle('active', cat === 'it_coorporate');
         }
 
         // 2. Sync button states for Quarterly Category tabs
         const btnSubarep = document.getElementById('btn-summary-cat-subarep');
         const btnWarehouse = document.getElementById('btn-summary-cat-warehouse');
+        const btnTeknoQ = document.getElementById('btn-summary-cat-tekno-q');
         if (btnSubarep && btnWarehouse) {
             btnSubarep.classList.toggle('active', cat === 'outlet_subarep');
             btnWarehouse.classList.toggle('active', cat === 'warehouse_hub');
+            if (btnTeknoQ) btnTeknoQ.classList.toggle('active', cat === 'warehouse_tekno');
         }
 
         const catStatus = document.getElementById('summary-cat-status');
@@ -3218,6 +3499,14 @@ const App = (() => {
                 label = 'Warehouse HUB';
                 color = '#d97706';
                 threshold = '85%';
+            } else if (cat === 'warehouse_tekno') {
+                label = 'Warehouse Tekno';
+                color = '#0891b2';
+                threshold = '98%';
+            } else if (cat === 'it_coorporate') {
+                label = 'IT Coorporate';
+                color = '#059669';
+                threshold = '98%';
             }
 
             catStatus.innerHTML = `(<strong style="color: ${color};">${label}</strong> Target ${threshold})`;
@@ -3230,44 +3519,112 @@ const App = (() => {
             : ['kpi-card-national', 'kpi-group-wro', 'kpi-group-cro', 'kpi-group-ero'];
         const pmdKpiCards = ['kpi-card-pmd', 'kpi-card-dno', 'kpi-card-dso'];
 
-        // In quarterly summary, ensure CRO group is completely hidden
-        const croGroup = document.getElementById('kpi-group-cro');
-        if (croGroup && isQuarterly) {
-            croGroup.style.display = 'none';
-        }
+        // IT Corporate & Warehouse Tekno cards
+        const itTbsCard = document.getElementById('kpi-card-it-tbs');
+        const itArcadiaCard = document.getElementById('kpi-card-it-arcadia');
+        const teknoGudangCard = document.getElementById('kpi-card-tekno-gudang');
+        const teknoKhususCard = document.getElementById('kpi-card-tekno-khusus');
+        const teknoQuarterlyCards = ['kpi-card-tekno-buffer', 'kpi-card-tekno-storage2', 'kpi-card-tekno-storage1', 'kpi-card-tekno-persiapan'];
+        const hideTeknoQuarterly = () => {
+            teknoQuarterlyCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+        };
+        const natCard = document.getElementById('kpi-card-national');
 
-        const showOutletKpis = (cat === 'outlet' || cat === 'outlet_subarep' || cat === 'warehouse_hub');
+        if (cat === 'it_coorporate') {
+            if (natCard) natCard.style.display = 'flex';
+            if (itTbsCard) itTbsCard.style.display = 'flex';
+            if (itArcadiaCard) itArcadiaCard.style.display = 'flex';
+            if (teknoGudangCard) teknoGudangCard.style.display = 'none';
+            if (teknoKhususCard) teknoKhususCard.style.display = 'none';
+            hideTeknoQuarterly();
 
-        // Update National / Category KPI card title
-        const natTitleEl = document.getElementById('kpi-national-title');
-        if (natTitleEl) {
-            if (cat === 'outlet_subarep') {
-                natTitleEl.textContent = 'Summary Outlet Subarep Achievement';
-            } else if (cat === 'warehouse_hub') {
-                natTitleEl.textContent = 'Summary Warehouse HUB Achievement';
-            } else {
-                natTitleEl.textContent = 'Summary Outlet Regional Achievement';
+            ['kpi-group-wro', 'kpi-group-cro', 'kpi-group-ero'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            pmdKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+        } else if (cat === 'warehouse_tekno') {
+            if (natCard) natCard.style.display = 'flex';
+            if (itTbsCard) itTbsCard.style.display = 'none';
+            if (itArcadiaCard) itArcadiaCard.style.display = 'none';
+
+            const isQuarterlyTekno = (summarySOType === 'quarterly');
+            if (teknoGudangCard) teknoGudangCard.style.display = isQuarterlyTekno ? 'none' : 'flex';
+            if (teknoKhususCard) teknoKhususCard.style.display = isQuarterlyTekno ? 'none' : 'flex';
+
+            teknoQuarterlyCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isQuarterlyTekno ? 'flex' : 'none';
+            });
+
+            ['kpi-group-wro', 'kpi-group-cro', 'kpi-group-ero'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            pmdKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+        } else if (cat === 'pmd') {
+            if (itTbsCard) itTbsCard.style.display = 'none';
+            if (itArcadiaCard) itArcadiaCard.style.display = 'none';
+            if (teknoGudangCard) teknoGudangCard.style.display = 'none';
+            if (teknoKhususCard) teknoKhususCard.style.display = 'none';
+            hideTeknoQuarterly();
+            outletKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            pmdKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'flex';
+            });
+        } else {
+            if (itTbsCard) itTbsCard.style.display = 'none';
+            if (itArcadiaCard) itArcadiaCard.style.display = 'none';
+            if (teknoGudangCard) teknoGudangCard.style.display = 'none';
+            if (teknoKhususCard) teknoKhususCard.style.display = 'none';
+            hideTeknoQuarterly();
+            pmdKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            outletKpiCards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'flex';
+            });
+            if (isQuarterly) {
+                const croGroup = document.getElementById('kpi-group-cro');
+                if (croGroup) croGroup.style.display = (cat === 'warehouse_hub') ? 'flex' : 'none';
             }
         }
 
-        outletKpiCards.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = showOutletKpis ? 'flex' : 'none';
-        });
+        // Subdept visibility for Warehouse HUB (both Monthly & Quarterly): only show EKO, NSO, SSO, EJO
+        // Explicitly remove/hide CSO, BNO, MPO, and SMO
+        const allSubDeptItems = ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo'];
+        if (cat === 'warehouse_hub') {
+            const whAllowedSubDepts = ['eko', 'nso', 'sso', 'ejo'];
+            allSubDeptItems.forEach(code => {
+                const el = document.getElementById(`kpi-subdept-item-${code}`);
+                if (el) el.style.display = whAllowedSubDepts.includes(code) ? 'block' : 'none';
+            });
+        } else {
+            allSubDeptItems.forEach(code => {
+                const el = document.getElementById(`kpi-subdept-item-${code}`);
+                if (el) el.style.display = 'block';
+            });
+        }
 
-        pmdKpiCards.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = (cat === 'pmd') ? 'flex' : 'none';
-        });
+        const showOutletKpis = (cat === 'outlet' || cat === 'outlet_subarep' || cat === 'warehouse_hub' || cat === 'warehouse_tekno' || cat === 'it_coorporate');
 
         // Sync DB Analysis visibility and grand total
         syncDbAnalysisVisibility();
-
-        // Ensure Catatan Executive Summary card is always displayed across all categories
-        const execCatatanCard = document.getElementById('card-executive-catatan');
-        if (execCatatanCard) {
-            execCatatanCard.style.display = 'block';
-        }
 
         // Toggle Trend chart cards
         const pmdTrendCard = document.getElementById('card-trend-pmd-wrapper');
@@ -3275,12 +3632,47 @@ const App = (() => {
         const trendRow2 = document.getElementById('trend-charts-row-sub');
         const deptTrendTitle = document.getElementById('trend-dept-title');
         const deptTrendBadge = document.getElementById('trend-dept-badge');
+        const subDeptTrendTitle = document.getElementById('trend-subdept-title');
+        const subDeptTrendBadge = document.getElementById('trend-subdept-badge');
 
         if (trendRow2) {
             trendRow2.classList.add('single-chart');
         }
 
-        if (showOutletKpis) {
+        if (cat === 'it_coorporate') {
+            if (pmdTrendCard) pmdTrendCard.style.display = 'none';
+            if (subDeptTrendCard) subDeptTrendCard.style.display = 'block';
+            if (deptTrendTitle) deptTrendTitle.textContent = 'Trend Achievement SO IT Coorporate';
+            if (deptTrendBadge) {
+                deptTrendBadge.textContent = 'IT Coorporate';
+                deptTrendBadge.style.background = '#ecfdf5';
+                deptTrendBadge.style.color = '#059669';
+            }
+            if (subDeptTrendTitle) subDeptTrendTitle.textContent = 'Trend Achievement SO TBS & ARCADIA';
+            if (subDeptTrendBadge) {
+                subDeptTrendBadge.textContent = 'TBS & ARCADIA';
+                subDeptTrendBadge.style.background = '#ecfdf5';
+                subDeptTrendBadge.style.color = '#059669';
+            }
+        } else if (cat === 'warehouse_tekno') {
+            if (pmdTrendCard) pmdTrendCard.style.display = 'none';
+            if (subDeptTrendCard) subDeptTrendCard.style.display = 'none';
+            if (deptTrendTitle) deptTrendTitle.textContent = 'Trend Achievement SO Warehouse Tekno';
+            if (deptTrendBadge) {
+                deptTrendBadge.textContent = 'Warehouse Tekno';
+                deptTrendBadge.style.background = '#ecfeff';
+                deptTrendBadge.style.color = '#0891b2';
+            }
+        } else if (cat === 'pmd') {
+            if (pmdTrendCard) pmdTrendCard.style.display = 'block';
+            if (subDeptTrendCard) subDeptTrendCard.style.display = 'none';
+            if (deptTrendTitle) deptTrendTitle.textContent = 'Trend Achievement SO Divisi (PMD)';
+            if (deptTrendBadge) {
+                deptTrendBadge.textContent = 'DIVISI';
+                deptTrendBadge.style.background = '#faf5ff';
+                deptTrendBadge.style.color = '#9333ea';
+            }
+        } else {
             if (pmdTrendCard) pmdTrendCard.style.display = 'none';
             if (subDeptTrendCard) subDeptTrendCard.style.display = 'block';
             if (deptTrendTitle) {
@@ -3294,14 +3686,15 @@ const App = (() => {
                 deptTrendBadge.style.background = '#eff6ff';
                 deptTrendBadge.style.color = '#2563eb';
             }
-        } else {
-            if (pmdTrendCard) pmdTrendCard.style.display = 'block';
-            if (subDeptTrendCard) subDeptTrendCard.style.display = 'none';
-            if (deptTrendTitle) deptTrendTitle.textContent = 'Trend Achievement SO Dept (PMD)';
-            if (deptTrendBadge) {
-                deptTrendBadge.textContent = 'PMD';
-                deptTrendBadge.style.background = '#faf5ff';
-                deptTrendBadge.style.color = '#9333ea';
+            if (subDeptTrendTitle) {
+                subDeptTrendTitle.textContent = (cat === 'warehouse_hub')
+                    ? 'Trend Achievement SO Warehouse HUB Sub Dept'
+                    : (cat === 'outlet_subarep' ? 'Trend Achievement SO Outlet Subarep Sub Dept' : 'Trend Achievement SO Outlet Regional Sub Dept');
+            }
+            if (subDeptTrendBadge) {
+                subDeptTrendBadge.textContent = (cat === 'warehouse_hub') ? 'Warehouse HUB' : ((cat === 'outlet_subarep') ? 'Outlet Subarep' : 'Outlet Regional');
+                subDeptTrendBadge.style.background = '#f0fdf4';
+                subDeptTrendBadge.style.color = '#16a34a';
             }
         }
 
@@ -3320,6 +3713,8 @@ const App = (() => {
             if (cat === 'outlet') catDisplayName = 'Outlet Regional';
             else if (cat === 'outlet_subarep') catDisplayName = 'Outlet Subarep';
             else if (cat === 'warehouse_hub') catDisplayName = 'Warehouse HUB';
+            else if (cat === 'warehouse_tekno') catDisplayName = 'Warehouse Tekno';
+            else if (cat === 'it_coorporate') catDisplayName = 'IT Coorporate';
 
             rekapSubtitle.textContent = summarySOType === 'monthly'
                 ? `Monthly Stock Opname - ${catDisplayName}`
@@ -3345,37 +3740,65 @@ const App = (() => {
         const titleEl = document.getElementById('hasil-so-title');
         const subtitleEl = document.getElementById('hasil-so-subtitle');
         const deptFilterContainer = document.getElementById('dept-result-filter-container');
+        const subdeptFilterContainer = document.getElementById('subdept-result-filter-container');
         const statusFilterContainer = document.getElementById('status-result-filter-container');
         const deptSelect = document.getElementById('dept-result-filter');
         const subDeptSelect = document.getElementById('subdept-result-filter');
+        const subDeptLabel = document.getElementById('label-subdept-result-filter');
         const statusSelect = document.getElementById('status-result-filter');
 
-        if (summaryCategory === 'pmd') {
+        const isIt = (summaryCategory === 'it_coorporate');
+        const isTekno = (summaryCategory === 'warehouse_tekno');
+        const isHub = (summaryCategory === 'warehouse_hub');
+        const isPmd = (summaryCategory === 'pmd');
+
+        if (isIt || isTekno) {
+            let reportName = isIt ? 'IT Coorporate' : ((summarySOType === 'quarterly') ? 'Warehouse Tekno (Quarterly)' : 'Warehouse Tekno');
+            if (titleEl) titleEl.textContent = `Report SO ${reportName}`;
+            if (subtitleEl) subtitleEl.textContent = `Pencapaian dan Hasil Stock Opname ${reportName}`;
+            if (deptFilterContainer) deptFilterContainer.style.display = 'none';
+            if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'none';
+            if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
+            if (statusSelect) statusSelect.value = 'all';
+        } else if (isPmd) {
             if (titleEl) titleEl.textContent = 'Report SO PMD';
             if (subtitleEl) subtitleEl.textContent = 'Pencapaian dan Hasil Stock Opname PMD';
             if (deptFilterContainer) deptFilterContainer.style.display = 'none';
+            if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'flex';
             if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
             if (statusSelect) statusSelect.value = 'all';
+            if (subDeptLabel) subDeptLabel.textContent = 'DEPT';
 
             if (subDeptSelect) {
                 subDeptSelect.innerHTML = `
-                    <option value="all" selected>Semua Sub Dept</option>
+                    <option value="all" selected>Semua Dept</option>
                     <option value="DNO">DNO</option>
                     <option value="DSO">DSO</option>
                 `;
             }
         } else {
-            if (titleEl) titleEl.textContent = (summarySOType === 'quarterly')
-                ? 'Report SO Outlet Regional (Quarterly)'
-                : 'Report SO Outlet Regional';
-            if (subtitleEl) subtitleEl.textContent = (summarySOType === 'quarterly')
-                ? 'Pencapaian dan Hasil Stock Opname Outlet Regional Quarterly'
-                : 'Pencapaian dan Hasil Stock Opname Outlet Regional';
+            if (subDeptLabel) subDeptLabel.textContent = 'SUB DEPT';
+            let reportName = 'Outlet Regional';
+            if (summaryCategory === 'outlet_subarep') reportName = 'Outlet Subarep (Quarterly)';
+            else if (isHub) reportName = (summarySOType === 'quarterly') ? 'Warehouse HUB (Quarterly)' : 'Warehouse HUB';
+
+            if (titleEl) titleEl.textContent = `Report SO ${reportName}`;
+            if (subtitleEl) subtitleEl.textContent = `Pencapaian dan Hasil Stock Opname ${reportName}`;
             if (deptFilterContainer) deptFilterContainer.style.display = 'flex';
+            if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'flex';
             if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
 
             if (deptSelect) {
-                if (summarySOType === 'quarterly') {
+                if (isHub) {
+                    // Warehouse HUB has sites in CRO (Balikpapan), ERO (Surabaya), WRO (Medan & Palembang) in both Monthly and Quarterly
+                    deptSelect.innerHTML = `
+                        <option value="all" selected>Semua DEPT</option>
+                        <option value="CRO">CRO</option>
+                        <option value="ERO">ERO</option>
+                        <option value="WRO">WRO</option>
+                    `;
+                    deptSelect.value = 'all';
+                } else if (summarySOType === 'quarterly') {
                     deptSelect.innerHTML = `
                         <option value="all" selected>Semua DEPT</option>
                         <option value="ERO">ERO</option>
@@ -3395,15 +3818,28 @@ const App = (() => {
 
             if (subDeptSelect) {
                 let html = '<option value="all" selected>Semua Sub Dept</option>';
-                const allowedDepts = (summarySOType === 'quarterly' ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO']);
-                allowedDepts.forEach(deptKey => {
-                    const list = DEPT_SUBDEPTS_MAP[deptKey] || [];
-                    html += `<optgroup label="${deptKey}">`;
-                    list.forEach(code => {
-                        html += `<option value="${code}">${code}</option>`;
+                if (isHub) {
+                    html += `<optgroup label="WRO">
+                        <option value="NSO">NSO</option>
+                        <option value="SSO">SSO</option>
+                    </optgroup>
+                    <optgroup label="CRO">
+                        <option value="EKO">EKO</option>
+                    </optgroup>
+                    <optgroup label="ERO">
+                        <option value="EJO">EJO</option>
+                    </optgroup>`;
+                } else {
+                    const allowedDepts = (summarySOType === 'quarterly' ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO']);
+                    allowedDepts.forEach(deptKey => {
+                        const list = DEPT_SUBDEPTS_MAP[deptKey] || [];
+                        html += `<optgroup label="${deptKey}">`;
+                        list.forEach(code => {
+                            html += `<option value="${code}">${code}</option>`;
+                        });
+                        html += `</optgroup>`;
                     });
-                    html += `</optgroup>`;
-                });
+                }
                 subDeptSelect.innerHTML = html;
                 subDeptSelect.value = 'all';
             }
@@ -3504,13 +3940,18 @@ const App = (() => {
         }
 
         // Update achievement card helper
-        const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false) => {
+        const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false, customTarget = null) => {
             const rawPct = item && item.pct !== null && item.pct !== undefined ? parseFloat(item.pct) : 0;
             const pct = Math.round(rawPct);
             const count = item?.count || 0;
             const total = item?.total_sites || 0;
-            const color = total === 0 ? '#94a3b8' : getPctColor(pct, isPmd);
-            const targetThreshold = isPmd ? 98 : 85;
+            let targetThreshold = 85;
+            if (customTarget !== null) {
+                targetThreshold = customTarget;
+            } else if (isPmd || summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate') {
+                targetThreshold = 98;
+            }
+            const color = total === 0 ? '#94a3b8' : getPctColor(pct, targetThreshold === 98);
 
             const valEl = document.getElementById(valId);
             if (valEl) {
@@ -3565,7 +4006,10 @@ const App = (() => {
             const t = json.totals || {};
             const ach = json.achievements || {};
 
-            const nat = ach.outlet_national || ach.national || {};
+            const isNationalCategory = (summaryCategory === 'it_coorporate' || summaryCategory === 'warehouse_tekno' || summaryCategory === 'warehouse_hub');
+            const nat = isNationalCategory
+                ? ((ach.national && ach.national.total_sites > 0) ? ach.national : (ach.outlet_national || ach.national || {}))
+                : ((ach.outlet_national && ach.outlet_national.total_sites > 0) ? ach.outlet_national : (ach.national || ach.outlet_national || {}));
             const cro = ach.cro || {};
             const ero = ach.ero || {};
             const wro = ach.wro || {};
@@ -3575,26 +4019,141 @@ const App = (() => {
 
             let natTitle = 'Summary Outlet Regional Achievement';
             let natDefaultLabel = 'Avg Outlet Regional';
-            if (summarySOType === 'quarterly') {
-                if (summaryCategory === 'outlet_subarep') {
-                    natTitle = 'Summary Outlet Subarep Achievement';
-                    natDefaultLabel = 'Avg Outlet Subarep';
-                } else if (summaryCategory === 'warehouse_hub') {
-                    natTitle = 'Summary Warehouse HUB Achievement';
-                    natDefaultLabel = 'Avg Warehouse HUB';
-                }
+            if (summaryCategory === 'outlet_subarep') {
+                natTitle = 'Summary Outlet Subarep Achievement';
+                natDefaultLabel = 'Avg Outlet Subarep';
+            } else if (summaryCategory === 'warehouse_hub') {
+                natTitle = 'Summary Warehouse HUB Achievement';
+                natDefaultLabel = 'Avg Warehouse HUB';
+            } else if (summaryCategory === 'warehouse_tekno') {
+                natTitle = 'Summary Warehouse Tekno Achievement';
+                natDefaultLabel = 'Avg Warehouse Tekno';
+            } else if (summaryCategory === 'it_coorporate') {
+                natTitle = 'Summary IT Coorporate Achievement';
+                natDefaultLabel = 'Avg IT Coorporate';
             }
 
             const natTitleEl = document.getElementById('kpi-national-title');
             if (natTitleEl) natTitleEl.textContent = natTitle;
 
-            updateAchCard('kpi-national-achievement', 'kpi-national-subtext', 'kpi-national-trend', 'kpi-national-status', nat, natDefaultLabel, false);
+            updateAchCard('kpi-national-achievement', 'kpi-national-subtext', 'kpi-national-trend', 'kpi-national-status', nat, natDefaultLabel, false, (summaryCategory === 'it_coorporate' || summaryCategory === 'warehouse_tekno') ? 98 : 85);
             updateAchCard('kpi-cro-achievement', 'kpi-cro-subtext', 'kpi-cro-trend', 'kpi-cro-status', cro, 'Avg DEPT CRO', false);
             updateAchCard('kpi-ero-achievement', 'kpi-ero-subtext', 'kpi-ero-trend', 'kpi-ero-status', ero, 'Avg DEPT ERO', false);
             updateAchCard('kpi-wro-achievement', 'kpi-wro-subtext', 'kpi-wro-trend', 'kpi-wro-status', wro, 'Avg DEPT WRO', false);
-            updateAchCard('kpi-pmd-achievement', 'kpi-pmd-subtext', 'kpi-pmd-trend', 'kpi-pmd-status', pmd, 'Avg PMD Departement', true);
-            updateAchCard('kpi-dno-achievement', 'kpi-dno-subtext', 'kpi-dno-trend', 'kpi-dno-status', dno, 'Avg Sub DEPT DNO', true);
-            updateAchCard('kpi-dso-achievement', 'kpi-dso-subtext', 'kpi-dso-trend', 'kpi-dso-status', dso, 'Avg Sub DEPT DSO', true);
+            updateAchCard('kpi-pmd-achievement', 'kpi-pmd-subtext', 'kpi-pmd-trend', 'kpi-pmd-status', pmd, 'Avg PMD Divisi', true);
+            updateAchCard('kpi-dno-achievement', 'kpi-dno-subtext', 'kpi-dno-trend', 'kpi-dno-status', dno, 'Avg DEPT DNO', true);
+            updateAchCard('kpi-dso-achievement', 'kpi-dso-subtext', 'kpi-dso-trend', 'kpi-dso-status', dso, 'Avg DEPT DSO', true);
+
+            // Populate IT Corporate Specific Site Cards (OUTLET OPTI TBS & IT CORPORATE - ARCADIA LT 4)
+            if (summaryCategory === 'it_coorporate') {
+                const sitesData = ach.sites || {};
+                const tbsSite = sitesData['50002001384'];
+                const arcadiaSite = sitesData['50002003133'];
+
+                updateAchCard(
+                    'kpi-it-tbs-achievement',
+                    'kpi-it-tbs-subtext',
+                    'kpi-it-tbs-trend',
+                    'kpi-it-tbs-status',
+                    { pct: tbsSite ? tbsSite.pct : null, count: (tbsSite && tbsSite.has_data) ? 1 : 0, total_sites: 1 },
+                    '50002001384',
+                    false,
+                    98
+                );
+
+                updateAchCard(
+                    'kpi-it-arcadia-achievement',
+                    'kpi-it-arcadia-subtext',
+                    'kpi-it-arcadia-trend',
+                    'kpi-it-arcadia-status',
+                    { pct: arcadiaSite ? arcadiaSite.pct : null, count: (arcadiaSite && arcadiaSite.has_data) ? 1 : 0, total_sites: 1 },
+                    '50002003133',
+                    false,
+                    98
+                );
+            }
+
+            // Populate Warehouse Tekno Specific Site Cards (2 Monthly sites or 4 Quarterly sites)
+            if (summaryCategory === 'warehouse_tekno') {
+                const sitesData = ach.sites || {};
+                const isQuarterlyTekno = (summarySOType === 'quarterly');
+
+                if (isQuarterlyTekno) {
+                    const teknoBuffer = sitesData['50002003305'];
+                    const teknoStorage2 = sitesData['50002003448'];
+                    const teknoStorage1 = sitesData['50002003922'];
+                    const teknoPersiapan = sitesData['50002003599'];
+
+                    updateAchCard(
+                        'kpi-tekno-buffer-achievement',
+                        'kpi-tekno-buffer-subtext',
+                        'kpi-tekno-buffer-trend',
+                        'kpi-tekno-buffer-status',
+                        { pct: teknoBuffer ? teknoBuffer.pct : null, count: (teknoBuffer && teknoBuffer.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003305',
+                        false,
+                        98
+                    );
+
+                    updateAchCard(
+                        'kpi-tekno-storage2-achievement',
+                        'kpi-tekno-storage2-subtext',
+                        'kpi-tekno-storage2-trend',
+                        'kpi-tekno-storage2-status',
+                        { pct: teknoStorage2 ? teknoStorage2.pct : null, count: (teknoStorage2 && teknoStorage2.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003448',
+                        false,
+                        98
+                    );
+
+                    updateAchCard(
+                        'kpi-tekno-storage1-achievement',
+                        'kpi-tekno-storage1-subtext',
+                        'kpi-tekno-storage1-trend',
+                        'kpi-tekno-storage1-status',
+                        { pct: teknoStorage1 ? teknoStorage1.pct : null, count: (teknoStorage1 && teknoStorage1.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003922',
+                        false,
+                        98
+                    );
+
+                    updateAchCard(
+                        'kpi-tekno-persiapan-achievement',
+                        'kpi-tekno-persiapan-subtext',
+                        'kpi-tekno-persiapan-trend',
+                        'kpi-tekno-persiapan-status',
+                        { pct: teknoPersiapan ? teknoPersiapan.pct : null, count: (teknoPersiapan && teknoPersiapan.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003599',
+                        false,
+                        98
+                    );
+                } else {
+                    const teknoGudang = sitesData['50002003289'];
+                    const teknoKhusus = sitesData['50002003307'];
+
+                    updateAchCard(
+                        'kpi-tekno-gudang-achievement',
+                        'kpi-tekno-gudang-subtext',
+                        'kpi-tekno-gudang-trend',
+                        'kpi-tekno-gudang-status',
+                        { pct: teknoGudang ? teknoGudang.pct : null, count: (teknoGudang && teknoGudang.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003289',
+                        false,
+                        98
+                    );
+
+                    updateAchCard(
+                        'kpi-tekno-khusus-achievement',
+                        'kpi-tekno-khusus-subtext',
+                        'kpi-tekno-khusus-trend',
+                        'kpi-tekno-khusus-status',
+                        { pct: teknoKhusus ? teknoKhusus.pct : null, count: (teknoKhusus && teknoKhusus.has_data) ? 1 : 0, total_sites: 1 },
+                        '50002003307',
+                        false,
+                        98
+                    );
+                }
+            }
 
             // Populate Subdept Average Value Cards under each group (WRO, CRO, ERO)
             const subDeptsData = ach.sub_depts || {};
@@ -3605,7 +4164,8 @@ const App = (() => {
                 const pct = Math.round(rawPct);
                 const count = sData.count || 0;
                 const total = sData.total_sites || 0;
-                const color = total === 0 ? '#94a3b8' : getPctColor(pct, false);
+                const targetThreshold = (summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate') ? 98 : 85;
+                const color = total === 0 ? '#94a3b8' : getPctColor(pct, targetThreshold === 98);
 
                 const valEl = document.getElementById(`kpi-subdept-val-${sKey}`);
                 if (valEl) {
@@ -3623,7 +4183,6 @@ const App = (() => {
                     if (total === 0) {
                         trendEl.innerHTML = '';
                     } else {
-                        const targetThreshold = 85;
                         const isAbove = (pct >= targetThreshold);
                         const diff = pct - targetThreshold;
                         const formattedDiff = (diff >= 0 ? '+' : '') + diff + '%';
@@ -3632,7 +4191,7 @@ const App = (() => {
                             : `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
 
                         trendEl.innerHTML = `
-                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: 85% (Gap: ${formattedDiff})">
+                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: ${targetThreshold}% (Gap: ${formattedDiff})">
                                 ${triangleSvg}
                                 <span>${formattedDiff}</span>
                             </span>
@@ -3644,7 +4203,7 @@ const App = (() => {
                 if (statusEl) {
                     if (total === 0) {
                         statusEl.innerHTML = '<span class="so-status-badge status-none">Belum Ada Data</span>';
-                    } else if (pct >= 85) {
+                    } else if (pct >= targetThreshold) {
                         statusEl.innerHTML = '<span class="so-status-badge status-green">Tercapai</span>';
                     } else {
                         statusEl.innerHTML = '<span class="so-status-badge status-red">Tidak Tercapai</span>';
@@ -3716,8 +4275,8 @@ const App = (() => {
 
     function prefetchCategoryVariants(year, month) {
         const variants = (summarySOType === 'quarterly')
-            ? ['outlet_subarep', 'warehouse_hub']
-            : ['pmd', 'outlet'];
+            ? ['outlet_subarep', 'warehouse_hub', 'warehouse_tekno']
+            : ['pmd', 'outlet', 'warehouse_hub', 'warehouse_tekno', 'it_coorporate'];
 
         variants.forEach(cat => {
             if (cat === summaryCategory) return;
@@ -3756,31 +4315,80 @@ const App = (() => {
 
     function syncDbAnalysisVisibility() {
         const isPmd = (summaryCategory === 'pmd');
+        const isIt = (summaryCategory === 'it_coorporate');
+        const isTekno = (summaryCategory === 'warehouse_tekno');
+        const isHub = (summaryCategory === 'warehouse_hub');
         const isQuarterly = (summarySOType === 'quarterly');
 
         const gWro = document.getElementById('db-group-wro');
         const gCro = document.getElementById('db-group-cro');
         const gEro = document.getElementById('db-group-ero');
         const gPmd = document.getElementById('db-group-pmd');
+        const gIt = document.getElementById('db-group-it');
+        const gTekno = document.getElementById('db-group-tekno');
 
-        if (isPmd) {
+        if (isIt) {
             if (gWro) gWro.style.display = 'none';
             if (gCro) gCro.style.display = 'none';
             if (gEro) gEro.style.display = 'none';
+            if (gPmd) gPmd.style.display = 'none';
+            if (gTekno) gTekno.style.display = 'none';
+            if (gIt) gIt.style.display = 'flex';
+        } else if (isTekno) {
+            if (gWro) gWro.style.display = 'none';
+            if (gCro) gCro.style.display = 'none';
+            if (gEro) gEro.style.display = 'none';
+            if (gPmd) gPmd.style.display = 'none';
+            if (gIt) gIt.style.display = 'none';
+            if (gTekno) gTekno.style.display = 'flex';
+        } else if (isPmd) {
+            if (gWro) gWro.style.display = 'none';
+            if (gCro) gCro.style.display = 'none';
+            if (gEro) gEro.style.display = 'none';
+            if (gIt) gIt.style.display = 'none';
+            if (gTekno) gTekno.style.display = 'none';
             if (gPmd) gPmd.style.display = 'flex';
         } else {
-            if (gWro) gWro.style.display = 'flex';
-            if (gCro) gCro.style.display = isQuarterly ? 'none' : 'flex';
-            if (gEro) gEro.style.display = 'flex';
+            if (gIt) gIt.style.display = 'none';
+            if (gTekno) gTekno.style.display = 'none';
             if (gPmd) gPmd.style.display = 'none';
+            if (gWro) gWro.style.display = 'flex';
+            // In Warehouse HUB, CRO is active in quarterly (Balikpapan). For regular outlet quarterly, CRO has no sites.
+            if (gCro) gCro.style.display = (isQuarterly && !isHub) ? 'none' : 'flex';
+            if (gEro) gEro.style.display = 'flex';
         }
 
-        // Toggle subdepts in Status Groups (Outlet vs PMD)
+        // Subdept items filtering in Result DB Analysis:
+        // For Warehouse HUB, ONLY show NSO, SSO, EKO, EJO. Hide others (CSO, CJDO, WJO, WKO, BNO, MPO, SMO).
+        const hubSubDepts = ['nso', 'sso', 'eko', 'ejo'];
+        ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo', 'dno', 'dso'].forEach(code => {
+            const el = document.getElementById(`db-subdept-item-${code}`);
+            if (el) {
+                if (isHub) {
+                    el.style.display = hubSubDepts.includes(code) ? 'flex' : 'none';
+                } else {
+                    el.style.display = 'flex';
+                }
+            }
+        });
+
+        // Toggle subdepts in Status Groups (Outlet vs PMD vs IT vs Tekno)
         document.querySelectorAll('.db-status-sub-outlet').forEach(el => {
-            el.style.display = isPmd ? 'none' : 'grid';
+            el.style.display = (!isPmd && !isIt && !isTekno) ? 'grid' : 'none';
+            // In Warehouse HUB quarterly, make sure CRO item inside .db-status-sub-outlet is visible
+            const croItem = el.children[1];
+            if (croItem) {
+                croItem.style.display = (isQuarterly && !isHub) ? 'none' : 'block';
+            }
         });
         document.querySelectorAll('.db-status-sub-pmd').forEach(el => {
             el.style.display = isPmd ? 'grid' : 'none';
+        });
+        document.querySelectorAll('.db-status-sub-it').forEach(el => {
+            el.style.display = isIt ? 'grid' : 'none';
+        });
+        document.querySelectorAll('.db-status-sub-tekno').forEach(el => {
+            el.style.display = isTekno ? 'grid' : 'none';
         });
 
         updateDbAnalysisGrandTotalBadge();
@@ -3905,10 +4513,17 @@ const App = (() => {
         const gNewEl = document.getElementById('db-grand-new');
         if (!badgeEl) return;
         const isPmd = (summaryCategory === 'pmd');
+        const isIt = (summaryCategory === 'it_coorporate');
+        const isTekno = (summaryCategory === 'warehouse_tekno');
+        const isHub = (summaryCategory === 'warehouse_hub');
+
         let totalQty = 0;
         let activeItem = null;
         if (isPmd) {
             activeItem = currentDbAnalysisData.pmd || {};
+            totalQty = activeItem.qty || 0;
+        } else if (isIt || isTekno || isHub) {
+            activeItem = currentDbAnalysisData.national || {};
             totalQty = activeItem.qty || 0;
         } else {
             activeItem = currentDbAnalysisData.outlet_national || currentDbAnalysisData.national || {};
@@ -3936,7 +4551,13 @@ const App = (() => {
         const subtextSolved = document.getElementById('db-subtext-solved');
         const subtextUnsolved = document.getElementById('db-subtext-unsolved');
         const subtextNew = document.getElementById('db-subtext-new');
-        const totalScopeSites = isPmd ? 6 : (activeItem?.total_sites || 58);
+        let totalScopeSites = 58;
+        if (isPmd) totalScopeSites = 6;
+        else if (isIt) totalScopeSites = 2;
+        else if (isHub) totalScopeSites = 4;
+        else if (isTekno) totalScopeSites = (summarySOType === 'quarterly') ? 4 : 2;
+        else totalScopeSites = activeItem?.total_sites || 58;
+
         if (subtextSolved) subtextSolved.textContent = `${activeItem?.solved_sites || 0}/${totalScopeSites} Sites`;
         if (subtextUnsolved) subtextUnsolved.textContent = `${activeItem?.unsolved_sites || 0}/${totalScopeSites} Sites`;
         if (subtextNew) subtextNew.textContent = `${activeItem?.new_db_sites || 0}/${totalScopeSites} Sites`;
@@ -4058,6 +4679,105 @@ const App = (() => {
         };
 
         ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo', 'dno', 'dso'].forEach(updateSubDeptDb);
+
+        // IT Corporate: Populate individual site cards and status breakdowns
+        const sitesData = currentDbAnalysisData.sites || {};
+        const tbsItem = sitesData['50002001384'] || {};
+        const arcadiaItem = sitesData['50002003133'] || {};
+
+        const valTbs = document.getElementById('db-val-it-tbs');
+        if (valTbs) valTbs.textContent = formatQty(tbsItem.qty);
+        const trendTbs = document.getElementById('db-trend-it-tbs');
+        if (trendTbs) trendTbs.innerHTML = renderDbTrendBadge(tbsItem, false);
+
+        const valArcadia = document.getElementById('db-val-it-arcadia');
+        if (valArcadia) valArcadia.textContent = formatQty(arcadiaItem.qty);
+        const trendArcadia = document.getElementById('db-trend-it-arcadia');
+        if (trendArcadia) trendArcadia.innerHTML = renderDbTrendBadge(arcadiaItem, false);
+
+        // IT Corporate status sub-items
+        const sTbsSolved = document.getElementById('db-solved-it-tbs');
+        if (sTbsSolved) sTbsSolved.textContent = formatQty(tbsItem.solved);
+        const stTbsSolved = document.getElementById('db-sub-trend-solved-it-tbs');
+        if (stTbsSolved) stTbsSolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_solved, tbsItem.prev_solved, true, 'solved');
+
+        const sArcSolved = document.getElementById('db-solved-it-arcadia');
+        if (sArcSolved) sArcSolved.textContent = formatQty(arcadiaItem.solved);
+        const stArcSolved = document.getElementById('db-sub-trend-solved-it-arcadia');
+        if (stArcSolved) stArcSolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_solved, arcadiaItem.prev_solved, true, 'solved');
+
+        const sTbsUnsolved = document.getElementById('db-unsolved-it-tbs');
+        if (sTbsUnsolved) sTbsUnsolved.textContent = formatQty(tbsItem.unsolved);
+        const stTbsUnsolved = document.getElementById('db-sub-trend-unsolved-it-tbs');
+        if (stTbsUnsolved) stTbsUnsolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_unsolved, tbsItem.prev_unsolved, true, 'unsolved');
+
+        const sArcUnsolved = document.getElementById('db-unsolved-it-arcadia');
+        if (sArcUnsolved) sArcUnsolved.textContent = formatQty(arcadiaItem.unsolved);
+        const stArcUnsolved = document.getElementById('db-sub-trend-unsolved-it-arcadia');
+        if (stArcUnsolved) stArcUnsolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_unsolved, arcadiaItem.prev_unsolved, true, 'unsolved');
+
+        const sTbsNew = document.getElementById('db-new-it-tbs');
+        if (sTbsNew) sTbsNew.textContent = formatQty(tbsItem.new_db);
+        const stTbsNew = document.getElementById('db-sub-trend-new-it-tbs');
+        if (stTbsNew) stTbsNew.innerHTML = renderStatusTrendBadge(tbsItem.diff_new_db, tbsItem.prev_new_db, true, 'new_db');
+
+        const sArcNew = document.getElementById('db-new-it-arcadia');
+        if (sArcNew) sArcNew.textContent = formatQty(arcadiaItem.new_db);
+        const stArcNew = document.getElementById('db-sub-trend-new-it-arcadia');
+        if (stArcNew) stArcNew.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_new_db, arcadiaItem.prev_new_db, true, 'new_db');
+
+        // Warehouse Tekno: Populate dynamic cards and status breakdown
+        const teknoContainer = document.getElementById('db-tekno-cards-container');
+        if (teknoContainer) {
+            let html = '';
+            Object.values(sitesData).forEach(s => {
+                const siteCode = s.sitecode || '';
+                const siteName = s.name_site || siteCode;
+                html += `
+                    <div class="kpi-card kpi-card-split">
+                        <div class="kpi-title" title="${escapeHtml(siteName)}">${escapeHtml(siteName)}</div>
+                        <div class="kpi-card-main">
+                            <div class="kpi-split-value" style="color: #0f172a;">${formatQty(s.qty || 0)}</div>
+                            <div class="kpi-split-badges">
+                                <span class="db-dept-trend">${renderDbTrendBadge(s, false)}</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card-meta">
+                            <div class="kpi-subtext">${escapeHtml(siteCode)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            teknoContainer.innerHTML = html || '<div style="color: #94a3b8; font-size: 12px; padding: 1rem; text-align: center;">Tidak ada data site Tekno</div>';
+        }
+
+        const renderTeknoSubStatus = (type, color) => {
+            return Object.values(sitesData).map(s => {
+                const diffVal = type === 'solved' ? s.diff_solved : (type === 'unsolved' ? s.diff_unsolved : s.diff_new_db);
+                const prevVal = type === 'solved' ? s.prev_solved : (type === 'unsolved' ? s.prev_unsolved : s.prev_new_db);
+                const countVal = type === 'solved' ? s.solved : (type === 'unsolved' ? s.unsolved : s.new_db);
+                const displayName = s.name_site || s.sitecode;
+                return `
+                    <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-header">
+                            <span class="kpi-subdept-name" title="${escapeHtml(s.name_site || s.sitecode)}">${escapeHtml(displayName)}</span>
+                            <span class="db-subdept-trend">${renderStatusTrendBadge(diffVal, prevVal, true, type)}</span>
+                        </div>
+                        <div class="kpi-subdept-val" style="color: ${color};">${formatQty(countVal || 0)}</div>
+                        <div class="kpi-subdept-meta">${escapeHtml(s.sitecode)}</div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        const teknoSolved = document.getElementById('db-status-sub-tekno-solved');
+        if (teknoSolved) teknoSolved.innerHTML = renderTeknoSubStatus('solved', '#16a34a');
+
+        const teknoUnsolved = document.getElementById('db-status-sub-tekno-unsolved');
+        if (teknoUnsolved) teknoUnsolved.innerHTML = renderTeknoSubStatus('unsolved', '#dc2626');
+
+        const teknoNew = document.getElementById('db-status-sub-tekno-new');
+        if (teknoNew) teknoNew.innerHTML = renderTeknoSubStatus('new_db', '#2563eb');
 
         updateDbAnalysisGrandTotalBadge();
     }
@@ -4271,8 +4991,8 @@ const App = (() => {
                         ${escapeHtml(m.name_site || '-')}
                     </td>
                     <td style="padding: 8px 10px; white-space: nowrap; color: #475569;">
-                        <strong>${escapeHtml(m.regional || '-')}</strong>
-                        <div style="font-size: 11px; color: #64748b;">${escapeHtml(m.dept || '')}${m.sub_dept ? ' - ' + escapeHtml(m.sub_dept) : ''}</div>
+                        <strong>${escapeHtml(m.dept || '-')}</strong>
+                        <div style="font-size: 11px; color: #64748b;">${m.sub_dept ? escapeHtml(m.sub_dept) : ''}</div>
                     </td>
                     <td style="text-align: center; padding: 8px 10px; white-space: nowrap;">
                         <div style="display: inline-flex; align-items: center; gap: 6px; justify-content: center;">
@@ -4435,10 +5155,25 @@ const App = (() => {
         const paginationInfo = document.getElementById('rdb-status-pagination-info');
         const paginationControls = document.getElementById('rdb-status-pagination-controls');
 
+        const thDept = document.getElementById('rdb-th-dept');
+        const thSubDept = document.getElementById('rdb-th-subdept');
+        const thDeptCol = document.getElementById('rdb-th-dept-col');
+        const thSubDeptCol = document.getElementById('rdb-th-subdept-col');
+        const isPmd = (summaryCategory === 'pmd');
+        const noDept = (summaryCategory === 'it_coorporate' || summaryCategory === 'warehouse_tekno');
+
+        if (thDeptCol) thDeptCol.style.display = noDept ? 'none' : '';
+        if (thSubDeptCol) thSubDeptCol.style.display = noDept ? 'none' : '';
+        if (deptSelect) deptSelect.style.display = noDept ? 'none' : '';
+        if (subDeptSelect) subDeptSelect.style.display = noDept ? 'none' : '';
+
+        if (thDept) thDept.textContent = isPmd ? 'DIVISI' : 'DEPT';
+        if (thSubDept) thSubDept.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
+
         if (flatTbody) {
             flatTbody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <td colspan="${noDept ? 9 : 11}" class="text-center" style="padding: 2.5rem; color: #64748b;">
                         <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
                             <span class="spinner" style="width: 16px; height: 16px;"></span>
                             <span>Memuat data status penyelesaian DB...</span>
@@ -4477,7 +5212,7 @@ const App = (() => {
                 if (rdbStatusView === 'grouped' && groupedContainer) {
                     groupedContainer.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 2rem;">${errMsg}</div>`;
                 } else if (flatTbody) {
-                    flatTbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 2rem; color: #ef4444;">${errMsg}</td></tr>`;
+                    flatTbody.innerHTML = `<tr><td colspan="${noDept ? 9 : 11}" class="text-center" style="padding: 2rem; color: #ef4444;">${errMsg}</td></tr>`;
                 }
                 return;
             }
@@ -4573,9 +5308,16 @@ const App = (() => {
         rdbStatusDeptSubDeptMap = filterOpts.dept_subdept_map || {};
         rdbStatusAllSitesList = filterOpts.sites || [];
         const deptSelect = document.getElementById('rdb-status-filter-dept');
+        const isPmd = (summaryCategory === 'pmd');
+        const thDept = document.getElementById('rdb-th-dept');
+        const thSubDept = document.getElementById('rdb-th-subdept');
+        if (thDept) thDept.textContent = isPmd ? 'DIVISI' : 'DEPT';
+        if (thSubDept) thSubDept.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
+
         if (deptSelect && filterOpts.depts) {
             const curVal = rdbStatusDept || deptSelect.value || 'all';
-            let html = '<option value="all">Semua Dept</option>';
+            const defaultAllDept = isPmd ? 'Semua Divisi' : 'Semua Dept';
+            let html = `<option value="all">${defaultAllDept}</option>`;
             filterOpts.depts.forEach(d => {
                 html += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
             });
@@ -4597,6 +5339,7 @@ const App = (() => {
         const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
         if (!subDeptSelect) return;
 
+        const isPmd = (summaryCategory === 'pmd');
         const selectedDept = deptSelect ? deptSelect.value : 'all';
         let availableSubs = [];
 
@@ -4611,7 +5354,8 @@ const App = (() => {
         }
 
         const curSub = rdbStatusSubDept || subDeptSelect.value || 'all';
-        let html = '<option value="all">Semua Sub Dept</option>';
+        const defaultAllSub = isPmd ? 'Semua Dept' : 'Semua Sub Dept';
+        let html = `<option value="all">${defaultAllSub}</option>`;
         availableSubs.forEach(sd => {
             html += `<option value="${escapeHtml(sd)}">${escapeHtml(sd)}</option>`;
         });
@@ -4858,10 +5602,21 @@ const App = (() => {
         const tbody = document.getElementById('rdb-status-flat-tbody');
         if (!tbody) return;
 
+        const noDept = (summaryCategory === 'it_coorporate' || summaryCategory === 'warehouse_tekno');
+        const thDeptCol = document.getElementById('rdb-th-dept-col');
+        const thSubDeptCol = document.getElementById('rdb-th-subdept-col');
+        if (thDeptCol) thDeptCol.style.display = noDept ? 'none' : '';
+        if (thSubDeptCol) thSubDeptCol.style.display = noDept ? 'none' : '';
+
+        const filterDept = document.getElementById('rdb-status-filter-dept');
+        const filterSubDept = document.getElementById('rdb-status-filter-subdept');
+        if (filterDept) filterDept.style.display = noDept ? 'none' : '';
+        if (filterSubDept) filterSubDept.style.display = noDept ? 'none' : '';
+
         if (items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                    <td colspan="${noDept ? 9 : 11}" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
                         No data.
                     </td>
                 </tr>
@@ -4899,11 +5654,15 @@ const App = (() => {
                 note = `<span style="color: #1d4ed8; font-size: 11px;">Temuan DB baru di ${currLabel}</span>`;
             }
 
+            const deptColsHtml = noDept ? '' : `
+                <td class="text-center" style="font-weight: 600; color: #475569;"><span class="badge" style="background: #f1f5f9; color: #334155; font-size: 11px;">${dept}</span></td>
+                <td class="text-center" style="font-weight: 500; color: #64748b; font-size: 11px;">${subDept}</td>
+            `;
+
             html += `
                 <tr>
                     <td class="text-center" style="color: #64748b; font-weight: 600;">${no}</td>
-                    <td class="text-center" style="font-weight: 600; color: #475569;"><span class="badge" style="background: #f1f5f9; color: #334155; font-size: 11px;">${dept}</span></td>
-                    <td class="text-center" style="font-weight: 500; color: #64748b; font-size: 11px;">${subDept}</td>
+                    ${deptColsHtml}
                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${sc}</td>
                     <td class="text-left" style="font-weight: 500; color: #1e293b;">${nameSite}</td>
                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
@@ -5208,6 +5967,11 @@ const App = (() => {
         const m = month || document.getElementById('summary-filter-month')?.value || 9;
         const category = summaryCategory || 'pmd';
         const soType = summarySOType || 'monthly';
+        const isPmd = (category === 'pmd');
+
+        document.querySelectorAll('th.scorecard-col-subdept').forEach(th => {
+            th.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
+        });
 
         const threeMonths = getThreeMonthsBack(y, m);
 
@@ -6065,6 +6829,7 @@ const App = (() => {
         if (currentCategory === 'pmd') catLabel = 'PMD';
         else if (currentCategory === 'outlet_subarep') catLabel = 'Outlet Subarep';
         else if (currentCategory === 'warehouse_hub') catLabel = 'Warehouse HUB';
+        else if (currentCategory === 'it_coorporate') catLabel = 'IT Coorporate';
 
         function renderSubDeptJsonData(json) {
             if (!json || !json.success) return;
@@ -6072,7 +6837,7 @@ const App = (() => {
             if (rows.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
                             No data.
                         </td>
                     </tr>
@@ -6132,7 +6897,7 @@ const App = (() => {
             if (pieSubtitle) {
                 let label = '';
                 if (currentCategory === 'pmd') {
-                    label = (subDept === 'all') ? 'Semua Sub Dept' : `PMD - ${subDept}`;
+                    label = (subDept === 'all') ? 'Semua Dept' : `PMD - ${subDept}`;
                 } else {
                     if (dept === 'all' && subDept === 'all') {
                         label = 'Semua DEPT';
@@ -6152,7 +6917,7 @@ const App = (() => {
                 const filterLabel = statusFilter === 'tercapai' ? 'Tercapai' : 'Tidak Tercapai';
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                        <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
                             Tidak ada data dengan status <strong>${escapeHtml(filterLabel)}</strong>.
                         </td>
                     </tr>
@@ -6170,6 +6935,7 @@ const App = (() => {
                 const matchQty = Number(r.match_physic_qty || 0).toLocaleString();
                 const physicQty = Number(r.physic_physic_qty || 0).toLocaleString();
                 const dbQty = Number(r.db_physic_qty || 0).toLocaleString();
+                const targetQty = Number(r.total_physic_target || 0).toLocaleString();
 
                 let pctDisplay = '-';
                 let statusHtml = '<span class="so-status-badge status-none">Belum Ada Data</span>';
@@ -6221,13 +6987,14 @@ const App = (() => {
 
                 html += `
                     <tr>
-                        <td style="font-weight: 600; color: #1e293b;">${sitecode}</td>
-                        <td style="color: #334155;">${nameSite}</td>
-                        <td class="text-right" style="color: #64748b;">${matchQty}</td>
-                        <td class="text-right" style="color: #64748b;">${physicQty}</td>
-                        <td class="text-right" style="color: #64748b;">${dbQty}</td>
+                        <td class="text-center" style="font-weight: 600; color: #1e293b;">${sitecode}</td>
+                        <td class="col-name-site" style="color: #334155; text-align: left;">${nameSite}</td>
+                        <td class="text-center" style="color: #64748b;">${matchQty}</td>
+                        <td class="text-center" style="color: #64748b;">${physicQty}</td>
+                        <td class="text-center" style="color: #64748b;">${dbQty}</td>
+                        <td class="text-center" style="color: #64748b; font-weight: 600;">${targetQty}</td>
                         <td class="text-center" style="font-weight: 600;">${pctDisplay}</td>
-                        <td class="text-center">${statusHtml}</td>
+                        <td class="col-status" style="text-align: initial;">${statusHtml}</td>
                     </tr>
                 `;
             });
@@ -6235,30 +7002,38 @@ const App = (() => {
 
             // Render Foot Summary Row
             if (tfoot) {
-                const totals = json.totals || {};
-                let totalMatch = totals.total_match !== undefined ? Number(totals.total_match).toLocaleString() : '0';
-                let totalPhysic = totals.total_physic !== undefined ? Number(totals.total_physic).toLocaleString() : '0';
-                let totalDb = totals.total_db !== undefined ? Number(totals.total_db).toLocaleString() : '0';
-                let avgPct = totals.avg_pct !== undefined ? Math.round(parseFloat(totals.avg_pct)) : 0;
-                let countWithData = totals.count_with_data || 0;
+                let sMatch = 0, sPhysic = 0, sDb = 0, sTarget = 0, sPct = 0;
+                let countWithData = 0;
 
-                if (statusFilter !== 'all') {
-                    let sMatch = 0, sPhysic = 0, sDb = 0, sPct = 0;
-                    countWithData = 0;
-                    displayRows.forEach(r => {
-                        sMatch += Number(r.match_physic_qty || 0);
-                        sPhysic += Number(r.physic_physic_qty || 0);
-                        sDb += Number(r.db_physic_qty || 0);
-                        if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
-                            sPct += parseFloat(r.total_physic_pct);
-                            countWithData++;
-                        }
-                    });
-                    totalMatch = sMatch.toLocaleString();
-                    totalPhysic = sPhysic.toLocaleString();
-                    totalDb = sDb.toLocaleString();
-                    avgPct = countWithData > 0 ? Math.round(sPct / countWithData) : 0;
+                displayRows.forEach(r => {
+                    sMatch += Number(r.match_physic_qty || 0);
+                    sPhysic += Number(r.physic_physic_qty || 0);
+                    sDb += Number(r.db_physic_qty || 0);
+                    sTarget += Number(r.total_physic_target || 0);
+                    if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
+                        sPct += parseFloat(r.total_physic_pct);
+                        countWithData++;
+                    }
+                });
+
+                // Fallback to json level totals if displayRows had no data
+                if (statusFilter === 'all' && countWithData === 0) {
+                    const fallbackTotals = json.totals || {};
+                    sMatch = Number(fallbackTotals.total_match ?? json.total_match_qty ?? 0);
+                    sPhysic = Number(fallbackTotals.total_physic ?? json.total_physic_qty ?? 0);
+                    sDb = Number(fallbackTotals.total_db ?? json.total_db_qty ?? 0);
+                    sTarget = Number(fallbackTotals.total_target ?? json.total_target_qty ?? 0);
+                    countWithData = Number(fallbackTotals.count_with_data ?? json.count_with_data ?? 0);
+                    if (countWithData > 0) {
+                        sPct = Number(fallbackTotals.avg_pct ?? json.avg_pct ?? 0) * countWithData;
+                    }
                 }
+
+                const totalMatch = sMatch.toLocaleString();
+                const totalPhysic = sPhysic.toLocaleString();
+                const totalDb = sDb.toLocaleString();
+                const totalTarget = sTarget.toLocaleString();
+                const avgPct = countWithData > 0 ? Math.round(sPct / countWithData) : 0;
                 const avgDisplay = `${avgPct}%`;
 
                 let overallText = 'Belum Ada Data';
@@ -6318,15 +7093,16 @@ const App = (() => {
                     : '';
 
                 tfoot.innerHTML = `
-                    <tr class="table-summary-row" style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
-                        <td colspan="2" style="color: #0f172a; padding: 0.75rem 1rem;">
+                    <tr class="table-summary-row" style="background: #f8fafc; font-weight: 700;">
+                        <td colspan="2" class="col-name-site" style="color: #0f172a; padding: 0.75rem 1rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1; text-align: left;">
                             Grand Total (${displayRows.length} Sites${filterNote})
                         </td>
-                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalMatch}</td>
-                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalPhysic}</td>
-                        <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${totalDb}</td>
-                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${avgDisplay}</td>
-                        <td class="text-center" style="padding: 0.75rem 0.5rem;">${overallStatusHtml}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalMatch}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalPhysic}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalDb}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalTarget}</td>
+                        <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${avgDisplay}</td>
+                        <td class="col-status" style="padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1; text-align: initial;">${overallStatusHtml}</td>
                     </tr>
                 `;
             }
@@ -6343,7 +7119,7 @@ const App = (() => {
         } else {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
                         <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
                             <span class="spinner" style="width: 16px; height: 16px;"></span>
                             <span>Memuat Hasil SO ${catLabel}...</span>
@@ -6371,7 +7147,7 @@ const App = (() => {
             if (!json.success) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #ef4444;">
                             Gagal memuat data: ${escapeHtml(json.message || 'Unknown error')}
                         </td>
                     </tr>
@@ -6385,7 +7161,7 @@ const App = (() => {
             console.error('Error loading subdept results:', err);
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: #ef4444;">
                         Kesalahan jaringan saat memuat data Hasil SO Outlet Regional.
                     </td>
                 </tr>
@@ -6430,6 +7206,10 @@ const App = (() => {
             } else if (subdeptSortCol === 'db_qty') {
                 valA = parseFloat(a.db_physic_qty) || 0;
                 valB = parseFloat(b.db_physic_qty) || 0;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'target_qty') {
+                valA = parseFloat(a.total_physic_target) || 0;
+                valB = parseFloat(b.total_physic_target) || 0;
                 return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
             } else if (subdeptSortCol === 'pct') {
                 valA = (a.has_data && a.total_physic_pct !== null && a.total_physic_pct !== undefined) ? parseFloat(a.total_physic_pct) : -1;
@@ -6913,68 +7693,76 @@ const App = (() => {
             };
 
             // Common Chart Options Builder with Dashed Target Line
-            const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85), isDept = false) => ({
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
-                    onClick: (e, elements, chart) => {
-                        if (elements && elements.length > 0) {
-                            const clickedIndex = elements[0].datasetIndex;
-                            const deptLabel = chart.data.datasets[clickedIndex]?.label;
-                            if (isDept) {
-                                if (chart._pinnedIndex === clickedIndex) {
-                                    chart._pinnedIndex = null;
-                                    applyChartHighlight(chart, null);
-                                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, null);
-                                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, null);
+            const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85), isDept = false) => {
+                if (datasets && Array.isArray(datasets)) {
+                    datasets.forEach(ds => {
+                        ds.clip = false;
+                    });
+                }
+                return {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                        onClick: (e, elements, chart) => {
+                            if (elements && elements.length > 0) {
+                                const clickedIndex = elements[0].datasetIndex;
+                                const deptLabel = chart.data.datasets[clickedIndex]?.label;
+                                if (isDept) {
+                                    if (chart._pinnedIndex === clickedIndex) {
+                                        chart._pinnedIndex = null;
+                                        applyChartHighlight(chart, null);
+                                        if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, null);
+                                        if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, null);
+                                    } else {
+                                        chart._pinnedIndex = clickedIndex;
+                                        applyChartHighlight(chart, clickedIndex);
+                                        if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, deptLabel);
+                                        if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, deptLabel);
+                                    }
                                 } else {
-                                    chart._pinnedIndex = clickedIndex;
-                                    applyChartHighlight(chart, clickedIndex);
-                                    if (chartTrendSubDept) applySubDeptGroupHighlight(chartTrendSubDept, deptLabel);
-                                    if (chartTrendPmd) applySubDeptGroupHighlight(chartTrendPmd, deptLabel);
-                                }
-                            } else {
-                                if (chart._pinnedIndex === clickedIndex) {
-                                    chart._pinnedIndex = null;
-                                    applyChartHighlight(chart, null);
-                                } else {
-                                    chart._pinnedIndex = clickedIndex;
-                                    applyChartHighlight(chart, clickedIndex);
-                                }
-                            }
-                            return;
-                        }
-
-                        // Check if an X-axis month label or tick was clicked
-                        try {
-                            const canvasPos = Chart.helpers?.getRelativePosition ? Chart.helpers.getRelativePosition(e, chart) : null;
-                            if (canvasPos && chart.scales && chart.scales.x) {
-                                const dataX = chart.scales.x.getValueForPixel(canvasPos.x);
-                                if (dataX !== undefined && dataX >= 0 && dataX < months.length) {
-                                    const monthIdx = dataX + 1;
-                                    const monthSel = document.getElementById('summary-filter-month');
-                                    if (monthSel && monthSel.value != monthIdx) {
-                                        monthSel.value = String(monthIdx);
-                                        loadSummaryData();
+                                    if (chart._pinnedIndex === clickedIndex) {
+                                        chart._pinnedIndex = null;
+                                        applyChartHighlight(chart, null);
+                                    } else {
+                                        chart._pinnedIndex = clickedIndex;
+                                        applyChartHighlight(chart, clickedIndex);
                                     }
                                 }
+                                return;
                             }
-                        } catch (err) {
-                            // Non-critical fallback
-                        }
-                    },
-                    layout: {
-                        padding: {
-                            top: 14,
-                            right: 8
-                        }
-                    },
+
+                            // Check if an X-axis month label or tick was clicked
+                            try {
+                                const canvasPos = Chart.helpers?.getRelativePosition ? Chart.helpers.getRelativePosition(e, chart) : null;
+                                if (canvasPos && chart.scales && chart.scales.x) {
+                                    const dataX = chart.scales.x.getValueForPixel(canvasPos.x);
+                                    if (dataX !== undefined && dataX >= 0 && dataX < months.length) {
+                                        const monthIdx = dataX + 1;
+                                        const monthSel = document.getElementById('summary-filter-month');
+                                        if (monthSel && monthSel.value != monthIdx) {
+                                            monthSel.value = String(monthIdx);
+                                            loadSummaryData();
+                                        }
+                                    }
+                                }
+                            } catch (err) {
+                                // Non-critical fallback
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                top: 26,
+                                right: 14,
+                                bottom: 6,
+                                left: 6
+                            }
+                        },
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -7204,24 +7992,62 @@ const App = (() => {
                         ctx.restore();
                     }
                 }]
-            });
+            };
+        };
 
             // 1. Render Card 1: DEPT Trends
             const isPmd = (summaryCategory === 'pmd');
-            const deptColors = isPmd
-                ? { 'PMD': '#8b5cf6' }
-                : (summarySOType === 'quarterly' ? { 'ERO': '#3b82f6', 'WRO': '#10b981' } : { 'CRO': '#f59e0b', 'ERO': '#3b82f6', 'WRO': '#10b981' });
+            const isIt = (summaryCategory === 'it_coorporate');
+            const isTekno = (summaryCategory === 'warehouse_tekno');
 
             const deptDatasets = [];
-            for (const [deptKey, color] of Object.entries(deptColors)) {
-                const values = json.dept_trends ? (json.dept_trends[deptKey] || []) : [];
+            const deptTargetVal = (isPmd || isIt || isTekno) ? 98 : 85;
+
+            if (isIt) {
+                const values = json.it_corporate_trend || [];
                 deptDatasets.push({
-                    label: deptKey,
+                    label: 'IT Coorporate',
                     data: values,
-                    borderColor: color,
-                    backgroundColor: color,
-                    _origBorderColor: color,
-                    _origBackgroundColor: color,
+                    borderColor: '#059669',
+                    backgroundColor: '#059669',
+                    _origBorderColor: '#059669',
+                    _origBackgroundColor: '#059669',
+                    _origBorderWidth: 3,
+                    _origPointRadius: 4,
+                    _origPointHoverRadius: 6,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.3,
+                    spanGaps: true
+                });
+            } else if (isTekno) {
+                const values = json.tekno_trend || [];
+                deptDatasets.push({
+                    label: 'Warehouse Tekno',
+                    data: values,
+                    borderColor: '#0891b2',
+                    backgroundColor: '#0891b2',
+                    _origBorderColor: '#0891b2',
+                    _origBackgroundColor: '#0891b2',
+                    _origBorderWidth: 3,
+                    _origPointRadius: 4,
+                    _origPointHoverRadius: 6,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.3,
+                    spanGaps: true
+                });
+
+                const khususValues = (json.tekno_site_trends && json.tekno_site_trends['PENYIMPANAN PERANGKAT KHUSUS T TEKNO']) || [];
+                deptDatasets.push({
+                    label: 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO',
+                    data: khususValues,
+                    borderColor: '#8b5cf6',
+                    backgroundColor: '#8b5cf6',
+                    _origBorderColor: '#8b5cf6',
+                    _origBackgroundColor: '#8b5cf6',
                     _origBorderWidth: 2.5,
                     _origPointRadius: 4,
                     _origPointHoverRadius: 6,
@@ -7231,13 +8057,71 @@ const App = (() => {
                     tension: 0.3,
                     spanGaps: true
                 });
+            } else {
+                const deptColors = isPmd
+                    ? { 'PMD': '#8b5cf6' }
+                    : (summarySOType === 'quarterly' ? { 'ERO': '#3b82f6', 'WRO': '#10b981' } : { 'CRO': '#f59e0b', 'ERO': '#3b82f6', 'WRO': '#10b981' });
+
+                for (const [deptKey, color] of Object.entries(deptColors)) {
+                    const values = json.dept_trends ? (json.dept_trends[deptKey] || []) : [];
+                    deptDatasets.push({
+                        label: deptKey,
+                        data: values,
+                        borderColor: color,
+                        backgroundColor: color,
+                        _origBorderColor: color,
+                        _origBackgroundColor: color,
+                        _origBorderWidth: 2.5,
+                        _origPointRadius: 4,
+                        _origPointHoverRadius: 6,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                }
             }
 
             if (chartTrendDept) chartTrendDept.destroy();
-            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, isPmd ? 98 : 85, true));
+            chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, deptTargetVal, true));
 
-            if (!isPmd) {
-                // 2. Render Card 2: Sub DEPT Trends (Outlet Regional)
+            // 2. Render Card 2: Sub DEPT / Site Trends
+            if (isIt) {
+                const itSitePalette = {
+                    'OUTLET OPTI TBS': '#059669',
+                    'IT CORPORATE - ARCADIA LT 4': '#3b82f6'
+                };
+                const subDeptDatasets = [];
+                const siteData = json.it_site_trends || {};
+                for (const [siteLabel, values] of Object.entries(siteData)) {
+                    const color = itSitePalette[siteLabel] || '#059669';
+                    subDeptDatasets.push({
+                        label: siteLabel,
+                        data: values || [],
+                        borderColor: color,
+                        backgroundColor: color,
+                        _origBorderColor: color,
+                        _origBackgroundColor: color,
+                        _origBorderWidth: 2.5,
+                        _origPointRadius: 4,
+                        _origPointHoverRadius: 6,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                }
+
+                if (chartTrendSubDept) chartTrendSubDept.destroy();
+                chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 98));
+                if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
+            } else if (isTekno) {
+                if (chartTrendSubDept) { chartTrendSubDept.destroy(); chartTrendSubDept = null; }
+                if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
+            } else if (!isPmd) {
+                // Render Card 2: Sub DEPT Trends (Outlet Regional)
                 const subDeptPalette = [
                     '#ef4444', // CJDO (red)
                     '#f97316', // EKO (orange)
@@ -7253,7 +8137,10 @@ const App = (() => {
                 ];
 
                 const subDeptDatasets = [];
-                const subEntries = Object.entries(json.subdept_trends || {});
+                let subEntries = Object.entries(json.subdept_trends || {});
+                if (summaryCategory === 'warehouse_hub') {
+                    subEntries = subEntries.filter(([subKey]) => !['CSO', 'BNO', 'MPO', 'SMO'].includes(subKey));
+                }
                 subEntries.forEach(([subKey, item], idx) => {
                     const color = subDeptPalette[idx % subDeptPalette.length];
                     subDeptDatasets.push({
@@ -7278,7 +8165,7 @@ const App = (() => {
                 chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 85));
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else {
-                // 3. Render Card 3: PMD Sub DEPT Trends
+                // Render Card 3: PMD Sub DEPT Trends
                 const pmdColors = {
                     'DNO': '#8b5cf6', // Purple
                     'DSO': '#06b6d4', // Cyan
@@ -7340,10 +8227,22 @@ const App = (() => {
 
     function getRekapCategory() {
         if (summarySOType === 'quarterly') {
+            if (summaryCategory === 'warehouse_tekno') {
+                return 'quarterly_tekno';
+            }
             if (summaryCategory === 'warehouse_hub') {
                 return 'quarterly_warehouse';
             }
             return 'quarterly_subarep';
+        }
+        if (summaryCategory === 'warehouse_tekno') {
+            return 'monthly_tekno';
+        }
+        if (summaryCategory === 'warehouse_hub') {
+            return 'monthly_warehouse';
+        }
+        if (summaryCategory === 'it_coorporate') {
+            return 'monthly_it_coorporate';
         }
         return `monthly_${summaryCategory}`;
     }
@@ -7394,7 +8293,12 @@ const App = (() => {
         }
         const subtitleEl = document.getElementById('rekap-card-subtitle');
         if (subtitleEl) {
-            const catLabel = summaryCategory === 'pmd' ? 'PMD' : 'Outlet Regional';
+            let catLabel = 'Outlet Regional';
+            if (summaryCategory === 'pmd') catLabel = 'PMD';
+            else if (summaryCategory === 'outlet_subarep') catLabel = 'Outlet Subarep';
+            else if (summaryCategory === 'warehouse_hub') catLabel = 'Warehouse HUB';
+            else if (summaryCategory === 'warehouse_tekno') catLabel = 'Warehouse Tekno';
+            else if (summaryCategory === 'it_coorporate') catLabel = 'IT Coorporate';
             const typeLabel = summarySOType === 'quarterly' ? 'Quarterly' : 'Monthly';
             subtitleEl.textContent = `Persentase ${typeLabel} Stock Opname ${catLabel}`;
         }
@@ -7459,6 +8363,17 @@ const App = (() => {
     function populateRekapDeptAndSubDeptDropdowns() {
         const deptSelect = document.getElementById('rekap-dept-filter');
         const subDeptSelect = document.getElementById('rekap-subdept-filter');
+        const deptLabel = document.getElementById('label-rekap-dept-filter');
+        const subDeptLabel = document.getElementById('label-rekap-subdept-filter');
+        const thDept = document.getElementById('rekap-th-dept');
+        const thSubDept = document.getElementById('rekap-th-subdept');
+
+        const isPmd = (summaryCategory === 'pmd');
+        if (deptLabel) deptLabel.textContent = isPmd ? 'DIVISI' : 'DEPT';
+        if (subDeptLabel) subDeptLabel.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
+        if (thDept) thDept.textContent = isPmd ? 'DIVISI' : 'DEPT';
+        if (thSubDept) thSubDept.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
+
         if (!deptSelect || !subDeptSelect) return;
 
         const deptSet = new Set();
@@ -7468,7 +8383,8 @@ const App = (() => {
         });
 
         const currentDept = deptSelect.value || rekapDeptFilter || 'all';
-        let deptHtml = '<option value="all">Semua DEPT</option>';
+        const defaultAllDept = isPmd ? 'Semua Divisi' : 'Semua DEPT';
+        let deptHtml = `<option value="all">${defaultAllDept}</option>`;
         Array.from(deptSet).sort().forEach(d => {
             deptHtml += `<option value="${d}">${d}</option>`;
         });
@@ -7490,6 +8406,7 @@ const App = (() => {
         const subDeptSelect = document.getElementById('rekap-subdept-filter');
         if (!subDeptSelect) return;
 
+        const isPmd = (summaryCategory === 'pmd');
         const selectedDept = deptSelect ? deptSelect.value : 'all';
         const currentSub = subDeptSelect.value || rekapSubDeptFilter || 'all';
 
@@ -7504,7 +8421,8 @@ const App = (() => {
             }
         });
 
-        let subHtml = '<option value="all">Semua Sub Dept</option>';
+        const defaultAllSub = isPmd ? 'Semua Dept' : 'Semua Sub Dept';
+        let subHtml = `<option value="all">${defaultAllSub}</option>`;
         Array.from(subSet).sort().forEach(s => {
             subHtml += `<option value="${s}">${s}</option>`;
         });
@@ -7661,12 +8579,25 @@ const App = (() => {
         const controlsEl = document.getElementById('rekap-pagination-controls');
         if (!tbody) return;
 
+        const isQuarterlyRekap = (summarySOType === 'quarterly');
+        const noDept = (summaryCategory === 'it_coorporate' || summaryCategory === 'warehouse_tekno');
+        const thDeptCol = document.getElementById('rekap-th-dept-col');
+        const thSubDeptCol = document.getElementById('rekap-th-subdept-col');
+        if (thDeptCol) thDeptCol.style.display = noDept ? 'none' : '';
+        if (thSubDeptCol) thSubDeptCol.style.display = noDept ? 'none' : '';
+
+        const filterDeptCont = document.getElementById('rekap-dept-filter-container');
+        const filterSubDeptCont = document.getElementById('rekap-subdept-filter-container');
+        if (filterDeptCont) filterDeptCont.style.display = noDept ? 'none' : 'flex';
+        if (filterSubDeptCont) filterSubDeptCont.style.display = noDept ? 'none' : 'flex';
+
         const totalItems = filteredRekapRows.length;
 
         if (totalItems === 0) {
+            const emptyColspan = isQuarterlyRekap ? (noDept ? 6 : 8) : (noDept ? 14 : 16);
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="17" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <td colspan="${emptyColspan}" class="text-center" style="padding: 2.5rem; color: #64748b;">
                         ${allRekapRows.length === 0 ? "No data in this category." : "No matching data found."}
                     </td>
                 </tr>
@@ -7686,7 +8617,6 @@ const App = (() => {
         const endIndex = Math.min(startIndex + effectiveSize, totalItems);
         const pageRows = filteredRekapRows.slice(startIndex, endIndex);
 
-        const isQuarterlyRekap = (summarySOType === 'quarterly');
         const visibleMonths = isQuarterlyRekap ? [3, 6, 9, 12] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         updateRekapMonthHeaders(visibleMonths, isQuarterlyRekap);
 
@@ -7695,11 +8625,13 @@ const App = (() => {
             const monthCells = visibleMonths
                 .map(m => `<td class="text-center">${formatPctBadge(row.months ? row.months[m] : null, isPmdCategory)}</td>`)
                 .join('');
+            const deptColsHtml = noDept ? '' : `
+                <td class="text-left">${escapeHtml(row.dept)}</td>
+                <td class="text-left">${escapeHtml(row.sub_dept)}</td>
+            `;
             html += `
                 <tr>
-                    <td class="text-left" style="font-weight: 500;">${escapeHtml(row.regional)}</td>
-                    <td class="text-left">${escapeHtml(row.dept)}</td>
-                    <td class="text-left">${escapeHtml(row.sub_dept)}</td>
+                    ${deptColsHtml}
                     <td class="text-center font-monospace">${escapeHtml(row.sitecode)}</td>
                     <td class="text-left" style="font-weight: 500;">${escapeHtml(row.name_site)}</td>
                     ${monthCells}
@@ -7712,7 +8644,7 @@ const App = (() => {
         if (tfoot) {
             let footHtml = `
                 <tr>
-                    <td colspan="5" class="text-left" style="padding: 8px 12px; font-size: 12px; letter-spacing: 0.03em;">
+                    <td colspan="${noDept ? 2 : 4}" class="text-left" style="padding: 8px 12px; font-size: 12px; letter-spacing: 0.03em;">
                         AVERAGE TOTAL PHYSICAL % (${totalItems} SITES)
                     </td>
             `;
@@ -8320,9 +9252,7 @@ const App = (() => {
         const subtitleEl = document.getElementById('exec-catatan-subtitle');
         const tbody = document.getElementById('exec-catatan-tbody');
         const cardEl = document.getElementById('card-executive-catatan');
-
-        // Always show the Catatan card across all SO Types & categories
-        if (cardEl) cardEl.style.display = 'block';
+        const rowEl = document.getElementById('executive-bottom-row');
 
         const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
         const mLabel = m ? (monthNames[parseInt(m, 10)] || `Bulan ${m}`) : 'Semua Bulan';
@@ -8335,6 +9265,12 @@ const App = (() => {
             const curSoType = (summarySOType || 'monthly').trim().toLowerCase();
             thPeriod.textContent = (curSoType === 'quarterly') ? 'QUARTER' : 'BULAN';
         }
+
+        const thDept = document.getElementById('exec-catatan-th-dept');
+        const thSubDept = document.getElementById('exec-catatan-th-subdept');
+        const isPmd = (summaryCategory === 'pmd');
+        if (thDept) thDept.textContent = isPmd ? 'DIVISI' : 'DEPT';
+        if (thSubDept) thSubDept.textContent = isPmd ? 'DEPT' : 'SUB DEPT';
 
         if (!tbody) return;
 
@@ -8366,20 +9302,41 @@ const App = (() => {
 
                 if (curSoType === 'monthly') {
                     if (summaryCategory === 'pmd') {
-                        // PMD view: show PMD notes, DNO/DSO notes, or notes for all departments
                         return isAllDept || dept === 'PMD' || subDept === 'DNO' || subDept === 'DSO';
-                    } else {
-                        // Outlet Regional view: show CRO, ERO, WRO, or notes for all departments (exclude specifically PMD-only notes)
-                        if (dept === 'PMD' || subDept === 'DNO' || subDept === 'DSO') {
-                            return false;
-                        }
-                        return true;
+                    } else if (summaryCategory === 'outlet') {
+                        return (isAllDept || dept === 'CRO' || dept === 'ERO' || dept === 'WRO') && dept !== 'PMD' && subDept !== 'DNO' && subDept !== 'DSO';
+                    } else if (summaryCategory === 'it_coorporate') {
+                        return !isAllDept && (dept === 'IT COORPORATE' || dept === 'IT' || dept === 'TBS' || dept === 'ARCADIA' || subDept === 'TBS' || subDept === 'ARCADIA' || dept.includes('IT '));
+                    } else if (summaryCategory === 'warehouse_tekno') {
+                        return !isAllDept && (dept.includes('TEKNO') || subDept.includes('TEKNO'));
+                    } else if (summaryCategory === 'warehouse_hub') {
+                        return !isAllDept && (dept.includes('HUB') || subDept.includes('HUB'));
+                    } else if (summaryCategory === 'outlet_subarep') {
+                        return !isAllDept && (dept.includes('SUBAREP') || subDept.includes('SUBAREP'));
                     }
+                    return false;
                 }
 
-                // In Quarterly: all quarterly notes are mapped for the quarterly view
+                if (curSoType === 'quarterly') {
+                    if (summaryCategory === 'warehouse_hub') {
+                        return dept.includes('HUB') || subDept.includes('HUB');
+                    } else if (summaryCategory === 'outlet_subarep') {
+                        return dept.includes('SUBAREP') || subDept.includes('SUBAREP');
+                    }
+                    return true;
+                }
+
                 return true;
             });
+
+            if (mappedNotes.length === 0) {
+                if (cardEl) cardEl.style.display = 'none';
+                if (rowEl) rowEl.style.display = 'none';
+                return;
+            }
+
+            if (cardEl) cardEl.style.display = 'flex';
+            if (rowEl) rowEl.style.display = 'block';
 
             if (execCatatanSortCol) {
                 mappedNotes.sort((a, b) => {
@@ -8405,27 +9362,13 @@ const App = (() => {
             }
             updateExecCatatanSortIndicators();
 
-            if (mappedNotes.length === 0) {
-                const contextName = curSoType === 'quarterly'
-                    ? (summaryCategory === 'warehouse_hub' ? 'Warehouse HUB (Quarterly)' : 'Outlet Subarep (Quarterly)')
-                    : (summaryCategory === 'pmd' ? 'PMD' : 'Outlet Regional');
-
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center" style="padding: 2.2rem 1rem; color: #94a3b8;">
-                            <div style="font-size: 12.5px; font-weight: 600; color: #64748b;">
-                                Tidak ada catatan ${escapeHtml(contextName)} untuk periode ${escapeHtml(periodStr)}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
 
             let html = '';
             mappedNotes.forEach((note, idx) => {
-                const displayDept = (note.dept && note.dept !== 'Semua Dept' && note.dept !== '(Semua Dept)') ? note.dept : 'Semua Dept';
-                const displaySubDept = (note.sub_dept && note.sub_dept !== 'Semua Sub Dept' && note.sub_dept !== '(Semua Sub Dept)') ? note.sub_dept : 'Semua Sub Dept';
+                const defaultDept = isPmd ? 'Semua Divisi' : 'Semua Dept';
+                const defaultSubDept = isPmd ? 'Semua Dept' : 'Semua Sub Dept';
+                const displayDept = (note.dept && !note.dept.toLowerCase().includes('semua')) ? note.dept : defaultDept;
+                const displaySubDept = (note.sub_dept && !note.sub_dept.toLowerCase().includes('semua')) ? note.sub_dept : defaultSubDept;
 
                 // Format mapped month from master data (just month, not year)
                 let periodDisplay = '-';
@@ -9011,6 +9954,8 @@ const App = (() => {
         updateSRGroupType,
         toggleSRActive,
         toggleSRCounted,
+        syncSiteProfile,
+        syncAllSiteProfiles,
         openSRHistoryModal,
         closeSRHistoryModal,
         loadSRHistory,
@@ -9123,12 +10068,16 @@ const App = (() => {
         openQuickAccess,
         closeQuickAccess,
         scrollToCard,
-        handleQuickAccessLogin,
         openLoginModal,
         closeLoginModal,
-        handleSpaLogin,
+        toggleLoginPassword,
+        toggleLoginModalPassword,
+        submitLogin,
+        logout,
         toggleUserDropdown,
         closeUserDropdown,
+        navigateTo,
+        keepCleanUrl,
     };
 })();
 

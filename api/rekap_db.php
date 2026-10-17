@@ -163,88 +163,7 @@ try {
                 exit;
             }
 
-            // Load spreadsheet memory-efficiently
             $tmpPath = $file['tmp_name'];
-            $reader = IOFactory::createReaderForFile($tmpPath);
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($tmpPath);
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Find header row and map columns across first 15 rows
-            $headerRowIdx = -1;
-            $headerMap = [];
-            $maxRow = $sheet->getHighestRow();
-
-            for ($r = 1; $r <= min(15, $maxRow); $r++) {
-                $colTexts = [];
-                $highestCol = $sheet->getHighestColumn($r);
-                $highestColIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestCol);
-
-                for ($c = 1; $c <= $highestColIdx; $c++) {
-                    $val = $sheet->getCell([$c, $r])->getValue();
-                    $colTexts[$c] = strtolower(trim((string) $val));
-                }
-
-                $hasSite = false;
-                $hasReg = false;
-                $hasNbv = false;
-
-                foreach ($colTexts as $idx => $t) {
-                    if (str_contains($t, 'sitecode') || str_contains($t, 'site code') || str_contains($t, 'kode site') || $t === 'site') {
-                        $hasSite = true;
-                    }
-                    if (str_contains($t, 'reg no') || str_contains($t, 'reg_no') || str_contains($t, 'no reg') || str_contains($t, 'asset no') || str_contains($t, 'no asset') || str_contains($t, 'no aset')) {
-                        $hasReg = true;
-                    }
-                    if (str_contains($t, 'nbv') || str_contains($t, 'nilai buku') || str_contains($t, 'book value')) {
-                        $hasNbv = true;
-                    }
-                }
-
-                if ($hasSite || ($hasReg && $hasNbv)) {
-                    $headerRowIdx = $r;
-                    foreach ($colTexts as $idx => $t) {
-                        if ($t !== '') {
-                            $headerMap[$t] = $idx;
-                        }
-                    }
-                    break;
-                }
-            }
-
-            if ($headerRowIdx === -1) {
-                $headerRowIdx = 1;
-                $highestCol = $sheet->getHighestColumn(1);
-                $highestColIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestCol);
-                for ($c = 1; $c <= $highestColIdx; $c++) {
-                    $t = strtolower(trim((string) $sheet->getCell([$c, 1])->getValue()));
-                    if ($t !== '')
-                        $headerMap[$t] = $c;
-                }
-            }
-
-            // Find 1-based column indexes for our 5 target columns
-            $findColIdx = function (array $aliases) use ($headerMap): ?int {
-                foreach ($aliases as $a) {
-                    if (isset($headerMap[$a])) {
-                        return $headerMap[$a];
-                    }
-                }
-                foreach ($headerMap as $h => $idx) {
-                    foreach ($aliases as $a) {
-                        if (str_contains($h, $a)) {
-                            return $idx;
-                        }
-                    }
-                }
-                return null;
-            };
-
-            $colSitecode = $findColIdx(['sitecode', 'site code', 'kode site', 'kode_site', 'site_code', 'site']);
-            $colRegNo = $findColIdx(['reg no', 'reg_no', 'no reg', 'no. reg', 'regno', 'registration no', 'asset no', 'no asset', 'no. asset', 'no aset', 'no. aset', 'nomor asset', 'nomor aset']);
-            $colName = $findColIdx(['name', 'asset name', 'nama asset', 'nama aset', 'item name', 'nama barang', 'deskripsi aset', 'description', 'nama']);
-            $colSn = $findColIdx(['sn', 'serial number', 'serial no', 'no seri', 'nomor seri', 's/n', 'serial_number', 'serial']);
-            $colNbv = $findColIdx(['nbv', 'net book value', 'nilai buku', 'book value', 'nilai_buku', 'book_value']);
 
             // Parse NBV helper
             $parseNbv = function ($val): float {
@@ -269,73 +188,587 @@ try {
                 return $isNegative ? -$num : $num;
             };
 
+            // Detect headers and column mapping helper
+            $detectColumns = function (array $sampleRows): array {
+                $headerRowIdx = -1;
+                $headerMap = [];
+
+                foreach ($sampleRows as $r => $colTexts) {
+                    $normalized = [];
+                    foreach ($colTexts as $c => $val) {
+                        $normalized[$c] = strtolower(trim((string) $val));
+                    }
+
+                    $hasSite = false;
+                    $hasReg = false;
+                    $hasNbv = false;
+
+                    foreach ($normalized as $t) {
+                        if (str_contains($t, 'sitecode') || str_contains($t, 'site code') || str_contains($t, 'kode site') || $t === 'site') {
+                            $hasSite = true;
+                        }
+                        if (str_contains($t, 'reg no') || str_contains($t, 'reg_no') || str_contains($t, 'no reg') || str_contains($t, 'asset no') || str_contains($t, 'no asset') || str_contains($t, 'no aset')) {
+                            $hasReg = true;
+                        }
+                        if (str_contains($t, 'nbv') || str_contains($t, 'nilai buku') || str_contains($t, 'book value')) {
+                            $hasNbv = true;
+                        }
+                    }
+
+                    if ($hasSite || ($hasReg && $hasNbv)) {
+                        $headerRowIdx = $r;
+                        foreach ($normalized as $c => $t) {
+                            if ($t !== '') {
+                                $headerMap[$t] = $c;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                if ($headerRowIdx === -1 && !empty($sampleRows)) {
+                    $firstKey = array_key_first($sampleRows);
+                    $headerRowIdx = $firstKey;
+                    foreach ($sampleRows[$firstKey] as $c => $val) {
+                        $t = strtolower(trim((string) $val));
+                        if ($t !== '') {
+                            $headerMap[$t] = $c;
+                        }
+                    }
+                }
+
+                $findColIdx = function (array $aliases) use ($headerMap) {
+                    foreach ($aliases as $a) {
+                        if (isset($headerMap[$a])) {
+                            return $headerMap[$a];
+                        }
+                    }
+                    foreach ($headerMap as $h => $idx) {
+                        foreach ($aliases as $a) {
+                            if (str_contains($h, $a)) {
+                                return $idx;
+                            }
+                        }
+                    }
+                    return null;
+                };
+
+                return [
+                    'header_row' => $headerRowIdx,
+                    'sitecode' => $findColIdx(['sitecode', 'site code', 'kode site', 'kode_site', 'site_code', 'site']),
+                    'reg_no' => $findColIdx(['reg no', 'reg_no', 'no reg', 'no. reg', 'regno', 'registration no', 'asset no', 'no asset', 'no. asset', 'no aset', 'no. aset', 'nomor asset', 'nomor aset']),
+                    'name' => $findColIdx(['name', 'asset name', 'nama asset', 'nama aset', 'item name', 'nama barang', 'deskripsi aset', 'description', 'nama']),
+                    'sn' => $findColIdx(['sn', 'serial number', 'serial no', 'no seri', 'nomor seri', 's/n', 'serial_number', 'serial']),
+                    'nbv' => $findColIdx(['nbv', 'net book value', 'nilai buku', 'book value', 'nilai_buku', 'book_value']),
+                ];
+            };
+
+            // High-performance batch multi-row insert helper
+            $flushBatch = function (PDO $db, array &$batch): int {
+                if (empty($batch)) return 0;
+                $count = count($batch);
+                $rowPlaceholder = '(?, ?, ?, ?, ?, ?, ?)';
+                $placeholders = implode(', ', array_fill(0, $count, $rowPlaceholder));
+                $sql = "INSERT INTO rekap_db_master (sitecode, reg_no, name, sn, nbv, period_month, period_year) VALUES " . $placeholders;
+                $params = [];
+                foreach ($batch as $r) {
+                    $params[] = $r['sitecode'];
+                    $params[] = $r['reg_no'];
+                    $params[] = $r['name'];
+                    $params[] = $r['sn'];
+                    $params[] = $r['nbv'];
+                    $params[] = $r['month'];
+                    $params[] = $r['year'];
+                }
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+                $batch = [];
+                return $count;
+            };
+
             if ($replaceExisting) {
                 $delStmt = $db->prepare('DELETE FROM rekap_db_master WHERE period_month = :m AND period_year = :y');
                 $delStmt->execute([':m' => $month, ':y' => $year]);
             }
 
-            $insertStmt = $db->prepare("
-                INSERT INTO rekap_db_master (sitecode, reg_no, name, sn, nbv, period_month, period_year)
-                VALUES (:sitecode, :reg_no, :name, :sn, :nbv, :month, :year)
-            ");
-
             $importedCount = 0;
-            $batchCount = 0;
+            $batch = [];
+            $BATCH_SIZE = 500;
+
             $db->beginTransaction();
 
-            // Iterate rows directly using RowIterator to keep memory low
-            $rowIterator = $sheet->getRowIterator($headerRowIdx + 1);
-            foreach ($rowIterator as $row) {
-                $r = $row->getRowIndex();
+            try {
+                // PARSER SELECTION:
+                // 1) CSV: Stream line-by-line using fgetcsv (Ultra fast, <2MB RAM)
+                if ($ext === 'csv') {
+                    $handle = fopen($tmpPath, 'r');
+                    if (!$handle) {
+                        throw new Exception("Gagal membuka file CSV");
+                    }
 
-                $sitecode = $colSitecode !== null ? trim((string) $sheet->getCell([$colSitecode, $r])->getValue()) : '';
-                $regNo = $colRegNo !== null ? trim((string) $sheet->getCell([$colRegNo, $r])->getValue()) : '';
-                $name = $colName !== null ? trim((string) $sheet->getCell([$colName, $r])->getValue()) : '';
-                $sn = $colSn !== null ? trim((string) $sheet->getCell([$colSn, $r])->getValue()) : '';
-                $nbvVal = $colNbv !== null ? $sheet->getCell([$colNbv, $r])->getValue() : 0;
-                $nbv = $parseNbv($nbvVal);
+                    // Check BOM
+                    $bom = fread($handle, 3);
+                    if ($bom !== "\xEF\xBB\xBF") {
+                        rewind($handle);
+                    }
 
-                // Skip completely blank rows
-                if ($sitecode === '' && $regNo === '' && $name === '' && $sn === '' && $nbv == 0.0) {
-                    continue;
+                    // Detect separator (, or ; or \t)
+                    $firstLine = fgets($handle);
+                    rewind($handle);
+                    if ($bom === "\xEF\xBB\xBF") {
+                        fread($handle, 3);
+                    }
+                    $delimiter = ',';
+                    if (substr_count($firstLine, ';') > substr_count($firstLine, ',')) {
+                        $delimiter = ';';
+                    } elseif (substr_count($firstLine, "\t") > substr_count($firstLine, ',')) {
+                        $delimiter = "\t";
+                    }
+
+                    // Read first 15 lines to sample headers
+                    $sampleRows = [];
+                    $lineNo = 1;
+                    while (($row = fgetcsv($handle, 0, $delimiter)) !== false && $lineNo <= 15) {
+                        $colData = [];
+                        foreach ($row as $ci => $cv) {
+                            $colData[$ci + 1] = $cv;
+                        }
+                        $sampleRows[$lineNo] = $colData;
+                        $lineNo++;
+                    }
+
+                    $cols = $detectColumns($sampleRows);
+                    $headerRow = $cols['header_row'];
+
+                    // Rewind and process data
+                    rewind($handle);
+                    if ($bom === "\xEF\xBB\xBF") {
+                        fread($handle, 3);
+                    }
+
+                    $currentLine = 0;
+                    while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+                        $currentLine++;
+                        if ($currentLine <= $headerRow) {
+                            continue;
+                        }
+
+                        $colData = [];
+                        foreach ($row as $ci => $cv) {
+                            $colData[$ci + 1] = $cv;
+                        }
+
+                        $sitecode = $cols['sitecode'] !== null ? trim((string)($colData[$cols['sitecode']] ?? '')) : '';
+                        $regNo    = $cols['reg_no'] !== null ? trim((string)($colData[$cols['reg_no']] ?? '')) : '';
+                        $name     = $cols['name'] !== null ? trim((string)($colData[$cols['name']] ?? '')) : '';
+                        $sn       = $cols['sn'] !== null ? trim((string)($colData[$cols['sn']] ?? '')) : '';
+                        $nbvVal   = $cols['nbv'] !== null ? ($colData[$cols['nbv']] ?? 0) : 0;
+                        $nbv      = $parseNbv($nbvVal);
+
+                        if ($sitecode === '' && $regNo === '' && $name === '' && $sn === '' && $nbv == 0.0) {
+                            continue;
+                        }
+
+                        $batch[] = [
+                            'sitecode' => $sitecode,
+                            'reg_no' => $regNo,
+                            'name' => $name,
+                            'sn' => $sn,
+                            'nbv' => $nbv,
+                            'month' => $month,
+                            'year' => $year
+                        ];
+                        $importedCount++;
+
+                        if (count($batch) >= $BATCH_SIZE) {
+                            $flushBatch($db, $batch);
+                        }
+                    }
+                    fclose($handle);
+
+                // 2) XLSX: Fast XMLReader streaming (ZipArchive + XMLReader, low RAM, <5 seconds)
+                } elseif ($ext === 'xlsx' && class_exists('ZipArchive') && class_exists('XMLReader')) {
+                    $usedStreaming = false;
+                    $tempSheet = null;
+                    try {
+                        $zip = new ZipArchive();
+                        if ($zip->open($tmpPath) !== true) {
+                            throw new Exception("Cannot open XLSX archive");
+                        }
+
+                        // Shared strings
+                        $sharedStrings = [];
+                        $ssStream = $zip->getStream('xl/sharedStrings.xml');
+                        if ($ssStream) {
+                            $tempSs = tempnam(sys_get_temp_dir(), 'ss_');
+                            $fp = fopen($tempSs, 'w');
+                            stream_copy_to_stream($ssStream, $fp);
+                            fclose($fp);
+                            fclose($ssStream);
+
+                            $xmlSs = new XMLReader();
+                            $xmlSs->open($tempSs);
+                            $currentStr = '';
+                            $inT = false;
+                            while ($xmlSs->read()) {
+                                if ($xmlSs->nodeType === XMLReader::ELEMENT) {
+                                    if ($xmlSs->name === 'si') {
+                                        $currentStr = '';
+                                    } elseif ($xmlSs->name === 't') {
+                                        $inT = true;
+                                    }
+                                } elseif ($xmlSs->nodeType === XMLReader::TEXT || $xmlSs->nodeType === XMLReader::CDATA) {
+                                    if ($inT) {
+                                        $currentStr .= $xmlSs->value;
+                                    }
+                                } elseif ($xmlSs->nodeType === XMLReader::END_ELEMENT) {
+                                    if ($xmlSs->name === 't') {
+                                        $inT = false;
+                                    } elseif ($xmlSs->name === 'si') {
+                                        $sharedStrings[] = $currentStr;
+                                    }
+                                }
+                            }
+                            $xmlSs->close();
+                            @unlink($tempSs);
+                        }
+
+                        // Find worksheet XML
+                        $sheetName = 'xl/worksheets/sheet1.xml';
+                        $sheetStream = $zip->getStream($sheetName);
+                        if (!$sheetStream) {
+                            for ($i = 0; $i < $zip->numFiles; $i++) {
+                                $snCandidate = $zip->statIndex($i)['name'];
+                                if (preg_match('#^xl/worksheets/sheet\d+\.xml$#i', $snCandidate)) {
+                                    $sheetName = $snCandidate;
+                                    $sheetStream = $zip->getStream($sheetName);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!$sheetStream) {
+                            throw new Exception("Worksheet XML not found in XLSX");
+                        }
+
+                        $tempSheet = tempnam(sys_get_temp_dir(), 'sh_');
+                        $fp = fopen($tempSheet, 'w');
+                        stream_copy_to_stream($sheetStream, $fp);
+                        fclose($fp);
+                        fclose($sheetStream);
+                        $zip->close();
+
+                        // Col index conversion helper
+                        $colLetterToIdx = function (string $col): int {
+                            $len = strlen($col);
+                            $idx = 0;
+                            for ($i = 0; $i < $len; $i++) {
+                                $idx = $idx * 26 + (ord(strtoupper($col[$i])) - ord('A') + 1);
+                            }
+                            return $idx;
+                        };
+
+                        // First pass: sample up to 15 rows for column detection
+                        $reader = new XMLReader();
+                        $reader->open($tempSheet);
+
+                        $sampleRows = [];
+                        $currentRow = [];
+                        $currentCellCol = null;
+                        $currentCellType = null;
+                        $currentCellValue = '';
+                        $inValue = false;
+                        $rowIndex = 1;
+
+                        while ($reader->read()) {
+                            if ($reader->nodeType === XMLReader::ELEMENT) {
+                                if ($reader->name === 'row') {
+                                    $currentRow = [];
+                                    $rAttr = $reader->getAttribute('r');
+                                    if ($rAttr !== null) {
+                                        $rowIndex = (int)$rAttr;
+                                    }
+                                } elseif ($reader->name === 'c') {
+                                    $currentCellType = $reader->getAttribute('t');
+                                    $r = $reader->getAttribute('r');
+                                    if ($r !== null && preg_match('/^([A-Z]+)(\d+)/', $r, $m)) {
+                                        $currentCellCol = $colLetterToIdx($m[1]);
+                                    } else {
+                                        $currentCellCol = empty($currentRow) ? 1 : (max(array_keys($currentRow)) + 1);
+                                    }
+                                    $currentCellValue = '';
+                                } elseif ($reader->name === 'v' || $reader->name === 't') {
+                                    $inValue = true;
+                                }
+                            } elseif ($reader->nodeType === XMLReader::TEXT || $reader->nodeType === XMLReader::CDATA) {
+                                if ($inValue) {
+                                    $currentCellValue .= $reader->value;
+                                }
+                            } elseif ($reader->nodeType === XMLReader::END_ELEMENT) {
+                                if ($reader->name === 'v' || $reader->name === 't') {
+                                    $inValue = false;
+                                } elseif ($reader->name === 'c') {
+                                    $finalValue = $currentCellValue;
+                                    if ($currentCellType === 's') {
+                                        $ssIdx = (int)$currentCellValue;
+                                        $finalValue = $sharedStrings[$ssIdx] ?? '';
+                                    } elseif ($currentCellType === 'b') {
+                                        $finalValue = ($currentCellValue === '1') ? '1' : '0';
+                                    }
+                                    if ($currentCellCol !== null) {
+                                        $currentRow[$currentCellCol] = $finalValue;
+                                    }
+                                    $currentCellCol = null;
+                                    $currentCellType = null;
+                                    $currentCellValue = '';
+                                } elseif ($reader->name === 'row') {
+                                    if (!empty($currentRow)) {
+                                        $sampleRows[$rowIndex] = $currentRow;
+                                        if (count($sampleRows) >= 15) {
+                                            break;
+                                        }
+                                    }
+                                    $rowIndex++;
+                                }
+                            }
+                        }
+                        $reader->close();
+
+                        $cols = $detectColumns($sampleRows);
+                        $headerRow = $cols['header_row'];
+
+                        // Second pass: stream and batch insert all data rows
+                        $reader->open($tempSheet);
+                        $currentRow = [];
+                        $currentCellCol = null;
+                        $currentCellType = null;
+                        $currentCellValue = '';
+                        $inValue = false;
+                        $rowIndex = 1;
+
+                        while ($reader->read()) {
+                            if ($reader->nodeType === XMLReader::ELEMENT) {
+                                if ($reader->name === 'row') {
+                                    $currentRow = [];
+                                    $rAttr = $reader->getAttribute('r');
+                                    if ($rAttr !== null) {
+                                        $rowIndex = (int)$rAttr;
+                                    }
+                                } elseif ($reader->name === 'c') {
+                                    $currentCellType = $reader->getAttribute('t');
+                                    $r = $reader->getAttribute('r');
+                                    if ($r !== null && preg_match('/^([A-Z]+)(\d+)/', $r, $m)) {
+                                        $currentCellCol = $colLetterToIdx($m[1]);
+                                    } else {
+                                        $currentCellCol = empty($currentRow) ? 1 : (max(array_keys($currentRow)) + 1);
+                                    }
+                                    $currentCellValue = '';
+                                } elseif ($reader->name === 'v' || $reader->name === 't') {
+                                    $inValue = true;
+                                }
+                            } elseif ($reader->nodeType === XMLReader::TEXT || $reader->nodeType === XMLReader::CDATA) {
+                                if ($inValue) {
+                                    $currentCellValue .= $reader->value;
+                                }
+                            } elseif ($reader->nodeType === XMLReader::END_ELEMENT) {
+                                if ($reader->name === 'v' || $reader->name === 't') {
+                                    $inValue = false;
+                                } elseif ($reader->name === 'c') {
+                                    $finalValue = $currentCellValue;
+                                    if ($currentCellType === 's') {
+                                        $ssIdx = (int)$currentCellValue;
+                                        $finalValue = $sharedStrings[$ssIdx] ?? '';
+                                    } elseif ($currentCellType === 'b') {
+                                        $finalValue = ($currentCellValue === '1') ? '1' : '0';
+                                    }
+                                    if ($currentCellCol !== null) {
+                                        $currentRow[$currentCellCol] = $finalValue;
+                                    }
+                                    $currentCellCol = null;
+                                    $currentCellType = null;
+                                    $currentCellValue = '';
+                                } elseif ($reader->name === 'row') {
+                                    if ($rowIndex > $headerRow && !empty($currentRow)) {
+                                        $sitecode = $cols['sitecode'] !== null ? trim((string)($currentRow[$cols['sitecode']] ?? '')) : '';
+                                        $regNo    = $cols['reg_no'] !== null ? trim((string)($currentRow[$cols['reg_no']] ?? '')) : '';
+                                        $name     = $cols['name'] !== null ? trim((string)($currentRow[$cols['name']] ?? '')) : '';
+                                        $sn       = $cols['sn'] !== null ? trim((string)($currentRow[$cols['sn']] ?? '')) : '';
+                                        $nbvVal   = $cols['nbv'] !== null ? ($currentRow[$cols['nbv']] ?? 0) : 0;
+                                        $nbv      = $parseNbv($nbvVal);
+
+                                        if (!($sitecode === '' && $regNo === '' && $name === '' && $sn === '' && $nbv == 0.0)) {
+                                            $batch[] = [
+                                                'sitecode' => $sitecode,
+                                                'reg_no' => $regNo,
+                                                'name' => $name,
+                                                'sn' => $sn,
+                                                'nbv' => $nbv,
+                                                'month' => $month,
+                                                'year' => $year
+                                            ];
+                                            $importedCount++;
+
+                                            if (count($batch) >= $BATCH_SIZE) {
+                                                $flushBatch($db, $batch);
+                                            }
+                                        }
+                                    }
+                                    $rowIndex++;
+                                }
+                            }
+                        }
+                        $reader->close();
+                        @unlink($tempSheet);
+                        $usedStreaming = true;
+                    } catch (Throwable $streamEx) {
+                        error_log('XLSX streaming fallback: ' . $streamEx->getMessage());
+                        $usedStreaming = false;
+                        if (!empty($tempSheet) && file_exists($tempSheet)) {
+                            @unlink($tempSheet);
+                        }
+                    }
+
+                    // Fallback to PhpSpreadsheet if streaming failed
+                    if (!$usedStreaming) {
+                        $reader = IOFactory::createReaderForFile($tmpPath);
+                        $reader->setReadDataOnly(true);
+                        $reader->setReadEmptyCells(false);
+                        $spreadsheet = $reader->load($tmpPath);
+                        $sheet = $spreadsheet->getActiveSheet();
+                        $rows = $sheet->toArray(null, true, false, false);
+
+                        $sampleRows = [];
+                        for ($i = 0; $i < min(15, count($rows)); $i++) {
+                            $colData = [];
+                            foreach ($rows[$i] as $ci => $cv) {
+                                $colData[$ci + 1] = $cv;
+                            }
+                            $sampleRows[$i + 1] = $colData;
+                        }
+                        $cols = $detectColumns($sampleRows);
+                        $headerRow = $cols['header_row'];
+
+                        for ($i = $headerRow; $i < count($rows); $i++) {
+                            $row = $rows[$i];
+                            $colData = [];
+                            foreach ($row as $ci => $cv) {
+                                $colData[$ci + 1] = $cv;
+                            }
+
+                            $sitecode = $cols['sitecode'] !== null ? trim((string)($colData[$cols['sitecode']] ?? '')) : '';
+                            $regNo    = $cols['reg_no'] !== null ? trim((string)($colData[$cols['reg_no']] ?? '')) : '';
+                            $name     = $cols['name'] !== null ? trim((string)($colData[$cols['name']] ?? '')) : '';
+                            $sn       = $cols['sn'] !== null ? trim((string)($colData[$cols['sn']] ?? '')) : '';
+                            $nbvVal   = $cols['nbv'] !== null ? ($colData[$cols['nbv']] ?? 0) : 0;
+                            $nbv      = $parseNbv($nbvVal);
+
+                            if ($sitecode === '' && $regNo === '' && $name === '' && $sn === '' && $nbv == 0.0) {
+                                continue;
+                            }
+
+                            $batch[] = [
+                                'sitecode' => $sitecode,
+                                'reg_no' => $regNo,
+                                'name' => $name,
+                                'sn' => $sn,
+                                'nbv' => $nbv,
+                                'month' => $month,
+                                'year' => $year
+                            ];
+                            $importedCount++;
+
+                            if (count($batch) >= $BATCH_SIZE) {
+                                $flushBatch($db, $batch);
+                            }
+                        }
+                        $spreadsheet->disconnectWorksheets();
+                        unset($spreadsheet, $sheet, $rows);
+                    }
+
+                // 3) XLS / Other formats via PhpSpreadsheet
+                } else {
+                    $reader = IOFactory::createReaderForFile($tmpPath);
+                    $reader->setReadDataOnly(true);
+                    $reader->setReadEmptyCells(false);
+                    $spreadsheet = $reader->load($tmpPath);
+                    $sheet = $spreadsheet->getActiveSheet();
+                    $rows = $sheet->toArray(null, true, false, false);
+
+                    $sampleRows = [];
+                    for ($i = 0; $i < min(15, count($rows)); $i++) {
+                        $colData = [];
+                        foreach ($rows[$i] as $ci => $cv) {
+                            $colData[$ci + 1] = $cv;
+                        }
+                        $sampleRows[$i + 1] = $colData;
+                    }
+                    $cols = $detectColumns($sampleRows);
+                    $headerRow = $cols['header_row'];
+
+                    for ($i = $headerRow; $i < count($rows); $i++) {
+                        $row = $rows[$i];
+                        $colData = [];
+                        foreach ($row as $ci => $cv) {
+                            $colData[$ci + 1] = $cv;
+                        }
+
+                        $sitecode = $cols['sitecode'] !== null ? trim((string)($colData[$cols['sitecode']] ?? '')) : '';
+                        $regNo    = $cols['reg_no'] !== null ? trim((string)($colData[$cols['reg_no']] ?? '')) : '';
+                        $name     = $cols['name'] !== null ? trim((string)($colData[$cols['name']] ?? '')) : '';
+                        $sn       = $cols['sn'] !== null ? trim((string)($colData[$cols['sn']] ?? '')) : '';
+                        $nbvVal   = $cols['nbv'] !== null ? ($colData[$cols['nbv']] ?? 0) : 0;
+                        $nbv      = $parseNbv($nbvVal);
+
+                        if ($sitecode === '' && $regNo === '' && $name === '' && $sn === '' && $nbv == 0.0) {
+                            continue;
+                        }
+
+                        $batch[] = [
+                            'sitecode' => $sitecode,
+                            'reg_no' => $regNo,
+                            'name' => $name,
+                            'sn' => $sn,
+                            'nbv' => $nbv,
+                            'month' => $month,
+                            'year' => $year
+                        ];
+                        $importedCount++;
+
+                        if (count($batch) >= $BATCH_SIZE) {
+                            $flushBatch($db, $batch);
+                        }
+                    }
+                    $spreadsheet->disconnectWorksheets();
+                    unset($spreadsheet, $sheet, $rows);
                 }
 
-                $insertStmt->execute([
-                    ':sitecode' => $sitecode,
-                    ':reg_no' => $regNo,
-                    ':name' => $name,
-                    ':sn' => $sn,
-                    ':nbv' => $nbv,
-                    ':month' => $month,
-                    ':year' => $year,
-                ]);
-                $importedCount++;
-                $batchCount++;
-
-                // Commit in chunks to prevent large transaction buffer & free memory
-                if ($batchCount >= 1000) {
-                    $db->commit();
-                    $db->beginTransaction();
-                    $batchCount = 0;
+                // Flush remaining rows
+                if (!empty($batch)) {
+                    $flushBatch($db, $batch);
                 }
-            }
 
-            if ($db->inTransaction()) {
                 $db->commit();
+
+                echo json_encode([
+                    'success' => true,
+                    'imported_count' => $importedCount,
+                    'month' => $month,
+                    'year' => $year,
+                    'message' => "Berhasil mengimpor {$importedCount} data Rekap DB Master Data untuk periode {$month}/{$year}"
+                ]);
+                exit;
+
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Gagal mengimpor file: ' . $e->getMessage()
+                ]);
+                exit;
             }
-
-            // Free spreadsheet memory
-            $spreadsheet->disconnectWorksheets();
-            unset($spreadsheet, $sheet);
-
-            echo json_encode([
-                'success' => true,
-                'imported_count' => $importedCount,
-                'month' => $month,
-                'year' => $year,
-                'message' => "Berhasil mengimpor {$importedCount} data Rekap DB Master Data untuk periode {$month}/{$year}"
-            ]);
-            exit;
         }
 
         // 2. DELETE SINGLE RECORD

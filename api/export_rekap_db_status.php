@@ -42,22 +42,6 @@ try {
     if ($currMonth < 1 || $currMonth > 12)
         $currMonth = 2;
 
-    if (isset($payload['compare_month']) && $payload['compare_month'] !== '') {
-        $prevMonth = (int) $payload['compare_month'];
-        $prevYear = (int) ($payload['compare_year'] ?? $currYear);
-    } elseif (isset($_GET['compare_month']) && $_GET['compare_month'] !== '') {
-        $prevMonth = (int) $_GET['compare_month'];
-        $prevYear = (int) ($_GET['compare_year'] ?? $currYear);
-    } else {
-        if ($currMonth === 1) {
-            $prevMonth = 12;
-            $prevYear = $currYear - 1;
-        } else {
-            $prevMonth = $currMonth - 1;
-            $prevYear = $currYear;
-        }
-    }
-
     $category = trim($payload['category'] ?? $_GET['category'] ?? 'pmd');
     $catLabel = trim($payload['category_label'] ?? $_GET['category_label'] ?? '');
     if (empty($catLabel)) {
@@ -71,6 +55,42 @@ try {
     }
 
     $soType         = strtolower(trim($payload['so_type'] ?? $_GET['so_type'] ?? 'monthly'));
+    $isQuarterly    = ($soType === 'quarterly' || in_array($category, [
+        'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+    ], true));
+
+    if (isset($payload['compare_month']) && $payload['compare_month'] !== '') {
+        $prevMonth = (int) $payload['compare_month'];
+        $prevYear = (int) ($payload['compare_year'] ?? $currYear);
+    } elseif (isset($_GET['compare_month']) && $_GET['compare_month'] !== '') {
+        $prevMonth = (int) $_GET['compare_month'];
+        $prevYear = (int) ($_GET['compare_year'] ?? $currYear);
+    } else {
+        if ($isQuarterly) {
+            if ($currMonth <= 3) {
+                $prevMonth = 12;
+                $prevYear  = $currYear - 1;
+            } elseif ($currMonth <= 6) {
+                $prevMonth = 3;
+                $prevYear  = $currYear;
+            } elseif ($currMonth <= 9) {
+                $prevMonth = 6;
+                $prevYear  = $currYear;
+            } else {
+                $prevMonth = 9;
+                $prevYear  = $currYear;
+            }
+        } else {
+            if ($currMonth === 1) {
+                $prevMonth = 12;
+                $prevYear = $currYear - 1;
+            } else {
+                $prevMonth = $currMonth - 1;
+                $prevYear = $currYear;
+            }
+        }
+    }
+
     $deptFilter     = trim($payload['dept'] ?? $_GET['dept'] ?? 'all');
     $subDeptFilter  = trim($payload['sub_dept'] ?? $_GET['sub_dept'] ?? 'all');
     $sitecodeFilter = trim($payload['sitecode'] ?? $_GET['sitecode'] ?? 'all');
@@ -83,12 +103,13 @@ try {
     $currMonthLabel = ($monthNames[$currMonth] ?? '') . " " . $currYear;
     $prevMonthLabel = ($monthNames[$prevMonth] ?? '') . " " . $prevYear;
 
-    // 1. Resolve valid sites for Category & SO Type from Site Master Data (site_regional)
     $isQuarterly = ($soType === 'quarterly' || in_array($category, [
         'quarterly_outlet',
         'quarterly_subarep',
         'quarterly_warehouse',
-        'quarterly_warehouse_hub'
+        'quarterly_warehouse_hub',
+        'quarterly_tekno',
+        'quarterly_warehouse_tekno'
     ], true));
 
     $whereCatParts = [
@@ -107,7 +128,9 @@ try {
         )"
     ];
 
-    if ($category === 'pmd' || $category === 'monthly_pmd') {
+    if ($category === 'all') {
+        // No dept filter for all category
+    } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
         $whereCatParts[] = "sr.dept = 'PMD'";
     } else {
         $whereCatParts[] = "sr.dept != 'PMD'";
@@ -159,27 +182,51 @@ try {
             continue;
         }
 
-        if ($isQuarterly) {
-            if ($isPmd || $effGroup !== 'quarterly') {
+        $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
+        if ($category === 'all') {
+            if ($isQuarterly) {
+                if ($effGroup !== 'quarterly') continue;
+            } else {
+                if ($effGroup !== 'monthly') continue;
+            }
+        } elseif ($isQuarterly) {
+            if ($isPmd) {
                 continue;
             }
 
             $info = trim($s['info'] ?? '');
-            if ($category === 'warehouse_hub' || $category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
-                if (!in_array($info, ['Under Warehouse', 'HUB'], true)) {
+            if ($category === 'warehouse_tekno' || $category === 'quarterly_tekno' || $category === 'quarterly_warehouse_tekno') {
+                if (!$isTekno || $effGroup !== 'quarterly') {
+                    continue;
+                }
+            } elseif ($category === 'warehouse_hub' || $category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
+                if ($isTekno || ($info !== 'HUB Quarterly' && !($effGroup === 'quarterly' && $info === 'HUB'))) {
                     continue;
                 }
             } else {
-                if (!in_array($info, ['Subarep', 'Outlet', ''], true) && !empty($info)) {
+                if ($isTekno || $effGroup !== 'quarterly' || (!in_array($info, ['Subarep', 'Outlet', ''], true) && !empty($info))) {
                     continue;
                 }
             }
         } else {
+            $info = trim($s['info'] ?? '');
             if ($category === 'pmd' || $category === 'monthly_pmd') {
                 if (!$isPmd)
                     continue;
+            } elseif ($category === 'warehouse_tekno' || $category === 'monthly_tekno' || $category === 'monthly_warehouse_tekno') {
+                if ($isPmd || !$isTekno || $effGroup !== 'monthly') {
+                    continue;
+                }
+            } elseif ($category === 'warehouse_hub' || $category === 'monthly_warehouse' || $category === 'monthly_warehouse_hub') {
+                if ($isPmd || $isTekno || ($info !== 'HUB Monthly' && !($effGroup === 'monthly' && $info === 'HUB'))) {
+                    continue;
+                }
+            } elseif ($category === 'it_coorporate' || $category === 'it_corporate' || $category === 'monthly_it_coorporate') {
+                if ($isPmd || !in_array($info, ['IT Coorporate', 'IT Corporate'], true)) {
+                    continue;
+                }
             } else {
-                if ($isPmd || $effGroup !== 'monthly') {
+                if ($isPmd || $isTekno || $effGroup !== 'monthly' || in_array($info, ['HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB'], true)) {
                     continue;
                 }
             }
@@ -527,10 +574,14 @@ try {
 
     // Table Column Headers (Row 13)
     $headerRow = 13;
+    $isPmdCategory = (stripos($category, 'pmd') !== false);
+    $deptHeader = $isPmdCategory ? 'DIVISI' : 'DEPT';
+    $subDeptHeader = $isPmdCategory ? 'DEPT' : 'SUB DEPT';
+
     $headers = [
         'A' => 'NO',
-        'B' => 'DEPT',
-        'C' => 'SUB DEPT',
+        'B' => $deptHeader,
+        'C' => $subDeptHeader,
         'D' => 'SITECODE',
         'E' => 'NAMA SITE',
         'F' => 'REG NO',
