@@ -535,23 +535,10 @@ try {
                               notes = EXCLUDED.notes
             ");
 
-            // 3. Clear any stale uncounted rule for period <= selected period
+            // 3. Clear any pending next period uncounted rules
             $db->exec("
                 DELETE FROM site_group_history
-                WHERE group_type = 'uncounted'
-                  AND (effective_year < {$selectedYear} OR (effective_year = {$selectedYear} AND effective_month <= {$selectedMonth}))
-            ");
-
-            // 4. Set subsequent period to uncounted for all active sites
-            $nextYear = ($selectedMonth === 12) ? ($selectedYear + 1) : $selectedYear;
-            $nextMonth = ($selectedMonth === 12) ? 1 : ($selectedMonth + 1);
-            $db->exec("
-                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
-                SELECT sr.sitecode, 'uncounted', {$nextYear}, {$nextMonth}, 'Pending next period SO Master Data upload'
-                FROM site_regional sr
-                WHERE COALESCE(sr.is_active, TRUE) = TRUE
-                ON CONFLICT (sitecode, effective_year, effective_month)
-                DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
+                WHERE notes = 'Pending next period SO Master Data upload'
             ");
 
             // 5. Update site_regional group_type to 'quarterly' for sites with quarterly profile

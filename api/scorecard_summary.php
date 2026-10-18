@@ -31,7 +31,13 @@ try {
     $year = (int)($_GET['year'] ?? 2026);
     if ($year < 2000 || $year > 2100) $year = 2026;
 
-    $month = (int)($_GET['month'] ?? 9);
+    if (empty($_GET['month'])) {
+        $stmtMax = $db->prepare("SELECT MAX(period_month) as max_m FROM asset_reconciliation WHERE period_year = :y");
+        $stmtMax->execute([':y' => $year]);
+        $month = (int)($stmtMax->fetchColumn() ?: 9);
+    } else {
+        $month = (int)$_GET['month'];
+    }
     if ($month < 1 || $month > 12) $month = 9;
 
     $category = trim($_GET['category'] ?? 'pmd');

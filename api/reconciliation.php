@@ -34,7 +34,7 @@ try {
         // Helper function to get effective group types for a given period
         $getEffectiveTypes = function (PDO $db, ?int $y, ?int $m): array {
             $year = $y ?: (int) date('Y');
-            $month = $m ?: (int) date('n');
+            $month = $m ?: 12;
 
             $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
             $map = [];

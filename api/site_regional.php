@@ -595,7 +595,7 @@ try {
         }
 
         // Helper function for profile syncing (used by sync_profile and sync_all_profiles)
-        $executeSyncSite = function($site, $maxYear, $maxMonth, $nextYear, $nextMonth) use ($db) {
+        $executeSyncSite = function($site, $maxYear, $maxMonth) use ($db) {
             $sc = strtoupper(trim($site['sitecode'] ?? ''));
             if ($sc === '') return ['mapped' => 0, 'group_type' => 'monthly'];
             $isPmd = (strtoupper(trim($site['dept'] ?? '')) === 'PMD');
@@ -663,27 +663,13 @@ try {
                 }
             }
 
-            // 2. Remove any stale uncounted rule for periods <= latest uploaded SO period
-            $delStaleUncounted = $db->prepare("
+            // Remove any pending next period uncounted rule
+            $delPendingUncounted = $db->prepare("
                 DELETE FROM site_group_history
                 WHERE UPPER(sitecode) = :sc
-                  AND group_type = 'uncounted'
-                  AND (effective_year < :maxY OR (effective_year = :maxY AND effective_month <= :maxM))
+                  AND notes = 'Pending next period SO Master Data upload'
             ");
-            $delStaleUncounted->execute([':sc' => $sc, ':maxY' => $maxYear, ':maxM' => $maxMonth]);
-
-            // 3. Set the subsequent period (not yet uploaded) to uncounted
-            $insertNextUncounted = $db->prepare("
-                INSERT INTO site_group_history (sitecode, group_type, effective_year, effective_month, notes)
-                VALUES (:sc, 'uncounted', :nextY, :nextM, 'Pending next period SO Master Data upload')
-                ON CONFLICT (sitecode, effective_year, effective_month)
-                DO UPDATE SET group_type = EXCLUDED.group_type, notes = EXCLUDED.notes
-            ");
-            $insertNextUncounted->execute([
-                ':sc' => $sc,
-                ':nextY' => $nextYear,
-                ':nextM' => $nextMonth
-            ]);
+            $delPendingUncounted->execute([':sc' => $sc]);
 
             $targetGt = $isPmd ? 'monthly' : ($hasQuarterly ? 'quarterly' : $latestType);
 
@@ -747,14 +733,11 @@ try {
             $maxYear = $maxRow ? (int)$maxRow['period_year'] : (int)date('Y');
             $maxMonth = $maxRow ? (int)$maxRow['period_month'] : (int)date('n');
 
-            $nextYear = ($maxMonth === 12) ? ($maxYear + 1) : $maxYear;
-            $nextMonth = ($maxMonth === 12) ? 1 : ($maxMonth + 1);
-
-            $res = $executeSyncSite($siteRow, $maxYear, $maxMonth, $nextYear, $nextMonth);
+            $res = $executeSyncSite($siteRow, $maxYear, $maxMonth);
 
             $message = $res['mapped_count'] > 0 
-                ? "Berhasil sinkronisasi: {$res['mapped_count']} periode profil dipetakan (Group Type: " . ucfirst($res['group_type']) . ", periode {$nextMonth}/{$nextYear} diset Uncounted)"
-                : "Sinkronisasi selesai (Group Type tetap: " . ucfirst($res['group_type']) . ", periode {$nextMonth}/{$nextYear} diset Uncounted)";
+                ? "Berhasil sinkronisasi: {$res['mapped_count']} periode profil dipetakan (Group Type: " . ucfirst($res['group_type']) . ")"
+                : "Sinkronisasi selesai (Group Type tetap: " . ucfirst($res['group_type']) . ")";
 
             echo json_encode([
                 'success'      => true,
@@ -773,9 +756,6 @@ try {
             $maxYear = $maxRow ? (int)$maxRow['period_year'] : (int)date('Y');
             $maxMonth = $maxRow ? (int)$maxRow['period_month'] : (int)date('n');
 
-            $nextYear = ($maxMonth === 12) ? ($maxYear + 1) : $maxYear;
-            $nextMonth = ($maxMonth === 12) ? 1 : ($maxMonth + 1);
-
             $allSitesStmt = $db->query("SELECT id, sitecode, dept, group_type, category FROM site_regional ORDER BY id ASC");
             $allSites = $allSitesStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -784,8 +764,11 @@ try {
 
             $db->beginTransaction();
             try {
+                // Clean up any remaining pending next period uncounted rules
+                $db->exec("DELETE FROM site_group_history WHERE notes = 'Pending next period SO Master Data upload'");
+
                 foreach ($allSites as $s) {
-                    $res = $executeSyncSite($s, $maxYear, $maxMonth, $nextYear, $nextMonth);
+                    $res = $executeSyncSite($s, $maxYear, $maxMonth);
                     $syncedCount++;
                     $totalMapped += $res['mapped_count'];
                 }
@@ -801,11 +784,10 @@ try {
 
             echo json_encode([
                 'success'       => true,
-                'message'       => "Berhasil sinkronisasi {$syncedCount} site master data sampai periode {$maxMonth}/{$maxYear}. Periode {$nextMonth}/{$nextYear} diset Uncounted.",
+                'message'       => "Berhasil sinkronisasi {$syncedCount} site master data sampai periode {$maxMonth}/{$maxYear}.",
                 'total_sites'   => $syncedCount,
                 'total_mapped'  => $totalMapped,
-                'latest_period' => "{$maxMonth}/{$maxYear}",
-                'next_period'   => "{$nextMonth}/{$nextYear}"
+                'latest_period' => "{$maxMonth}/{$maxYear}"
             ]);
             exit;
         }

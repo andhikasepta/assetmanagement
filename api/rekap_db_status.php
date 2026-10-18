@@ -26,8 +26,14 @@ header('Cache-Control: no-store');
 try {
     $db = getDbConnection();
 
-    $currMonth = isset($_GET['month']) && $_GET['month'] !== '' && $_GET['month'] !== 'all' ? (int)$_GET['month'] : 2;
     $currYear  = isset($_GET['year']) && $_GET['year'] !== '' && $_GET['year'] !== 'all' ? (int)$_GET['year'] : 2026;
+    if (isset($_GET['month']) && $_GET['month'] !== '' && $_GET['month'] !== 'all') {
+        $currMonth = (int)$_GET['month'];
+    } else {
+        $stmtMaxDb = $db->prepare("SELECT MAX(period_month) as max_m FROM rekap_db_master WHERE period_year = :y");
+        $stmtMaxDb->execute([':y' => $currYear]);
+        $currMonth = (int)($stmtMaxDb->fetchColumn() ?: 9);
+    }
 
     $category       = trim($_GET['category'] ?? 'pmd');
     $soType         = trim($_GET['so_type'] ?? 'monthly');

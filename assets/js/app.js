@@ -3876,7 +3876,7 @@ const App = (() => {
             const savedMonth = sessionStorage.getItem('summary_filter_month');
             const savedYear = sessionStorage.getItem('summary_filter_year');
 
-            if (savedMonth && savedYear && monthSelect && yearSelect) {
+            if (savedMonth !== null && savedYear && monthSelect && yearSelect) {
                 if (Array.from(monthSelect.options).some(opt => opt.value === savedMonth)) {
                     monthSelect.value = savedMonth;
                 }
@@ -3918,7 +3918,7 @@ const App = (() => {
 
         // Save selected filter month & year to sessionStorage for reload persistence
         try {
-            if (month) sessionStorage.setItem('summary_filter_month', month);
+            if (month !== undefined && month !== null) sessionStorage.setItem('summary_filter_month', month);
             if (year) sessionStorage.setItem('summary_filter_year', year);
         } catch (e) { }
 
@@ -5139,8 +5139,8 @@ const App = (() => {
         } else if (masterMonthEl && masterMonthEl.value && masterMonthEl.value !== '') {
             rdbStatusMonth = parseInt(masterMonthEl.value, 10);
         } else {
-            // Default to February if master filter is "Semua Bulan"
-            rdbStatusMonth = 2;
+            // Default to latest month (9) if master filter is "Semua Bulan"
+            rdbStatusMonth = 9;
         }
 
         if (deptSelect) rdbStatusDept = deptSelect.value;

@@ -9,6 +9,8 @@ const AllSummaryApp = (function () {
     let chartTrendAll = null;
     let ratingPieChart = null;
     let execPieChart = null;
+    let hasilPieChart = null;
+    let hasilStats = { tercapai: 0, tidakTercapai: 0, noData: 0, total: 0 };
 
     let allHasilRows = [];
     let filteredHasilRows = [];
@@ -22,20 +24,23 @@ const AllSummaryApp = (function () {
 
     let movementsData = [];
 
+    let isInitialized = false;
+
     // ── Initialization ──
     function init() {
-        const pageEl = document.getElementById('page-all-summary');
+        const pageEl = document.getElementById('page-all-summary') || document.getElementById('card-executive-summary');
         if (!pageEl) return;
 
-        // Set default month to 9 (September) or current month
-        const monthSel = document.getElementById('all-summary-filter-month');
-        if (monthSel && !monthSel.value) {
+        // Set default month to 9 (September) on initial load if unset
+        const monthSel = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
+        if (monthSel && !isInitialized && monthSel.value === '') {
             monthSel.value = '9';
         }
-        const yearSel = document.getElementById('all-summary-filter-year');
+        const yearSel = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
         if (yearSel && !yearSel.value) {
             yearSel.value = '2026';
         }
+        isInitialized = true;
 
         loadAllSummary();
     }
@@ -55,12 +60,14 @@ const AllSummaryApp = (function () {
 
     // ── Master Loader ──
     async function loadAllSummary() {
-        const month = document.getElementById('all-summary-filter-month')?.value || '9';
-        const year = document.getElementById('all-summary-filter-year')?.value || '2026';
+        const monthEl = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
+        const month = monthEl ? monthEl.value : '';
+        const yearEl = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
+        const year = yearEl ? yearEl.value : '2026';
 
         // Update period badge
         const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        const badge = document.getElementById('all-executive-period-badge');
+        const badge = document.getElementById('all-executive-period-badge') || document.getElementById('executive-period-badge');
         if (badge) {
             badge.textContent = month ? `${monthNames[parseInt(month)] || ''} ${year}` : `Semua Bulan ${year}`;
         }
@@ -401,7 +408,227 @@ const AllSummaryApp = (function () {
         });
     }
 
-    // ── 4. Hasil Stock Opname Table (All Data) ──
+    // ── 4. Hasil Stock Opname Table & Pie Chart (All Data) ──
+    function getRowStatus(r) {
+        if (r.status) {
+            const s = r.status.toLowerCase();
+            if (s.includes('tercapai') && !s.includes('tidak')) return 'tercapai';
+            if (s.includes('tidak') || r.status_class === 'red' || r.status_class === 'orange') return 'tidak_tercapai';
+            if (s.includes('belum') || r.status_class === 'none') return 'no_data';
+        }
+        const pct = (r.total_physic_pct !== null && r.total_physic_pct !== undefined)
+            ? Number(r.total_physic_pct)
+            : (r.pct_physic !== null && r.pct_physic !== undefined ? Number(r.pct_physic) : null);
+        if (pct === null) return 'no_data';
+        const isPmd = (r.dept && r.dept.toUpperCase() === 'PMD');
+        const threshold = isPmd ? 98 : 85;
+        return pct >= threshold ? 'tercapai' : 'tidak_tercapai';
+    }
+
+    function toggleHasilStatusFilter(target) {
+        const sel = document.getElementById('hasil-so-filter-status');
+        if (!sel) return;
+        if (sel.value === target) {
+            sel.value = 'all';
+        } else {
+            sel.value = target;
+        }
+        applyHasilFilter();
+    }
+
+    function renderHasilPieChart(tercapai, tidakTercapai, noData, total) {
+        const canvas = document.getElementById('all-chart-hasil-so-pie');
+        const statsContainer = document.getElementById('all-hasil-pie-stats');
+        if (!canvas) return;
+
+        if (hasilPieChart) {
+            hasilPieChart.destroy();
+            hasilPieChart = null;
+        }
+
+        if (total === 0) {
+            if (typeof Chart !== 'undefined') {
+                const ctx = canvas.getContext('2d');
+                hasilPieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Belum Ada Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e2e8f0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        },
+                        cutout: '68%'
+                    }
+                });
+            }
+            if (statsContainer) {
+                statsContainer.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.75rem 0.5rem;">Tidak ada data site</div>';
+            }
+            return;
+        }
+
+        const labels = ['Tercapai', 'Tidak Tercapai'];
+        const data = [tercapai, tidakTercapai];
+        const colors = ['#16a34a', '#dc2626'];
+        const statusKeys = ['tercapai', 'tidak_tercapai'];
+
+        if (noData > 0) {
+            labels.push('Belum Ada Data');
+            data.push(noData);
+            colors.push('#94a3b8');
+            statusKeys.push('no_data');
+        }
+
+        if (typeof Chart !== 'undefined') {
+            const ctx = canvas.getContext('2d');
+            hasilPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                    onClick: (evt, elements) => {
+                        if (elements && elements.length > 0) {
+                            const idx = elements[0].index;
+                            const target = statusKeys[idx] || 'all';
+                            toggleHasilStatusFilter(target);
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        event.native.target.style.cursor = (chartElement && chartElement.length > 0) ? 'pointer' : 'default';
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            onClick: (e, legendItem) => {
+                                const idx = legendItem.index;
+                                const target = statusKeys[idx] || 'all';
+                                toggleHasilStatusFilter(target);
+                            },
+                            onHover: (e, legendItem, legend) => {
+                                legend.chart.canvas.style.cursor = 'pointer';
+                            },
+                            labels: {
+                                boxWidth: 12,
+                                padding: 12,
+                                font: {
+                                    family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                                    size: 11,
+                                    weight: '600'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.raw || 0;
+                                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                    return ` ${context.label}: ${val} sites (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '62%'
+                }
+            });
+        }
+
+        updateHasilPieStatsView();
+    }
+
+    function updateHasilPieStatsView() {
+        const statsContainer = document.getElementById('all-hasil-pie-stats');
+        const pieSubtitle = document.getElementById('all-hasil-pie-subtitle');
+        const { tercapai, tidakTercapai, noData, total } = hasilStats;
+
+        const statusSel = document.getElementById('hasil-so-filter-status');
+        const curStatus = statusSel ? statusSel.value : 'all';
+
+        if (pieSubtitle) {
+            let filterSuffix = ` (${total} Sites)`;
+            if (curStatus === 'tercapai') filterSuffix = ` [Tercapai: ${tercapai} Sites]`;
+            else if (curStatus === 'tidak_tercapai') filterSuffix = ` [Tidak Tercapai: ${tidakTercapai} Sites]`;
+            else if (curStatus === 'no_data') filterSuffix = ` [Belum Ada Data: ${noData} Sites]`;
+            pieSubtitle.textContent = `Tercapai vs Tidak Tercapai${filterSuffix}`;
+        }
+
+        if (!statsContainer || total === 0) return;
+
+        const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
+        const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
+        const pctNoData = total > 0 ? Math.round((noData / total) * 100) : 0;
+
+        const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
+        const activeTidak = (curStatus === 'tidak_tercapai') ? ' active' : '';
+        const activeNoData = (curStatus === 'no_data') ? ' active' : '';
+        const activeAll = (curStatus === 'all') ? ' active' : '';
+
+        let statsHtml = `
+            <div class="so-pie-stat-row${activeTercapai}" onclick="AllSummaryApp.toggleHasilStatusFilter('tercapai')" title="Klik untuk filter status Tercapai">
+                <span class="so-pie-stat-label">
+                    <span class="so-pie-stat-dot" style="background-color: #16a34a;"></span>
+                    Tercapai
+                </span>
+                <span class="so-pie-stat-val" style="color: #16a34a;">
+                    ${tercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
+                </span>
+            </div>
+            <div class="so-pie-stat-row${activeTidak}" onclick="AllSummaryApp.toggleHasilStatusFilter('tidak_tercapai')" title="Klik untuk filter status Tidak Tercapai">
+                <span class="so-pie-stat-label">
+                    <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
+                    Tidak Tercapai
+                </span>
+                <span class="so-pie-stat-val" style="color: #dc2626;">
+                    ${tidakTercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
+                </span>
+            </div>
+        `;
+
+        if (noData > 0) {
+            statsHtml += `
+                <div class="so-pie-stat-row${activeNoData}" onclick="AllSummaryApp.toggleHasilStatusFilter('no_data')" title="Klik untuk filter Belum Ada Data">
+                    <span class="so-pie-stat-label">
+                        <span class="so-pie-stat-dot" style="background-color: #94a3b8;"></span>
+                        Belum Ada Data
+                    </span>
+                    <span class="so-pie-stat-val" style="color: #64748b;">
+                        ${noData} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctNoData}%)</span>
+                    </span>
+                </div>
+            `;
+        }
+
+        statsHtml += `
+            <div class="so-pie-stat-row${activeAll}" onclick="AllSummaryApp.toggleHasilStatusFilter('all')" title="Klik untuk tampilkan Semua Status" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
+                <span class="so-pie-stat-label" style="font-weight: 600; color: #1e293b;">
+                    Total Sites
+                </span>
+                <span class="so-pie-stat-val" style="font-weight: 700; color: #0f172a;">${total} sites</span>
+            </div>
+        `;
+
+        statsContainer.innerHTML = statsHtml;
+    }
+
     async function loadHasilSO(month, year) {
         const tbody = document.getElementById('hasil-so-table-body');
         if (!tbody) return;
@@ -414,14 +641,35 @@ const AllSummaryApp = (function () {
             const json = await res.json();
             if (!json.success) {
                 tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
+                renderHasilPieChart(0, 0, 0, 0);
                 return;
             }
 
             allHasilRows = json.data || [];
+
+            let countTercapai = 0;
+            let countTidakTercapai = 0;
+            let countNoData = 0;
+            allHasilRows.forEach(r => {
+                const st = getRowStatus(r);
+                if (st === 'tercapai') countTercapai++;
+                else if (st === 'tidak_tercapai') countTidakTercapai++;
+                else countNoData++;
+            });
+
+            hasilStats = {
+                tercapai: countTercapai,
+                tidakTercapai: countTidakTercapai,
+                noData: countNoData,
+                total: allHasilRows.length
+            };
+
+            renderHasilPieChart(countTercapai, countTidakTercapai, countNoData, allHasilRows.length);
             applyHasilFilter();
         } catch (err) {
             console.error('Error loading hasil SO:', err);
             tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
+            renderHasilPieChart(0, 0, 0, 0);
         }
     }
 
@@ -439,12 +687,8 @@ const AllSummaryApp = (function () {
             }
 
             if (status !== 'all') {
-                const pct = (r.total_physic_pct !== null && r.total_physic_pct !== undefined)
-                    ? Number(r.total_physic_pct)
-                    : (r.pct_physic !== null && r.pct_physic !== undefined ? Number(r.pct_physic) : null);
-                if (status === 'tercapai' && (pct === null || pct < 85)) return false;
-                if (status === 'tidak_tercapai' && (pct === null || pct >= 85)) return false;
-                if (status === 'no_data' && pct !== null) return false;
+                const rowStatus = getRowStatus(r);
+                if (rowStatus !== status) return false;
             }
 
             return true;
@@ -452,6 +696,7 @@ const AllSummaryApp = (function () {
 
         currentHasilPage = 1;
         renderHasilTable();
+        updateHasilPieStatsView();
     }
 
     function renderHasilTable() {
@@ -551,7 +796,7 @@ const AllSummaryApp = (function () {
     }
 
     function changeHasilPageSize(size) {
-        hasilPageSize = parseInt(size) || 10;
+        hasilPageSize = (size === 'all') ? 999999 : (parseInt(size) || 10);
         currentHasilPage = 1;
         renderHasilTable();
     }
@@ -719,7 +964,7 @@ const AllSummaryApp = (function () {
     }
 
     function changeRekapPageSize(size) {
-        rekapPageSize = parseInt(size) || 10;
+        rekapPageSize = (size === 'all') ? 999999 : (parseInt(size) || 10);
         currentRekapPage = 1;
         renderRekapTable();
     }
@@ -749,8 +994,8 @@ const AllSummaryApp = (function () {
         const periodSub = document.getElementById('all-sm-period-subtitle');
         const tbody = document.getElementById('all-sm-table-body');
 
-        const curYear = year || document.getElementById('all-summary-filter-year')?.value || 2026;
-        const curMonth = (month !== undefined && month !== null) ? month : (document.getElementById('all-summary-filter-month')?.value || '');
+        const curYear = year || (document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year'))?.value || 2026;
+        const curMonth = (month !== undefined && month !== null) ? month : ((document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month'))?.value ?? '');
 
         if (tbody) {
             tbody.innerHTML = `
@@ -882,8 +1127,8 @@ const AllSummaryApp = (function () {
         const infoEl = document.getElementById('all-sm-table-info');
         if (!tbody) return;
 
-        const curYear = document.getElementById('all-summary-filter-year')?.value || 2026;
-        const monthSelect = document.getElementById('all-summary-filter-month');
+        const curYear = (document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year'))?.value || 2026;
+        const monthSelect = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
         const monthText = (monthSelect && monthSelect.value) ? monthSelect.options[monthSelect.selectedIndex].text : 'Tahun Ini';
         const hasSearch = Boolean(document.getElementById('all-sm-search-input')?.value?.trim());
 
@@ -1025,8 +1270,8 @@ const AllSummaryApp = (function () {
     }
 
     function viewAllYearMovements() {
-        const year = document.getElementById('all-summary-filter-year')?.value || 2026;
-        const monthSel = document.getElementById('all-summary-filter-month');
+        const year = (document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year'))?.value || 2026;
+        const monthSel = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
         if (monthSel) monthSel.value = '';
         loadSiteMovements(year, '');
     }
@@ -1047,7 +1292,8 @@ const AllSummaryApp = (function () {
         filterMovementsTable,
         toggleMovementDetails,
         viewAllYearMovements,
-        loadSiteMovements
+        loadSiteMovements,
+        toggleHasilStatusFilter
     };
 })();
 
