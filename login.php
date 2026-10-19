@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amora-Asset Management Opname Report Analytics</title>
+    <title>Amora - Asset Management Opname Report Analytics</title>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2.5rem 1.25rem;
+            padding: 1.25rem 1rem;
         }
 
         .login-card-container {
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .login-header {
-            padding: 2rem 2rem 1.25rem 2rem;
+            padding: 1.6rem 2rem 1.15rem 2rem;
             text-align: center;
             background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
             border-bottom: 1px solid #f1f5f9;
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .login-body {
-            padding: 1.75rem 2rem 2rem 2rem;
+            padding: 1.5rem 2rem 1.75rem 2rem;
         }
 
         .login-default-hint {

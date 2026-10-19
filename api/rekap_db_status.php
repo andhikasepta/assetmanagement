@@ -251,6 +251,67 @@ try {
         return strcmp($a['sitecode'], $b['sitecode']);
     });
 
+    $monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Check if the current selected period has been uploaded to rekap_db_master
+    $checkCurrStmt = $db->prepare("SELECT 1 FROM rekap_db_master WHERE period_month = :m AND period_year = :y LIMIT 1");
+    $checkCurrStmt->execute([':m' => $currMonth, ':y' => $currYear]);
+    $hasCurrData = (bool)$checkCurrStmt->fetchColumn();
+
+    if (!$hasCurrData) {
+        $currMonthLabel = ($monthNames[$currMonth] ?? "Bulan $currMonth") . " " . $currYear;
+        $prevMonthLabel = ($monthNames[$prevMonth] ?? "Bulan $prevMonth") . " " . $prevYear;
+
+        // Compute total master sites in this Category for current filters
+        $filteredMasterSites = array_filter($categoryMasterSites, function($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
+            if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter) return false;
+            if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter) return false;
+            if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter) return false;
+            return true;
+        });
+        $totalMasterSites = count($filteredMasterSites);
+
+        echo json_encode([
+            'success' => true,
+            'view' => $viewMode,
+            'period' => [
+                'current_month' => $currMonth,
+                'current_year' => $currYear,
+                'current_label' => $currMonthLabel,
+                'previous_month' => $prevMonth,
+                'previous_year' => $prevYear,
+                'previous_label' => $prevMonthLabel,
+                'is_uploaded' => false,
+            ],
+            'stats' => [
+                'total_sites' => 0,
+                'total_items' => 0,
+                'solved_count' => 0,
+                'unsolved_count' => 0,
+                'new_db_count' => 0,
+                'total_nbv' => 0,
+                'solved_nbv' => 0,
+                'unsolved_nbv' => 0,
+                'new_db_nbv' => 0,
+                'total_master_sites' => $totalMasterSites,
+                'sites_display' => "0/{$totalMasterSites} Sites",
+            ],
+            'filter_options' => [
+                'depts' => $availableDepts,
+                'dept_subdept_map' => $deptSubDeptMap,
+                'sites' => $availableSitesList
+            ],
+            'data' => [],
+            'groups' => [],
+            'total' => 0,
+            'page' => $page,
+            'limit' => $limitParam,
+            'total_pages' => 1,
+            'message' => "Data DB periode {$currMonthLabel} belum diupload oleh Admin.",
+        ], JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
     // CTE Query strictly joining with site_regional within the valid category sitecodes
     // Any sitecode outside this category/SO type is completely filtered out!
     $sqlBase = "
@@ -524,6 +585,7 @@ try {
                 'previous_month' => $prevMonth,
                 'previous_year' => $prevYear,
                 'previous_label' => ($monthNames[$prevMonth] ?? '') . " " . $prevYear,
+                'is_uploaded' => true,
             ],
             'stats' => $stats,
             'filter_options' => [
@@ -608,6 +670,7 @@ try {
             'previous_month' => $prevMonth,
             'previous_year' => $prevYear,
             'previous_label' => ($monthNames[$prevMonth] ?? '') . " " . $prevYear,
+            'is_uploaded' => true,
         ],
         'stats' => $stats,
         'filter_options' => [

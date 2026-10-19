@@ -6,23 +6,23 @@
 $csrfToken = getCsrfToken();
 ?>
 <section id="page-login" class="page-section"
-    style="display: none; min-height: calc(100vh - 120px); align-items: center; justify-content: center;">
+    style="display: none; width: 100%; flex: 1; flex-direction: column; align-items: center; justify-content: center;">
     <div class="login-main-wrapper"
-        style="width: 100%; display: flex; align-items: center; justify-content: center; padding: 2.5rem 1rem;">
-        <div class="login-card-container" style="width: 100%; max-width: 440px;">
+        style="width: 100%; max-width: 440px; margin: auto; padding: 1.25rem 0.5rem; display: flex; align-items: center; justify-content: center;">
+        <div class="login-card-container" style="width: 100%;">
             <div class="login-card"
                 style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.03); overflow: hidden;">
                 <!-- Login Card Header -->
                 <div class="login-header"
-                    style="padding: 2rem 2rem 1.25rem 2rem; text-align: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-bottom: 1px solid #f1f5f9;">
+                    style="padding: 1.6rem 2rem 1.15rem 2rem; text-align: center; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-bottom: 1px solid #f1f5f9;">
                     <h1 class="login-title"
-                        style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 0.35rem 0; letter-spacing: -0.01em;">
+                        style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0; letter-spacing: -0.01em;">
                         LOGIN
                     </h1>
                 </div>
 
                 <!-- Login Card Body -->
-                <div class="login-body" style="padding: 1.75rem 2rem 2rem 2rem;">
+                <div class="login-body" style="padding: 1.5rem 2rem 1.75rem 2rem;">
                     <!-- Error Alert -->
                     <div id="login-page-alert"
                         style="display: none; padding: 0.75rem 0.95rem; border-radius: 8px; font-size: 12.5px; margin-bottom: 1.25rem; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;">

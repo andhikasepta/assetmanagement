@@ -146,10 +146,10 @@ const AllSummaryApp = (function () {
             const dbNat = dbA.national || dbA.outlet_national || {};
             const grandTotal = (dbNat.qty !== undefined) ? dbNat.qty : (dbA.grand_total || 0);
 
-            const dbTotalEl = document.getElementById('all-db-analysis-grand-total');
-            if (dbTotalEl) dbTotalEl.textContent = Number(grandTotal).toLocaleString('id-ID');
-            const dbCardValEl = document.getElementById('all-db-val-total');
-            if (dbCardValEl) dbCardValEl.textContent = Number(grandTotal).toLocaleString('id-ID');
+            ['all-db-analysis-grand-total', 'db-analysis-grand-total', 'all-db-val-total', 'all-db-status-grand-total', 'db-status-grand-total'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = Number(grandTotal).toLocaleString('id-ID');
+            });
 
             const diffQty = (dbNat.diff_qty !== undefined && dbNat.diff_qty !== null) ? Number(dbNat.diff_qty) : (dbA.diff_grand_total !== undefined ? Number(dbA.diff_grand_total) : null);
             const prevQty = (dbNat.prev_qty !== undefined && dbNat.prev_qty !== null) ? Number(dbNat.prev_qty) : null;
@@ -175,22 +175,29 @@ const AllSummaryApp = (function () {
                 `;
             };
 
-            const grandTrendEl = document.getElementById('all-db-grand-trend');
-            if (grandTrendEl) grandTrendEl.innerHTML = renderDbTrend();
-            const cardTrendEl = document.getElementById('all-db-card-trend');
-            if (cardTrendEl) cardTrendEl.innerHTML = renderDbTrend();
+            const trendHtml = renderDbTrend();
+            ['all-db-grand-trend', 'db-grand-trend', 'all-db-card-trend', 'all-db-status-grand-trend', 'db-status-grand-trend'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = trendHtml;
+            });
 
             // Status DB Counts
             const solved = dbNat.solved !== undefined ? dbNat.solved : (dbA.outlet_national?.solved || 0);
             const unsolved = dbNat.unsolved !== undefined ? dbNat.unsolved : (dbA.outlet_national?.unsolved || 0);
             const newDb = dbNat.new_db !== undefined ? dbNat.new_db : (dbA.outlet_national?.new_db || 0);
 
-            const solvedEl = document.getElementById('all-db-status-val-solved');
-            if (solvedEl) solvedEl.textContent = Number(solved).toLocaleString('id-ID');
-            const unsolvedEl = document.getElementById('all-db-status-val-unsolved');
-            if (unsolvedEl) unsolvedEl.textContent = Number(unsolved).toLocaleString('id-ID');
-            const newEl = document.getElementById('all-db-status-val-new');
-            if (newEl) newEl.textContent = Number(newDb).toLocaleString('id-ID');
+            ['all-db-status-val-solved', 'db-status-val-solved'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = Number(solved).toLocaleString('id-ID');
+            });
+            ['all-db-status-val-unsolved', 'db-status-val-unsolved'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = Number(unsolved).toLocaleString('id-ID');
+            });
+            ['all-db-status-val-new', 'db-status-val-new'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = Number(newDb).toLocaleString('id-ID');
+            });
 
         } catch (err) {
             console.error('Error loading summary KPIs:', err);
@@ -819,7 +826,8 @@ const AllSummaryApp = (function () {
 
             const rows = json.data || [];
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data status DB pada periode ini.</td></tr>`;
+                const emptyMsg = json.message || 'Tidak ada data status DB pada periode ini.';
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">${escapeHtml(emptyMsg)}</td></tr>`;
                 return;
             }
 

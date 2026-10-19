@@ -242,8 +242,27 @@ try {
     }, $validSitecodes);
     $inValidSitesSql = !empty($escapedSitecodes) ? implode(',', $escapedSitecodes) : "''";
 
-    // 2. CTE Query strictly joining with site_regional within the valid category sitecodes
-    $sqlBase = "
+    // Check if the current selected period has been uploaded to rekap_db_master
+    $checkCurrStmt = $db->prepare("SELECT 1 FROM rekap_db_master WHERE period_month = :m AND period_year = :y LIMIT 1");
+    $checkCurrStmt->execute([':m' => $currMonth, ':y' => $currYear]);
+    $hasCurrData = (bool)$checkCurrStmt->fetchColumn();
+
+    if (!$hasCurrData) {
+        $stats = [
+            'total_sites' => 0,
+            'total_items' => 0,
+            'solved_count' => 0,
+            'unsolved_count' => 0,
+            'new_db_count' => 0,
+            'total_nbv' => 0,
+            'solved_nbv' => 0,
+            'unsolved_nbv' => 0,
+            'new_db_nbv' => 0,
+        ];
+        $items = [];
+    } else {
+        // 2. CTE Query strictly joining with site_regional within the valid category sitecodes
+        $sqlBase = "
         WITH prev AS (
             SELECT DISTINCT ON (TRIM(r.reg_no)) 
                 r.sitecode, TRIM(r.reg_no) as reg_no, r.name, r.sn, r.nbv
@@ -411,6 +430,7 @@ try {
     }
     $dataStmt->execute();
     $items = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     // 3. Initialize PhpSpreadsheet
     $ss = new Spreadsheet();
@@ -627,6 +647,20 @@ try {
     $currentRow = $startDataRow;
     $itemCount = count($items);
 
+    if ($itemCount === 0) {
+        $noDataMsg = !$hasCurrData
+            ? "Data DB periode {$currMonthLabel} belum diupload oleh Admin."
+            : "Tidak ada data pada filter ini.";
+        $sheet->setCellValue("A{$startDataRow}", $noDataMsg);
+        $sheet->mergeCells("A{$startDataRow}:K{$startDataRow}");
+        $sheet->getStyle("A{$startDataRow}:K{$startDataRow}")->applyFromArray([
+            'font' => ['italic' => true, 'color' => ['rgb' => '64748B']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']]],
+        ]);
+        $sheet->getRowDimension($startDataRow)->setRowHeight(30);
+    }
+
     for ($i = 0; $i < $itemCount; $i++) {
         $row = $items[$i];
         $st = strtolower(trim($row['status'] ?? ''));
@@ -749,10 +783,15 @@ try {
     // Freeze panes at startDataRow so table header remains visible when scrolling
     $sheet->freezePane("A{$startDataRow}");
 
-    // Clean filename
-    $safeCat = preg_replace('/[^A-Za-z0-9_-]/', '_', $catLabel);
-    $safeMonth = preg_replace('/[^A-Za-z0-9_-]/', '_', $monthNames[$currMonth] ?? "M{$currMonth}");
-    $filename = "Rekapitulasi_Status_DB_{$safeCat}_{$safeMonth}_{$currYear}.xlsx";
+    // Clean filename: rekapdb_[category]_[dmYHi].xlsx
+    $catSlug = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $catLabel ?: $category));
+    if (in_array($category, ['all', 'all_monthly', 'all_quarterly'], true) || $catSlug === 'allsummary' || $catSlug === 'allsites') {
+        $catSlug = 'all';
+    } elseif ($catSlug === 'outlet' || $catSlug === 'monthlyoutlet') {
+        $catSlug = 'outletregional';
+    }
+    $timeStr = date('dmYHi');
+    $filename = "rekapdb_{$catSlug}_{$timeStr}.xlsx";
 
     // Send download headers
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

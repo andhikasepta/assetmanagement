@@ -16,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
 ini_set('memory_limit', '512M');
 set_time_limit(180);
+date_default_timezone_set('Asia/Jakarta');
 
 // Determine input method (POST JSON or GET)
 $method = $_SERVER['REQUEST_METHOD'];
@@ -639,10 +640,15 @@ $sheet->getColumnDimension('E')->setWidth(30);
 // Freeze header & identity panes (freeze row 2 and columns A-E)
 $sheet->freezePane('F3');
 
-// Clean filename
-$safeCat = preg_replace('/[^A-Za-z0-9_-]/', '_', $catLabel);
-$safeType = ucfirst($soType);
-$filename = "Rekapitulasi_SO_{$safeCat}_{$safeType}_{$year}.xlsx";
+// Clean filename: rekap_[category]_[dmYHi].xlsx
+$catSlug = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $catLabel ?: $category));
+if (in_array($category, ['all', 'all_monthly', 'all_quarterly'], true) || $catSlug === 'allsummary' || $catSlug === 'allsites') {
+    $catSlug = 'all';
+} elseif ($catSlug === 'outlet' || $catSlug === 'monthlyoutlet') {
+    $catSlug = 'outletregional';
+}
+$timeStr = date('dmYHi');
+$filename = "rekap_{$catSlug}_{$timeStr}.xlsx";
 
 // Send download headers
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

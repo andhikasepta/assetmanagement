@@ -251,8 +251,9 @@ const App = (() => {
         const targetSec = document.getElementById('page-' + page);
         if (targetSec) {
             targetSec.classList.add('active');
-            targetSec.style.display = 'block';
+            targetSec.style.display = (page === 'login') ? 'flex' : 'block';
         }
+        document.body.classList.toggle('page-is-login', page === 'login');
 
         // Update Navbar Tabs active state
         document.querySelectorAll('.navbar-menu .nav-link').forEach(btn => {
@@ -4529,9 +4530,16 @@ const App = (() => {
             activeItem = currentDbAnalysisData.outlet_national || currentDbAnalysisData.national || {};
             totalQty = activeItem.qty || 0;
         }
-        badgeEl.textContent = Number(totalQty).toLocaleString();
-        if (trendEl && activeItem) {
-            trendEl.innerHTML = renderDbTrendBadge(activeItem, false);
+        ['db-analysis-grand-total', 'db-status-grand-total', 'all-db-status-grand-total'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = Number(totalQty).toLocaleString();
+        });
+        if (activeItem) {
+            const trendBadgeHtml = renderDbTrendBadge(activeItem, false);
+            ['db-grand-trend', 'db-status-grand-trend', 'all-db-status-grand-trend'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = trendBadgeHtml;
+            });
         }
 
         const formatQty = (n) => Number(n || 0).toLocaleString();
@@ -5463,9 +5471,12 @@ const App = (() => {
         if (!container) return;
 
         if (sites.length === 0) {
+            const noDataMsg = (period && period.is_uploaded === false)
+                ? `Data DB periode ${escapeHtml(period.current_label || '')} belum diupload oleh Admin.`
+                : 'Tidak ada data Site yang sesuai dengan filter atau pencarian.';
             container.innerHTML = `
                 <div style="text-align: center; color: #94a3b8; padding: 2.5rem;">
-                    Tidak ada data Site yang sesuai dengan filter atau pencarian.
+                    ${noDataMsg}
                 </div>
             `;
             return;
@@ -5614,10 +5625,13 @@ const App = (() => {
         if (filterSubDept) filterSubDept.style.display = noDept ? 'none' : '';
 
         if (items.length === 0) {
+            const noDataMsg = (period && period.is_uploaded === false)
+                ? `Data DB periode ${escapeHtml(period.current_label || '')} belum diupload oleh Admin.`
+                : 'No data.';
             tbody.innerHTML = `
                 <tr>
                     <td colspan="${noDept ? 9 : 11}" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
-                        No data.
+                        ${noDataMsg}
                     </td>
                 </tr>
             `;
@@ -5839,7 +5853,12 @@ const App = (() => {
             let yr = rdbStatusYear || (masterYearEl && masterYearEl.value ? parseInt(masterYearEl.value, 10) : 2026);
             let mo = rdbStatusMonth || (masterMonthEl && masterMonthEl.value && masterMonthEl.value !== '' ? parseInt(masterMonthEl.value, 10) : 2);
             let cat = summaryCategory || 'pmd';
-            let catLabel = cat === 'pmd' ? 'PMD' : 'Outlet Regional';
+            let catLabel = 'Outlet Regional';
+            if (cat === 'pmd') catLabel = 'PMD';
+            else if (cat === 'outlet_subarep') catLabel = 'Outlet Subarep';
+            else if (cat === 'warehouse_hub') catLabel = 'Warehouse HUB';
+            else if (cat === 'warehouse_tekno') catLabel = 'Warehouse Tekno';
+            else if (cat === 'it_coorporate') catLabel = 'IT Corporate';
             let soType = summarySOType || 'monthly';
             let dept = deptSelect ? deptSelect.value : (rdbStatusDept || 'all');
             let subDept = subDeptSelect ? subDeptSelect.value : (rdbStatusSubDept || 'all');
@@ -5875,10 +5894,28 @@ const App = (() => {
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = blobUrl;
-            const safeCat = catLabel.replace(/[^A-Za-z0-9_-]/g, '_');
-            const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            const safeMonth = monthNames[mo] || `Bulan_${mo}`;
-            a.download = `Rekapitulasi_Status_DB_${safeCat}_${safeMonth}_${yr}.xlsx`;
+
+            let downloadFilename = '';
+            const disposition = res.headers.get('content-disposition');
+            if (disposition && disposition.indexOf('filename=') !== -1) {
+                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                if (matches != null && matches[1]) {
+                    downloadFilename = matches[1].replace(/['"]/g, '').trim();
+                }
+            }
+            if (!downloadFilename) {
+                const now = new Date();
+                const d = String(now.getDate()).padStart(2, '0');
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const y = String(now.getFullYear());
+                const H = String(now.getHours()).padStart(2, '0');
+                const i = String(now.getMinutes()).padStart(2, '0');
+                let catSlug = (catLabel || cat || 'outletregional').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (catSlug === 'outlet' || catSlug === 'monthlyoutlet') catSlug = 'outletregional';
+                downloadFilename = `rekapdb_${catSlug}_${d}${m}${y}${H}${i}.xlsx`;
+            }
+
+            a.download = downloadFilename;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(blobUrl);
@@ -6218,13 +6255,34 @@ const App = (() => {
         const title2 = document.getElementById('national-col-title-m2')?.textContent?.trim() || 'Bulan 2';
         const title3 = document.getElementById('national-col-title-m3')?.textContent?.trim() || 'Bulan 3';
 
+        // Preceding month info (m0) for Month 1 monthly comparison
+        const m0Data = scorecardPeriod && scorecardPeriod.m0;
+        const title0 = (m0Data && m0Data.label && m0Data.year)
+            ? `${m0Data.label} ${m0Data.year}`
+            : (m0Data && m0Data.label ? m0Data.label : 'Bulan Sebelumnya');
+        const hasM0Data = Boolean(m0Data && m0Data.has_data);
+
+        // Count for m0 sites matching current filter
+        let list0Count = null;
+        if (hasM0Data) {
+            if (currentNationalRatingFilter === 'all') {
+                list0Count = scorecardRatingData.length;
+            } else {
+                list0Count = scorecardRatingData.filter(r => {
+                    const rVal = (r.m0_rating || '').toLowerCase().replace(/\s+/g, '_');
+                    return rVal === currentNationalRatingFilter;
+                }).length;
+            }
+        }
+
         const isNegativeMetric = (currentNationalRatingFilter === 'very_poor' || currentNationalRatingFilter === 'poor');
 
         const renderCountTrendBadge = (diff, prevLabel, isBaseline = false) => {
-            if (isBaseline) {
-                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="Bulan acuan (baseline)"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">-</span></span>`;
+            if (isBaseline || diff === null || diff === undefined) {
+                const tip = prevLabel ? `Tidak ada data perbandingan vs ${prevLabel}` : 'Bulan acuan (baseline)';
+                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="${tip}"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">-</span></span>`;
             }
-            if (diff === null || diff === undefined || diff === 0) {
+            if (diff === 0) {
                 return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="Tidak ada perubahan vs ${prevLabel}"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">0</span></span>`;
             }
 
@@ -6247,7 +6305,12 @@ const App = (() => {
         };
 
         if (trendEl1) {
-            trendEl1.innerHTML = renderCountTrendBadge(null, title1, true);
+            if (hasM0Data && list0Count !== null) {
+                const diff1 = list1.length - list0Count;
+                trendEl1.innerHTML = renderCountTrendBadge(diff1, title0, false);
+            } else {
+                trendEl1.innerHTML = renderCountTrendBadge(null, title0, true);
+            }
         }
         if (trendEl2) {
             const diff2 = list2.length - list1.length;
@@ -8733,7 +8796,13 @@ const App = (() => {
         }
 
         try {
-            const catLabel = summaryCategory === 'pmd' ? 'PMD' : 'Outlet Regional';
+            let catLabel = 'Outlet Regional';
+            if (summaryCategory === 'pmd') catLabel = 'PMD';
+            else if (summaryCategory === 'outlet_subarep') catLabel = 'Outlet Subarep';
+            else if (summaryCategory === 'warehouse_hub') catLabel = 'Warehouse HUB';
+            else if (summaryCategory === 'warehouse_tekno') catLabel = 'Warehouse Tekno';
+            else if (summaryCategory === 'it_coorporate') catLabel = 'IT Corporate';
+
             const payload = {
                 year: rekapYear,
                 category: getRekapCategory(),
@@ -8764,9 +8833,28 @@ const App = (() => {
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = blobUrl;
-            const safeCat = catLabel.replace(/[^A-Za-z0-9_-]/g, '_');
-            const safeType = summarySOType === 'quarterly' ? 'Quarterly' : 'Monthly';
-            a.download = `Rekapitulasi_SO_${safeCat}_${safeType}_${rekapYear}.xlsx`;
+
+            let downloadFilename = '';
+            const disposition = res.headers.get('content-disposition');
+            if (disposition && disposition.indexOf('filename=') !== -1) {
+                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                if (matches != null && matches[1]) {
+                    downloadFilename = matches[1].replace(/['"]/g, '').trim();
+                }
+            }
+            if (!downloadFilename) {
+                const now = new Date();
+                const d = String(now.getDate()).padStart(2, '0');
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const y = String(now.getFullYear());
+                const H = String(now.getHours()).padStart(2, '0');
+                const i = String(now.getMinutes()).padStart(2, '0');
+                let catSlug = (catLabel || summaryCategory || 'outletregional').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (catSlug === 'outlet' || catSlug === 'monthlyoutlet') catSlug = 'outletregional';
+                downloadFilename = `rekap_${catSlug}_${d}${m}${y}${H}${i}.xlsx`;
+            }
+
+            a.download = downloadFilename;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(blobUrl);

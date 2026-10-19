@@ -48,8 +48,8 @@ try {
         'quarterly', 'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno', 'outlet_subarep'
     ], true));
 
-    // Compute 3 rolling periods back
-    $threeMonths = [];
+    // Compute 4 rolling periods back (m0, m1, m2, m3): m1..m3 are displayed on page, m0 is for m1's trend comparison
+    $rollingPeriods = [];
     if ($isQuarterly) {
         $curQ = (int)ceil($month / 3);
         if ($curQ < 1) $curQ = 1;
@@ -57,7 +57,7 @@ try {
         // Stop on Q1-Q3 because 2025 data not uploaded in the database
         $curQ = max(3, $curQ);
 
-        for ($i = 2; $i >= 0; $i--) {
+        for ($i = 3; $i >= 0; $i--) {
             $tq = $curQ - $i;
             $ty = $year;
             while ($tq <= 0) {
@@ -65,7 +65,7 @@ try {
                 $ty -= 1;
             }
             $targetMonth = $tq * 3;
-            $threeMonths[] = [
+            $rollingPeriods[] = [
                 'month'   => $targetMonth,
                 'year'    => $ty,
                 'quarter' => $tq,
@@ -76,14 +76,14 @@ try {
         $shortNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         // Stop rolling back at January - March because 2025 data is not uploaded in the database
         $effM = max(3, $month);
-        for ($i = 2; $i >= 0; $i--) {
+        for ($i = 3; $i >= 0; $i--) {
             $tm = $effM - $i;
             $ty = $year;
             while ($tm <= 0) {
                 $tm += 12;
                 $ty -= 1;
             }
-            $threeMonths[] = [
+            $rollingPeriods[] = [
                 'month' => $tm,
                 'year'  => $ty,
                 'label' => strtoupper($shortNames[$tm])
@@ -274,10 +274,10 @@ try {
         $sites[] = $s;
     }
 
-    // 5. Fetch Reconciliation records for the 3 target periods
+    // 5. Fetch Reconciliation records for the 4 target periods (m0, m1, m2, m3)
     $mConditions = [];
     $recParams = [];
-    foreach ($threeMonths as $idx => $tm) {
+    foreach ($rollingPeriods as $idx => $tm) {
         $mConditions[] = "(period_year = :y{$idx} AND period_month = :m{$idx})";
         $recParams[":y{$idx}"] = $tm['year'];
         $recParams[":m{$idx}"] = $tm['month'];
@@ -365,15 +365,20 @@ try {
         'not_executed' => 0
     ];
 
-    $m1Info = $threeMonths[0];
-    $m2Info = $threeMonths[1];
-    $m3Info = $threeMonths[2]; // Latest month
+    $m0Info = $rollingPeriods[0]; // Preceding month for m1 trend comparison
+    $m1Info = $rollingPeriods[1]; // Displayed Column 1
+    $m2Info = $rollingPeriods[2]; // Displayed Column 2
+    $m3Info = $rollingPeriods[3]; // Displayed Column 3 (Latest / Selected)
+
+    $hasM0Data = !empty($recListByYM["{$m0Info['year']}_{$m0Info['month']}"]);
+    $m0Info['has_data'] = $hasM0Data;
 
     foreach ($sites as $s) {
         $sc = trim($s['sitecode'] ?? '');
         $name = trim($s['name_site'] ?? '-');
         $subDept = trim($s['sub_dept'] ?? '-');
 
+        $p0 = $getSitePct($sc, $m0Info['year'], $m0Info['month']);
         $p1 = $getSitePct($sc, $m1Info['year'], $m1Info['month']);
         $p2 = $getSitePct($sc, $m2Info['year'], $m2Info['month']);
         $p3 = $getSitePct($sc, $m3Info['year'], $m3Info['month']); // Latest
@@ -391,6 +396,8 @@ try {
             'sub_dept'  => $subDept,
             'pct'       => $p3 !== null ? round($p3, 2) : null,
             'rating'    => $rating,
+            'm0_pct'    => $p0 !== null ? round($p0, 2) : null,
+            'm0_rating' => $hasM0Data ? $evalRating($p0) : null,
             'm1_pct'    => $p1 !== null ? round($p1, 2) : null,
             'm1_rating' => $evalRating($p1),
             'm2_pct'    => $p2 !== null ? round($p2, 2) : null,
@@ -412,6 +419,8 @@ try {
             'sub_dept'         => $subDept,
             'pct'              => $p3 !== null ? round($p3, 2) : null,
             'execution_status' => $execStatus,
+            'm0_pct'           => $p0 !== null ? round($p0, 2) : null,
+            'm0_status'        => $hasM0Data ? $evalExec($p0) : null,
             'm1_pct'           => $p1 !== null ? round($p1, 2) : null,
             'm2_pct'           => $p2 !== null ? round($p2, 2) : null,
             'm3_pct'           => $p3 !== null ? round($p3, 2) : null,
@@ -426,6 +435,7 @@ try {
         'year'             => $year,
         'month'            => $month,
         'period'           => [
+            'm0' => $m0Info,
             'm1' => $m1Info,
             'm2' => $m2Info,
             'm3' => $m3Info

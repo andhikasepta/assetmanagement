@@ -244,10 +244,23 @@ $csrfToken = getCsrfToken();
                         <!-- Right Column: Status Penyelesaian DB Summary -->
                         <div class="executive-db-col" id="col-status-db-analysis">
                             <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                                <h3 style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b;">
-                                    Status Penyelesaian DB (All Sites)
-                                </h3>
+                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                                <div>
+                                    <h3
+                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        Status Penyelesaian DB (All Sites)
+                                    </h3>
+                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                        Total data DB seluruh site dibanding periode sebelumnya
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span class="db-grand-trend" id="all-db-status-grand-trend"></span>
+                                    <span class="so-status-badge"
+                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                        Total DB: <span id="all-db-status-grand-total">0</span> QTY
+                                    </span>
+                                </div>
                             </div>
                             <div
                                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;">

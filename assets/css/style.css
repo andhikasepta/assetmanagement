@@ -20,6 +20,8 @@ body {
     color: #1e293b;
     background-color: #f8fafc;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
@@ -140,14 +142,48 @@ label {
 .main-wrapper {
     padding: 1.5rem;
     max-width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .page-section {
     display: none;
+    width: 100%;
 }
 
 .page-section.active {
     display: block;
+}
+
+/* Page Section: In-Page Login View */
+#page-login.active {
+    display: flex !important;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    width: 100%;
+}
+
+body.page-is-login {
+    height: 100vh;
+    overflow-y: auto;
+}
+
+body.page-is-login .main-wrapper {
+    padding: 0.5rem 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+body.page-is-login .app-footer {
+    margin-top: 0;
+    flex-shrink: 0;
 }
 
 /* ---- Cards ---- */
@@ -3820,7 +3856,7 @@ textarea,
     margin-top: 1.5rem;
     border-top: 1px solid #cbd5e1;
     padding-top: 1.25rem;
-    align-items: stretch;
+    align-items: start;
 }
 
 .executive-db-col {
@@ -3832,9 +3868,17 @@ textarea,
     border-radius: 12px;
     padding: 1rem 1.15rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    height: fit-content;
+    align-self: start;
 }
 
 /* ── Result DB Analysis (Left Column: Vertically stacked dept cards) ── */
+#col-result-db-analysis,
+#all-col-result-db-analysis {
+    height: fit-content;
+    align-self: start;
+}
+
 #col-result-db-analysis .db-analysis-scroll {
     display: flex;
     flex-direction: column;
@@ -3854,6 +3898,7 @@ textarea,
     padding: 0.65rem 0.75rem;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
     transition: all 0.15s ease;
+    height: fit-content;
 }
 
 .executive-db-col .kpi-card-group:hover {

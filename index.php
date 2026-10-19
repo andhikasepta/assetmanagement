@@ -51,7 +51,7 @@ $monthNames = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-    <title>Amora - Asset Management & Opname Report Analytics</title>
+    <title>Amora - Asset Management Opname Report Analytics</title>
 
     <!-- Google Fonts: Inter (Enterprise Corporate Typography) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,7 +65,7 @@ $monthNames = [
     <link rel="stylesheet" href="layout/footer.css?v=<?= filemtime(__DIR__ . '/layout/footer.css') ?>">
 </head>
 
-<body>
+<body class="<?= (($_SESSION['initial_page'] ?? '') === 'login') ? 'page-is-login' : '' ?>">
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
@@ -83,19 +83,21 @@ $monthNames = [
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="javascript:void(0)" onclick="App.navigateTo(window.AUTH_USER ? 'all-summary' : 'summary')" class="navbar-brand">
+            <a href="javascript:void(0)" onclick="App.navigateTo(window.AUTH_USER ? 'all-summary' : 'summary')"
+                class="navbar-brand">
                 Asset Management
             </a>
         </div>
 
         <!-- Navigation Menus: Summary, All Summary, Master Data (SPA) -->
         <nav class="navbar-menu" id="navbar-menu">
-            <button type="button" class="nav-link <?= $isLoggedIn ? '' : 'active' ?>" data-page="summary" id="tab-summary"
-                onclick="App.navigateTo('summary')" style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
+            <button type="button" class="nav-link <?= $isLoggedIn ? '' : 'active' ?>" data-page="summary"
+                id="tab-summary" onclick="App.navigateTo('summary')" style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
                 Summary
             </button>
-            <button type="button" class="nav-link <?= $isLoggedIn ? 'active' : '' ?>" data-page="all-summary" id="tab-all-summary"
-                onclick="App.navigateTo('all-summary')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+            <button type="button" class="nav-link <?= $isLoggedIn ? 'active' : '' ?>" data-page="all-summary"
+                id="tab-all-summary" onclick="App.navigateTo('all-summary')"
+                style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
                 All Summary
             </button>
             <button type="button" class="nav-link" data-page="master-data" id="tab-master-data"
@@ -259,8 +261,7 @@ $monthNames = [
                             <label for="summary-filter-month"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">BULAN</label>
                             <select id="summary-filter-month" class="form-control unified-filter-select"
-                                style="width: auto;"
-                                onchange="App.loadSummaryData()">
+                                style="width: auto;" onchange="App.loadSummaryData()">
                                 <option value="">Semua Bulan</option>
                                 <option value="1">Januari</option>
                                 <option value="2">Februari</option>
@@ -280,8 +281,7 @@ $monthNames = [
                             <label for="summary-filter-year"
                                 style="font-size: 12px; font-weight: 600; color: #475569;">TAHUN</label>
                             <select id="summary-filter-year" class="form-control unified-filter-select"
-                                style="width: auto;"
-                                onchange="App.loadSummaryData()">
+                                style="width: auto;" onchange="App.loadSummaryData()">
                                 <option value="2026" selected>2026</option>
                                 <option value="2027">2027</option>
                                 <option value="2028">2028</option>
@@ -564,7 +564,8 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-khusus" style="display: none;">
-                            <div class="kpi-title" title="PENYIMPANAN PERANGKAT KHUSUS T TEKNO">PENYIMPANAN PERANGKAT KHUSUS T TEKNO</div>
+                            <div class="kpi-title" title="PENYIMPANAN PERANGKAT KHUSUS T TEKNO">PENYIMPANAN PERANGKAT
+                                KHUSUS T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-khusus-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -579,7 +580,8 @@ $monthNames = [
 
                         <!-- Warehouse Tekno Quarterly Cards (Shown when Category is Warehouse Tekno & SO Type is Quarterly) -->
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-buffer" style="display: none;">
-                            <div class="kpi-title" title="BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO">BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO</div>
+                            <div class="kpi-title" title="BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO">BUFFER PERANGKAT
+                                RUSAK WAREHOUSE T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-buffer-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -593,7 +595,8 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage2" style="display: none;">
-                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO">STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO</div>
+                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO">STORAGE END OF
+                                CYCLE LT.2 WAREHOUSE TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-storage2-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -607,7 +610,8 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage1" style="display: none;">
-                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO">STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO</div>
+                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO">STORAGE END OF
+                                CYCLE LT.1 WAREHOUSE TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-storage1-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -621,7 +625,8 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-persiapan" style="display: none;">
-                            <div class="kpi-title" title="PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO">PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO</div>
+                            <div class="kpi-title" title="PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO">PERSIAPAN PENGUJIAN
+                                WAREHOUSE T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-persiapan-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -890,6 +895,13 @@ $monthNames = [
                                         Distribusi status penyelesaian data database
                                     </div>
                                 </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span class="db-grand-trend" id="db-status-grand-trend"></span>
+                                    <span class="so-status-badge"
+                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                        Total DB: <span id="db-status-grand-total">0</span> QTY
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="db-status-groups-container" id="db-status-groups-container">
@@ -961,7 +973,8 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                    TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-solved-it-tbs"></span>
                                             </div>
                                             <div class="kpi-subdept-val" id="db-solved-it-tbs" style="color: #16a34a;">0
@@ -970,7 +983,9 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="kpi-subdept-name"
+                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                    CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend"
                                                     id="db-sub-trend-solved-it-arcadia"></span>
                                             </div>
@@ -1053,7 +1068,8 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                    TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-unsolved-it-tbs"></span>
                                             </div>
                                             <div class="kpi-subdept-val" id="db-unsolved-it-tbs"
@@ -1062,7 +1078,9 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="kpi-subdept-name"
+                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                    CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend"
                                                     id="db-sub-trend-unsolved-it-arcadia"></span>
                                             </div>
@@ -1140,7 +1158,8 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI TBS</span>
+                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                    TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-new-it-tbs"></span>
                                             </div>
                                             <div class="kpi-subdept-val" id="db-new-it-tbs" style="color: #2563eb;">0
@@ -1149,7 +1168,9 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT CORPORATE - ARCADIA LT 4</span>
+                                                <span class="kpi-subdept-name"
+                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                    CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-new-it-arcadia"></span>
                                             </div>
                                             <div class="kpi-subdept-val" id="db-new-it-arcadia" style="color: #2563eb;">
@@ -2387,9 +2408,9 @@ $monthNames = [
                     <div id="sm-table-container" style="padding: 1.25rem;">
                         <div
                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                            <input type="search" id="sm-search-input" class="table-search-input unified-search-input" placeholder="Search..."
-                                oninput="App.filterMovementsTable()" onkeyup="App.filterMovementsTable()"
-                                onsearch="App.filterMovementsTable()"
+                            <input type="search" id="sm-search-input" class="table-search-input unified-search-input"
+                                placeholder="Search..." oninput="App.filterMovementsTable()"
+                                onkeyup="App.filterMovementsTable()" onsearch="App.filterMovementsTable()"
                                 style="max-width: 320px;">
                             <div style="font-size: 12px; color: #64748b;" id="sm-table-info">
                                 Menampilkan log pergerakan

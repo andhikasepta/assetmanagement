@@ -632,6 +632,8 @@ try {
             ];
         }
 
+        $isCurrRecUploaded = !empty($totals['total_profiles']) && ((int)$totals['total_profiles'] > 0);
+
         $deptKeys = ['national', 'outlet_national', 'cro', 'ero', 'wro', 'pmd', 'dno', 'dso'];
         foreach ($deptKeys as $dk) {
             if (isset($achievements[$dk])) {
@@ -640,7 +642,7 @@ try {
                     ? (float) $prevAchievements[$dk]['pct']
                     : null;
                 $achievements[$dk]['prev_pct'] = $prevPct;
-                $achievements[$dk]['diff_pct'] = ($hasPrevious && $currPct !== null && $prevPct !== null)
+                $achievements[$dk]['diff_pct'] = ($hasPrevious && $isCurrRecUploaded && $currPct !== null && $prevPct !== null)
                     ? round($currPct - $prevPct, 2)
                     : null;
             }
@@ -660,7 +662,7 @@ try {
                     $currQty = (int) ($dbA[$dk]['qty'] ?? 0);
                     $prevQty = ($hasPrevious && $prevDbAnalysis) ? (int) ($prevDbAnalysis[$dk]['qty'] ?? 0) : 0;
                     $dbA[$dk]['prev_qty'] = $prevQty;
-                    $dbA[$dk]['diff_qty'] = $hasPrevious ? ($currQty - $prevQty) : null;
+                    $dbA[$dk]['diff_qty'] = ($hasPrevious && $isCurrRecUploaded) ? ($currQty - $prevQty) : null;
                 }
             }
 
@@ -669,7 +671,7 @@ try {
                     $currQty = (int) ($sVal['qty'] ?? 0);
                     $prevQty = ($hasPrevious && $prevDbAnalysis) ? (int) ($prevDbAnalysis['sub_depts'][$sKey]['qty'] ?? 0) : 0;
                     $sVal['prev_qty'] = $prevQty;
-                    $sVal['diff_qty'] = $hasPrevious ? ($currQty - $prevQty) : null;
+                    $sVal['diff_qty'] = ($hasPrevious && $isCurrRecUploaded) ? ($currQty - $prevQty) : null;
                 }
                 unset($sVal);
             }
@@ -686,7 +688,7 @@ try {
                         'name_site' => $sInfo['name_site'] ?? '',
                         'qty' => $currQty,
                         'prev_qty' => $hasPrevious ? $prevQty : 0,
-                        'diff_qty' => $hasPrevious ? ($currQty - $prevQty) : null,
+                        'diff_qty' => ($hasPrevious && $isCurrRecUploaded) ? ($currQty - $prevQty) : null,
                         'solved' => 0,
                         'unsolved' => 0,
                         'new_db' => 0,
@@ -705,6 +707,29 @@ try {
                     }
 
                     $fetchStatusStats = function($pM, $pY, $cM, $cY) use ($db, $scopeSiteMap) {
+                        // Check if current comparison month has data uploaded in rekap_db_master
+                        $checkCurr = $db->prepare("SELECT 1 FROM rekap_db_master WHERE period_month = :c_m AND period_year = :c_y LIMIT 1");
+                        $checkCurr->execute([':c_m' => (int)$cM, ':c_y' => (int)$cY]);
+                        if (!$checkCurr->fetchColumn()) {
+                            $emptyFormatted = [
+                                'solved' => 0,
+                                'unsolved' => 0,
+                                'new_db' => 0,
+                                'solved_sites' => 0,
+                                'unsolved_sites' => 0,
+                                'new_db_sites' => 0,
+                            ];
+                            return [
+                                'scope_total' => $emptyFormatted,
+                                'outlet' => $emptyFormatted,
+                                'pmd' => $emptyFormatted,
+                                'depts' => [],
+                                'sub_depts' => [],
+                                'site_stats' => [],
+                                'is_uploaded' => false,
+                            ];
+                        }
+
                         $sql = "
                             WITH prev AS (
                                 SELECT DISTINCT ON (TRIM(r.reg_no)) 
@@ -817,14 +842,17 @@ try {
                             'depts' => array_map($format, $depts),
                             'sub_depts' => array_map($format, $subDepts),
                             'site_stats' => $siteStats,
+                            'is_uploaded' => true,
                         ];
                     };
 
                     $currStatus = $fetchStatusStats($prevM, $prevY, $month, $effY);
+                    $isCurrDbUploaded = ($currStatus['is_uploaded'] ?? false);
+                    $dbA['is_uploaded'] = $isCurrDbUploaded;
 
                     // Find period prior to prevM/prevY for diff comparison
                     $prevPrevPeriod = null;
-                    if ($hasPrevious && $prevM && $prevY) {
+                    if ($isCurrDbUploaded && $hasPrevious && $prevM && $prevY) {
                         $ppStmt = $db->prepare("
                             SELECT DISTINCT period_year, period_month 
                             FROM asset_reconciliation 
@@ -838,14 +866,14 @@ try {
                     }
 
                     $prevStatus = null;
-                    if ($prevPrevPeriod && !empty($prevPrevPeriod['period_month'])) {
+                    if ($isCurrDbUploaded && $prevPrevPeriod && !empty($prevPrevPeriod['period_month'])) {
                         $prevStatus = $fetchStatusStats((int)$prevPrevPeriod['period_month'], (int)$prevPrevPeriod['period_year'], (int)$prevM, (int)$prevY);
                     }
 
                     foreach (['cro', 'ero', 'wro', 'pmd'] as $dk) {
                         if (isset($dbA[$dk])) {
                             $cDept = $currStatus['depts'][$dk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
-                            $pDept = $prevStatus['depts'][$dk] ?? null;
+                            $pDept = $isCurrDbUploaded ? ($prevStatus['depts'][$dk] ?? null) : null;
 
                             $dbA[$dk]['solved'] = $cDept['solved'];
                             $dbA[$dk]['unsolved'] = $cDept['unsolved'];
