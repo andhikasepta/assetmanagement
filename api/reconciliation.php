@@ -697,7 +697,47 @@ try {
             }
 
             // Compute Solved, Unsolved, New DB counts & site stats comparing current month vs previous month
-            if ($month && $effY && $prevM && $prevY) {
+            $cmpCurrM = (int) $month;
+            $cmpCurrY = (int) $effY;
+            $cmpPrevM = (int) $prevM;
+            $cmpPrevY = (int) $prevY;
+
+            if (!$cmpCurrM) {
+                // "Semua Bulan" selected: determine latest month uploaded in rekap_db_master for effY
+                $stmtMaxDb = $db->prepare("SELECT MAX(period_month) as max_m FROM rekap_db_master WHERE period_year = :y");
+                $stmtMaxDb->execute([':y' => $cmpCurrY]);
+                $cmpCurrM = (int)($stmtMaxDb->fetchColumn() ?: 0);
+                if ($cmpCurrM > 0) {
+                    $isQuarterlySo = ($soType === 'quarterly' || in_array($category, [
+                        'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+                    ], true));
+                    if ($isQuarterlySo) {
+                        if ($cmpCurrM <= 3) {
+                            $cmpPrevM = 12;
+                            $cmpPrevY = $cmpCurrY - 1;
+                        } elseif ($cmpCurrM <= 6) {
+                            $cmpPrevM = 3;
+                            $cmpPrevY = $cmpCurrY;
+                        } elseif ($cmpCurrM <= 9) {
+                            $cmpPrevM = 6;
+                            $cmpPrevY = $cmpCurrY;
+                        } else {
+                            $cmpPrevM = 9;
+                            $cmpPrevY = $cmpCurrY;
+                        }
+                    } else {
+                        if ($cmpCurrM > 1) {
+                            $cmpPrevM = $cmpCurrM - 1;
+                            $cmpPrevY = $cmpCurrY;
+                        } else {
+                            $cmpPrevM = 12;
+                            $cmpPrevY = $cmpCurrY - 1;
+                        }
+                    }
+                }
+            }
+
+            if ($cmpCurrM && $cmpCurrY && $cmpPrevM && $cmpPrevY) {
                 try {
                     $scopeSiteMap = [];
                     if (isset($achievements['sites']) && is_array($achievements['sites'])) {
@@ -846,13 +886,13 @@ try {
                         ];
                     };
 
-                    $currStatus = $fetchStatusStats($prevM, $prevY, $month, $effY);
+                    $currStatus = $fetchStatusStats($cmpPrevM, $cmpPrevY, $cmpCurrM, $cmpCurrY);
                     $isCurrDbUploaded = ($currStatus['is_uploaded'] ?? false);
                     $dbA['is_uploaded'] = $isCurrDbUploaded;
 
-                    // Find period prior to prevM/prevY for diff comparison
+                    // Find period prior to cmpPrevM/cmpPrevY for diff comparison
                     $prevPrevPeriod = null;
-                    if ($isCurrDbUploaded && $hasPrevious && $prevM && $prevY) {
+                    if ($isCurrDbUploaded && $cmpPrevM && $cmpPrevY) {
                         $ppStmt = $db->prepare("
                             SELECT DISTINCT period_year, period_month 
                             FROM asset_reconciliation 
@@ -861,13 +901,45 @@ try {
                             ORDER BY period_year DESC, period_month DESC 
                             LIMIT 1
                         ");
-                        $ppStmt->execute([':pm' => $prevM, ':py' => $prevY]);
+                        $ppStmt->execute([':pm' => $cmpPrevM, ':py' => $cmpPrevY]);
                         $prevPrevPeriod = $ppStmt->fetch(PDO::FETCH_ASSOC);
                     }
 
                     $prevStatus = null;
-                    if ($isCurrDbUploaded && $prevPrevPeriod && !empty($prevPrevPeriod['period_month'])) {
-                        $prevStatus = $fetchStatusStats((int)$prevPrevPeriod['period_month'], (int)$prevPrevPeriod['period_year'], (int)$prevM, (int)$prevY);
+                    if ($isCurrDbUploaded) {
+                        $ppM = !empty($prevPrevPeriod['period_month']) ? (int)$prevPrevPeriod['period_month'] : null;
+                        $ppY = !empty($prevPrevPeriod['period_year']) ? (int)$prevPrevPeriod['period_year'] : null;
+                        if (!$ppM) {
+                            $isQuarterlySo = ($soType === 'quarterly' || in_array($category, [
+                                'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+                            ], true));
+                            if ($isQuarterlySo) {
+                                if ($cmpPrevM <= 3) {
+                                    $ppM = 12;
+                                    $ppY = $cmpPrevY - 1;
+                                } elseif ($cmpPrevM <= 6) {
+                                    $ppM = 3;
+                                    $ppY = $cmpPrevY;
+                                } elseif ($cmpPrevM <= 9) {
+                                    $ppM = 6;
+                                    $ppY = $cmpPrevY;
+                                } else {
+                                    $ppM = 9;
+                                    $ppY = $cmpPrevY;
+                                }
+                            } else {
+                                if ($cmpPrevM > 1) {
+                                    $ppM = $cmpPrevM - 1;
+                                    $ppY = $cmpPrevY;
+                                } else {
+                                    $ppM = 12;
+                                    $ppY = $cmpPrevY - 1;
+                                }
+                            }
+                        }
+                        if ($ppM && $ppY) {
+                            $prevStatus = $fetchStatusStats($ppM, $ppY, $cmpPrevM, $cmpPrevY);
+                        }
                     }
 
                     foreach (['cro', 'ero', 'wro', 'pmd'] as $dk) {

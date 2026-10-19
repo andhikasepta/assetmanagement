@@ -728,8 +728,10 @@ const AllSummaryApp = (function () {
 
             let statusBadge = '<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px;">Belum Ada Data</span>';
             if (r.status) {
-                const isGreen = r.status_class === 'green' || r.status.toLowerCase().includes('tercapai');
+                const s = r.status.toLowerCase();
+                const isTidak = r.status_class === 'red' || s.includes('tidak');
                 const isOrange = r.status_class === 'orange';
+                const isGreen = !isTidak && (r.status_class === 'green' || s.includes('tercapai'));
                 const bg = isGreen ? '#dcfce7' : (isOrange ? '#ffedd5' : '#fee2e2');
                 const col = isGreen ? '#15803d' : (isOrange ? '#c2410c' : '#b91c1c');
                 statusBadge = `<span class="badge" style="background: ${bg}; color: ${col}; font-weight: 700; font-size: 11px;">${r.status}</span>`;
@@ -769,14 +771,52 @@ const AllSummaryApp = (function () {
         updateHasilPagination(filteredHasilRows.length);
     }
 
+    function renderPaginationControls(container, currentPage, totalPages, clickHandler) {
+        if (!container) return;
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        html += `<button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="${clickHandler}(${currentPage - 1})">&laquo; Prev</button>`;
+
+        const maxButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="${clickHandler}(1)">1</button>`;
+            if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            html += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="${clickHandler}(${p})">${p}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+            html += `<button class="pagination-btn" onclick="${clickHandler}(${totalPages})">${totalPages}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="${clickHandler}(${currentPage + 1})">Next &raquo;</button>`;
+        container.innerHTML = html;
+    }
+
     function updateHasilPagination(total) {
         const info = document.getElementById('hasil-so-table-info');
+        const controls = document.getElementById('hasil-so-pagination-controls');
         const totalPages = Math.ceil(total / hasilPageSize) || 1;
         if (info) {
             const start = total > 0 ? (currentHasilPage - 1) * hasilPageSize + 1 : 0;
             const end = Math.min(currentHasilPage * hasilPageSize, total);
-            info.textContent = `Menampilkan ${start} - ${end} dari ${total} data`;
+            info.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
         }
+
+        renderPaginationControls(controls, currentHasilPage, totalPages, 'AllSummaryApp.goToHasilPage');
 
         const prevBtn = document.getElementById('hasil-so-prev-btn');
         const nextBtn = document.getElementById('hasil-so-next-btn');
@@ -787,18 +827,24 @@ const AllSummaryApp = (function () {
         if (pageSpan) pageSpan.textContent = `Hal ${currentHasilPage} / ${totalPages}`;
     }
 
+    function goToHasilPage(p) {
+        const totalPages = Math.ceil(filteredHasilRows.length / hasilPageSize) || 1;
+        if (p < 1) p = 1;
+        if (p > totalPages) p = totalPages;
+        currentHasilPage = p;
+        renderHasilTable();
+    }
+
     function prevHasilPage() {
         if (currentHasilPage > 1) {
-            currentHasilPage--;
-            renderHasilTable();
+            goToHasilPage(currentHasilPage - 1);
         }
     }
 
     function nextHasilPage() {
         const totalPages = Math.ceil(filteredHasilRows.length / hasilPageSize) || 1;
         if (currentHasilPage < totalPages) {
-            currentHasilPage++;
-            renderHasilTable();
+            goToHasilPage(currentHasilPage + 1);
         }
     }
 
@@ -809,22 +855,41 @@ const AllSummaryApp = (function () {
     }
 
     // ── 5. Rekap DB Status Table ──
-    async function loadRekapDbStatus(month, year) {
+    let allRdbStatusPage = 1;
+    let allRdbStatusPageSize = 10;
+    let allRdbStatusTotalPages = 1;
+
+    async function loadRekapDbStatus(month, year, page = 1) {
         const tbody = document.getElementById('rekap-db-status-tbody');
+        const info = document.getElementById('all-rdb-status-pagination-info');
+        const controls = document.getElementById('all-rdb-status-pagination-controls');
         if (!tbody) return;
 
+        allRdbStatusPage = page;
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data status DB...</td></tr>`;
 
         try {
-            const url = `api/rekap_db_status.php?category=all&month=${month}&year=${year}`;
+            const url = `api/rekap_db_status.php?category=all&month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}&page=${allRdbStatusPage}&limit=${allRdbStatusPageSize}`;
             const res = await fetch(url);
             const json = await res.json();
             if (!json.success) {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
+                if (info) info.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+                if (controls) controls.innerHTML = '';
                 return;
             }
 
             const rows = json.data || [];
+            const total = json.total !== undefined ? json.total : rows.length;
+            allRdbStatusTotalPages = json.total_pages || (Math.ceil(total / allRdbStatusPageSize) || 1);
+
+            if (info) {
+                const start = total > 0 ? (allRdbStatusPage - 1) * allRdbStatusPageSize + 1 : 0;
+                const end = Math.min(allRdbStatusPage * allRdbStatusPageSize, total);
+                info.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
+            }
+            renderPaginationControls(controls, allRdbStatusPage, allRdbStatusTotalPages, 'AllSummaryApp.goToAllRekapDbStatusPage');
+
             if (rows.length === 0) {
                 const emptyMsg = json.message || 'Tidak ada data status DB pada periode ini.';
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">${escapeHtml(emptyMsg)}</td></tr>`;
@@ -833,6 +898,7 @@ const AllSummaryApp = (function () {
 
             let html = '';
             rows.forEach((r, idx) => {
+                const no = (allRdbStatusPage - 1) * allRdbStatusPageSize + idx + 1;
                 const status = (r.status || '').toUpperCase();
                 let badgeClass = 'badge ';
                 if (status === 'SOLVED') badgeClass += 'badge-success';
@@ -841,7 +907,7 @@ const AllSummaryApp = (function () {
 
                 html += `
                     <tr>
-                        <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+                        <td style="text-align: center; color: #64748b;">${no}</td>
                         <td style="font-weight: 700; color: #0284c7; text-align: center;">${r.sitecode || '-'}</td>
                         <td style="font-weight: 500;">${r.name_site || '-'}</td>
                         <td style="font-size: 11.5px; color: #475569;">${r.dept || '-'} / ${r.sub_dept || '-'}</td>
@@ -855,7 +921,19 @@ const AllSummaryApp = (function () {
         } catch (err) {
             console.error('Error loading rekap db status:', err);
             tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat status DB</td></tr>`;
+            if (info) info.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            if (controls) controls.innerHTML = '';
         }
+    }
+
+    function goToAllRekapDbStatusPage(p) {
+        if (p < 1) p = 1;
+        if (allRdbStatusTotalPages > 0 && p > allRdbStatusTotalPages) p = allRdbStatusTotalPages;
+        const monthEl = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
+        const month = monthEl ? monthEl.value : '';
+        const yearEl = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
+        const year = yearEl ? yearEl.value : '2026';
+        loadRekapDbStatus(month, year, p);
     }
 
     // ── 6. Rekapitulasi Table (All Sites) ──
@@ -939,35 +1017,44 @@ const AllSummaryApp = (function () {
     }
 
     function updateRekapPagination(total) {
-        const info = document.getElementById('all-rekap-table-info');
+        const info = document.getElementById('all-rekap-table-info') || document.getElementById('rekap-table-info');
+        const controls = document.getElementById('all-rekap-pagination-controls') || document.getElementById('rekap-pagination-controls');
         const totalPages = Math.ceil(total / rekapPageSize) || 1;
         if (info) {
             const start = total > 0 ? (currentRekapPage - 1) * rekapPageSize + 1 : 0;
             const end = Math.min(currentRekapPage * rekapPageSize, total);
-            info.textContent = `Menampilkan ${start} - ${end} dari ${total} data`;
+            info.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
         }
 
-        const prevBtn = document.getElementById('all-rekap-prev-btn');
-        const nextBtn = document.getElementById('all-rekap-next-btn');
-        const pageSpan = document.getElementById('all-rekap-current-page');
+        renderPaginationControls(controls, currentRekapPage, totalPages, 'AllSummaryApp.goToAllRekapPage');
+
+        const prevBtn = document.getElementById('all-rekap-prev-btn') || document.getElementById('rekap-prev-btn');
+        const nextBtn = document.getElementById('all-rekap-next-btn') || document.getElementById('rekap-next-btn');
+        const pageSpan = document.getElementById('all-rekap-current-page') || document.getElementById('rekap-current-page');
 
         if (prevBtn) prevBtn.disabled = (currentRekapPage <= 1);
         if (nextBtn) nextBtn.disabled = (currentRekapPage >= totalPages);
         if (pageSpan) pageSpan.textContent = `Hal ${currentRekapPage} / ${totalPages}`;
     }
 
+    function goToAllRekapPage(p) {
+        const totalPages = Math.ceil(filteredRekapRows.length / rekapPageSize) || 1;
+        if (p < 1) p = 1;
+        if (p > totalPages) p = totalPages;
+        currentRekapPage = p;
+        renderRekapTable();
+    }
+
     function prevRekapPage() {
         if (currentRekapPage > 1) {
-            currentRekapPage--;
-            renderRekapTable();
+            goToAllRekapPage(currentRekapPage - 1);
         }
     }
 
     function nextRekapPage() {
         const totalPages = Math.ceil(filteredRekapRows.length / rekapPageSize) || 1;
         if (currentRekapPage < totalPages) {
-            currentRekapPage++;
-            renderRekapTable();
+            goToAllRekapPage(currentRekapPage + 1);
         }
     }
 
@@ -1289,14 +1376,18 @@ const AllSummaryApp = (function () {
         switchSOType,
         loadAllSummary,
         applyHasilFilter,
+        goToHasilPage,
         prevHasilPage,
         nextHasilPage,
         changeHasilPageSize,
         applyRekapFilter,
+        goToAllRekapPage,
         prevRekapPage,
         nextRekapPage,
         changeRekapPageSize,
         exportRekapExcel,
+        loadRekapDbStatus,
+        goToAllRekapDbStatusPage,
         filterMovementsTable,
         toggleMovementDetails,
         viewAllYearMovements,

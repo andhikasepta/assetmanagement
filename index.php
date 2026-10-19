@@ -149,12 +149,6 @@ $monthNames = [
                 <?php if (!$isLoggedIn): ?>
                     <button type="button" onclick="App.closeQuickAccess(); App.navigateTo('login');"
                         class="btn-quick-access-login" id="drawer-header-login-btn" title="Masuk ke Halaman Login">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                            <polyline points="10 17 15 12 10 7"></polyline>
-                            <line x1="15" y1="12" x2="3" y2="12"></line>
-                        </svg>
                         <span>LOGIN</span>
                     </button>
                 <?php endif; ?>
@@ -166,11 +160,6 @@ $monthNames = [
         </div>
 
 
-        <div style="padding: 0.75rem 1rem 0.25rem 1rem;">
-            <div
-                style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
-                Lompat ke Bagian</div>
-        </div>
         <div class="quick-access-body" id="quick-access-nav-list">
             <!-- Populated dynamically with links to cards -->
         </div>
@@ -2192,8 +2181,8 @@ $monthNames = [
                         <span>baris per halaman</span>
                     </div>
                     <div class="table-toolbar-right">
-                        <input type="text" id="rekap-search-input" class="table-search-input" placeholder="Search..."
-                            autocomplete="off" oninput="App.handleRekapSearch(this.value)">
+                        <input type="text" id="rekap-search-input" class="table-search-input unified-search-input"
+                            placeholder="Search..." autocomplete="off" oninput="App.handleRekapSearch(this.value)">
                     </div>
                 </div>
 
@@ -2444,6 +2433,16 @@ $monthNames = [
                     </div>
                 </div>
             </div>
+
+            <!-- Floating Chat Room Action Button (WhatsApp Direct) -->
+            <button type="button" class="floating-chat-room-btn" id="btn-chat-room-fab"
+                onclick="App.openChatRoomModal()" title="Buka Chat Room PIC Sites"
+                aria-label="Buka Chat Room PIC Sites">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z" />
+                </svg>
+            </button>
         </section>
 
         <!-- Login Page Section (SPA Clean URL) -->
@@ -2454,6 +2453,113 @@ $monthNames = [
 
         <!-- Master Data Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_master_data.php'; ?>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- MODAL: Chat Room PIC Sites (WhatsApp Direct)                -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <div id="chat-room-modal" class="modal-backdrop" style="display: none;">
+            <div class="modal-dialog" style="max-width: 480px;">
+                <div class="modal-header"
+                    style="align-items: center; border-bottom: 1px solid #e2e8f0; padding: 1rem 1.25rem;">
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                        <div
+                            style="width: 36px; height: 36px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="modal-title"
+                                style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">Chat Room PIC
+                                Sites</h3>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close-btn" onclick="App.closeChatRoomModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 1.25rem;">
+                    <!-- Hidden phone number store (nomor tidak ditampilkan pada UI) -->
+                    <input type="hidden" id="chat-room-notelp" value="">
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                        <!-- Dropdown DEPT -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="chat-room-dept"
+                                style="font-size: 12px; font-weight: 600; color: #334155;">
+                                DEPT <span style="color:#ef4444;">*</span>
+                            </label>
+                            <select id="chat-room-dept" class="form-control unified-filter-select" style="width: 100%;"
+                                onchange="App.onChatRoomDeptChange(this.value)">
+                                <option value="">Pilih Dept</option>
+                            </select>
+                        </div>
+
+                        <!-- Dropdown SUB DEPT -->
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="chat-room-subdept"
+                                style="font-size: 12px; font-weight: 600; color: #334155;">
+                                SUB DEPT <span style="color:#ef4444;">*</span>
+                            </label>
+                            <select id="chat-room-subdept" class="form-control unified-filter-select"
+                                style="width: 100%;" onchange="App.onChatRoomSubDeptChange(this.value)" disabled>
+                                <option value="">Pilih Sub Dept</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dropdown SITECODE -->
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="chat-room-sitecode"
+                            style="font-size: 12px; font-weight: 600; color: #334155;">
+                            SITECODE / SITE <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="chat-room-sitecode" class="form-control unified-filter-select" style="width: 100%;"
+                            onchange="App.onChatRoomSitecodeChange(this.value)" disabled>
+                            <option value="">Pilih Sitecode</option>
+                        </select>
+                    </div>
+
+                    <!-- Input PIC (Readonly) -->
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="chat-room-pic"
+                            style="font-size: 12px; font-weight: 600; color: #334155;">
+                            Nama PIC
+                        </label>
+                        <input type="text" id="chat-room-pic" class="form-control" readonly placeholder="Pilih sitecode"
+                            style="background-color: #f8fafc; color: #0f172a; font-weight: 600; cursor: not-allowed; border-color: #cbd5e1;">
+                        <!-- Alert if no phone number registered -->
+                        <div id="chat-room-no-phone-alert"
+                            style="display: none; margin-top: 6px; padding: 6px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 11.5px; color: #b45309;">
+                            ⚠️ Site ini belum memiliki nomor WhatsApp PIC terdaftar.
+                        </div>
+                    </div>
+
+                    <!-- Textbox Pesan -->
+                    <div class="form-group" style="margin-bottom: 0.5rem;">
+                        <label class="form-label" for="chat-room-message"
+                            style="font-size: 12px; font-weight: 600; color: #334155;">
+                            Pesan <span style="color:#ef4444;">*</span>
+                        </label>
+                        <textarea id="chat-room-message" class="form-control" rows="4" placeholder="Masukkan pesan..."
+                            style="resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.45;"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer"
+                    style="padding: 0.85rem 1.25rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.6rem;">
+                    <button type="button" class="btn btn-secondary" onclick="App.closeChatRoomModal()">Batal</button>
+                    <button type="button" class="btn btn-success" id="btn-chat-room-send"
+                        onclick="App.submitChatRoomMessage()"
+                        style="display: inline-flex; align-items: center; gap: 6px; background-color: #16a34a; border-color: #15803d; font-weight: 600; padding: 0.5rem 1rem;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z" />
+                        </svg>
+                        <span>Kirim ke WhatsApp</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- App Layout Footer -->

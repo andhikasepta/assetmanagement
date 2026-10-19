@@ -967,6 +967,16 @@ select.form-control option {
     color: #94a3b8;
 }
 
+.pagination-ellipsis {
+    padding: 0.35rem 0.4rem;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+}
+
 /* KPI Summary Cards */
 .kpi-grid {
     display: grid;
@@ -4333,6 +4343,63 @@ textarea,
         transform: rotate(360deg);
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Floating Chat Room Button & Modal
+   ══════════════════════════════════════════════════════════════ */
+.floating-chat-room-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 16px rgba(18, 140, 126, 0.42);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 990;
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    outline: none;
+}
+
+.floating-chat-room-btn:hover {
+    transform: translateY(-3px) scale(1.06);
+    box-shadow: 0 8px 24px rgba(18, 140, 126, 0.55);
+}
+
+.floating-chat-room-btn:active {
+    transform: translateY(1px) scale(0.96);
+}
+
+.floating-chat-room-btn svg {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+    transition: transform 0.2s ease;
+}
+
+.floating-chat-room-btn:hover svg {
+    transform: scale(1.08);
+}
+
+@media (max-width: 640px) {
+    .floating-chat-room-btn {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+    }
+    .floating-chat-room-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+}
+
 
 
 

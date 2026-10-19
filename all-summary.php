@@ -481,20 +481,10 @@ $csrfToken = getCsrfToken();
                                     </tbody>
                                 </table>
                             </div>
-                            <!-- Pagination Bar -->
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <div id="hasil-so-table-info" style="font-size: 12px; color: #64748b;">
-                                    Menampilkan 0 data
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="hasil-so-prev-btn"
-                                        onclick="AllSummaryApp.prevHasilPage()" disabled>Sebelumnya</button>
-                                    <span id="hasil-so-current-page"
-                                        style="font-size: 12px; font-weight: 600; color: #475569;">Hal 1 / 1</span>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="hasil-so-next-btn"
-                                        onclick="AllSummaryApp.nextHasilPage()" disabled>Selanjutnya</button>
-                                </div>
+                            <!-- Table Pagination Footer -->
+                            <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                <div id="hasil-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                                <div class="pagination-controls" id="hasil-so-pagination-controls"></div>
                             </div>
                         </div>
 
@@ -553,6 +543,11 @@ $csrfToken = getCsrfToken();
                             </tbody>
                         </table>
                     </div>
+                    <!-- Table Pagination Footer -->
+                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <div id="all-rdb-status-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                        <div class="pagination-controls" id="all-rdb-status-pagination-controls"></div>
+                    </div>
                 </div>
             </div>
 
@@ -564,9 +559,9 @@ $csrfToken = getCsrfToken();
                         <p class="card-subtitle">Rekapitulasi persentase fisik seluruh site per bulan</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <input type="search" id="rekap-search" class="form-control" placeholder="Search..."
+                        <input type="search" id="rekap-search" class="table-search-input unified-search-input" placeholder="Search..."
                             oninput="AllSummaryApp.applyRekapFilter()"
-                            style="max-width: 200px; font-size: 12px; padding: 0.35rem 0.75rem;">
+                            style="max-width: 240px;">
                         <button type="button" class="btn btn-outline-primary btn-sm"
                             onclick="AllSummaryApp.exportRekapExcel()">
                             Export Excel
@@ -606,20 +601,10 @@ $csrfToken = getCsrfToken();
                             </tbody>
                         </table>
                     </div>
-                    <!-- Pagination Bar -->
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <div id="rekap-table-info" style="font-size: 12px; color: #64748b;">
-                            Menampilkan 0 data
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="rekap-prev-btn"
-                                onclick="AllSummaryApp.prevRekapPage()" disabled>Sebelumnya</button>
-                            <span id="rekap-current-page" style="font-size: 12px; font-weight: 600; color: #475569;">Hal
-                                1 / 1</span>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="rekap-next-btn"
-                                onclick="AllSummaryApp.nextRekapPage()" disabled>Selanjutnya</button>
-                        </div>
+                    <!-- Table Pagination Footer -->
+                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <div id="rekap-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                        <div class="pagination-controls" id="rekap-pagination-controls"></div>
                     </div>
                 </div>
             </div>
@@ -632,9 +617,9 @@ $csrfToken = getCsrfToken();
                         <p class="card-subtitle">Log mutasi dan perubahan status master site</p>
                     </div>
                     <div>
-                        <input type="search" id="sm-search-input" class="form-control" placeholder="Search..."
+                        <input type="search" id="sm-search-input" class="table-search-input unified-search-input" placeholder="Search..."
                             oninput="AllSummaryApp.filterMovementsTable()"
-                            style="max-width: 250px; font-size: 12px; padding: 0.35rem 0.75rem;">
+                            style="max-width: 250px;">
                     </div>
                 </div>
                 <div class="card-body" style="padding: 1rem;">

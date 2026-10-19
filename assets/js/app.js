@@ -138,6 +138,7 @@ const App = (() => {
         setupDragAndDrop();
         setupSRDragAndDrop();
         setupRekapDbDragAndDrop();
+        setupPicSitesDragAndDrop();
 
         // Clean legacy localStorage to prevent stale storage hijacking default landing page
         try {
@@ -236,7 +237,7 @@ const App = (() => {
 
         // Protected pages require authenticated session
         if ((page === 'all-summary' || page === 'master-data') && !window.AUTH_USER) {
-            showToast('info', 'Akses Terbatas', 'Silakan login terlebih dahulu untuk mengakses menu Administrator.');
+            showToast('info', 'Akses Terbatas', 'Silakan login untuk mengakses menu Administrator.');
             openLoginModal(page);
             return;
         }
@@ -274,6 +275,12 @@ const App = (() => {
         // Update drawer quick jump links for this active page
         renderQuickAccessList(page);
 
+        // Toggle Chat Room FAB visibility (shown only on summary pages)
+        const chatFab = document.getElementById('btn-chat-room-fab');
+        const chatFabAll = document.getElementById('btn-chat-room-fab-all');
+        if (chatFab) chatFab.style.display = (page === 'summary') ? 'inline-flex' : 'none';
+        if (chatFabAll) chatFabAll.style.display = (page === 'all-summary') ? 'inline-flex' : 'none';
+
         // Page-specific data loaders
         if (page === 'summary') {
             if (!summaryInitialized || !isInit) {
@@ -290,6 +297,7 @@ const App = (() => {
             loadRekapDbData();
             loadScorecardKpi();
             loadMasterCatatan();
+            loadPicSites();
         }
 
         // Scroll to top on page switch
@@ -327,9 +335,9 @@ const App = (() => {
     const QUICK_ACCESS_ITEMS_MASTER = [
         { id: 'card-master-opname', title: 'Stock Opname Raw Data' },
         { id: 'card-site-regional', title: 'Master Site Regional' },
-        { id: 'card-rekapitulasi-2026', title: 'Master Rekapitulasi 2026' },
-        { id: 'card-master-catatan', title: 'Master Catatan Evaluasi' },
         { id: 'card-master-rekap-db', title: 'Master Rekap DB' },
+        { id: 'card-master-catatan', title: 'Catatan & Evaluasi Master' },
+        { id: 'card-pic-sites', title: 'PIC Sites Master Data' },
         { id: 'card-scorecard-rating-kpi', title: 'KPI Rating Master' },
         { id: 'card-scorecard-exec-kpi', title: 'KPI Execution Master' }
     ];
@@ -591,7 +599,7 @@ const App = (() => {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="22" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                <td colspan="21" class="text-center" style="padding: 2.5rem; color: #64748b;">
                     Loading records from PostgreSQL database...
                 </td>
             </tr>
@@ -604,7 +612,7 @@ const App = (() => {
             if (!json.success) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        <td colspan="21" class="text-center" style="padding: 2rem; color: #dc2626;">
                             ${json.message || 'Error loading records from database'}
                         </td>
                     </tr>
@@ -617,7 +625,7 @@ const App = (() => {
         } catch (err) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="22" class="text-center" style="padding: 2rem; color: #dc2626;">
+                    <td colspan="21" class="text-center" style="padding: 2rem; color: #dc2626;">
                         Network error loading records: ${escapeHtml(err.message || 'Unknown error')}
                     </td>
                 </tr>
@@ -787,7 +795,7 @@ const App = (() => {
         if (totalItems === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="22" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <td colspan="21" class="text-center" style="padding: 2.5rem; color: #64748b;">
                         ${allMasterRows.length === 0 ? "Tidak ada data Stock Opname." : "Data Stock Opname tidak ditemukan."}
                     </td>
                 </tr>
@@ -809,11 +817,6 @@ const App = (() => {
         pageRows.forEach(row => {
             html += `
                 <tr>
-                    <td class="text-center col-action">
-                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRecord(${row.id})" title="Hapus data ini">
-                            Hapus
-                        </button>
-                    </td>
                     <td class="text-left" style="font-weight: 500; max-width: 320px; white-space: normal;">
                         ${escapeHtml(row.profile)}
                     </td>
@@ -852,34 +855,42 @@ const App = (() => {
 
         // Update info text
         if (infoEl) {
-            infoEl.textContent = `Menampilkan ${(startIndex + 1).toLocaleString()} sampai ${endIndex.toLocaleString()} dari ${totalItems.toLocaleString()} data`;
+            infoEl.textContent = `Menampilkan ${totalItems > 0 ? (startIndex + 1).toLocaleString('id-ID') : 0} sampai ${endIndex.toLocaleString('id-ID')} dari ${totalItems.toLocaleString('id-ID')} data`;
         }
 
         // Generate pagination buttons
         if (controlsEl) {
-            let btnsHtml = '';
+            if (totalPages <= 1 || pageSize === 'all') {
+                controlsEl.innerHTML = '';
+            } else {
+                let btnsHtml = '';
+                btnsHtml += `<button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="App.goToPage(${currentPage - 1})">&laquo; Prev</button>`;
 
-            // First & Prev buttons
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>« Awal</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Sebelumnya</button>`;
+                const maxButtons = 5;
+                let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                }
 
-            // Window of page numbers
-            const maxButtons = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-            if (endPage - startPage + 1 < maxButtons) {
-                startPage = Math.max(1, endPage - maxButtons + 1);
+                if (startPage > 1) {
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(1)">1</button>`;
+                    if (startPage > 2) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                }
+
+                for (let p = startPage; p <= endPage; p++) {
+                    btnsHtml += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="App.goToPage(${p})">${p}</button>`;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${totalPages})">${totalPages}</button>`;
+                }
+
+                btnsHtml += `<button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="App.goToPage(${currentPage + 1})">Next &raquo;</button>`;
+
+                controlsEl.innerHTML = btnsHtml;
             }
-
-            for (let p = startPage; p <= endPage; p++) {
-                btnsHtml += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="App.goToPage(${p})">${p}</button>`;
-            }
-
-            // Next & Last buttons
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Berikutnya ›</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>Akhir »</button>`;
-
-            controlsEl.innerHTML = btnsHtml;
         }
     }
 
@@ -1371,7 +1382,7 @@ const App = (() => {
                             ${isActive && isCounted ? 'checked' : ''}
                             ${!isActive ? 'disabled' : ''}
                             onchange="App.toggleSRCounted(${row.id}, this.checked, this)"
-                            title="${!isActive ? 'Site harus aktif terlebih dahulu' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik')}"
+                            title="${!isActive ? 'Site harus aktif ' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik')}"
                             style="cursor: ${!isActive ? 'not-allowed' : 'pointer'}; width: 16px; height: 16px; accent-color: #16a34a; opacity: ${!isActive ? '0.45' : '1'};">
                     </td>
                     <td class="text-center col-action-sync" id="sr-sync-cell-${row.id}" style="padding: 3px 6px;">
@@ -1430,29 +1441,41 @@ const App = (() => {
         updateSRBulkDeleteButton();
 
         if (infoEl) {
-            infoEl.textContent = `Menampilkan ${(startIndex + 1).toLocaleString()} sampai ${endIndex.toLocaleString()} dari ${totalItems.toLocaleString()} data`;
+            infoEl.textContent = `Menampilkan ${totalItems > 0 ? (startIndex + 1).toLocaleString('id-ID') : 0} sampai ${endIndex.toLocaleString('id-ID')} dari ${totalItems.toLocaleString('id-ID')} data`;
         }
 
         if (controlsEl) {
-            let btnsHtml = '';
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(1)" ${srCurrentPage === 1 ? 'disabled' : ''}>« Awal</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(${srCurrentPage - 1})" ${srCurrentPage === 1 ? 'disabled' : ''}>‹ Sebelumnya</button>`;
+            if (totalPages <= 1 || srPageSize === 'all') {
+                controlsEl.innerHTML = '';
+            } else {
+                let btnsHtml = '';
+                btnsHtml += `<button class="pagination-btn" ${srCurrentPage === 1 ? 'disabled' : ''} onclick="App.goToSRPage(${srCurrentPage - 1})">&laquo; Prev</button>`;
 
-            const maxButtons = 5;
-            let startPage = Math.max(1, srCurrentPage - Math.floor(maxButtons / 2));
-            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-            if (endPage - startPage + 1 < maxButtons) {
-                startPage = Math.max(1, endPage - maxButtons + 1);
+                const maxButtons = 5;
+                let startPage = Math.max(1, srCurrentPage - Math.floor(maxButtons / 2));
+                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                }
+
+                if (startPage > 1) {
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(1)">1</button>`;
+                    if (startPage > 2) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                }
+
+                for (let p = startPage; p <= endPage; p++) {
+                    btnsHtml += `<button class="pagination-btn ${p === srCurrentPage ? 'active' : ''}" onclick="App.goToSRPage(${p})">${p}</button>`;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(${totalPages})">${totalPages}</button>`;
+                }
+
+                btnsHtml += `<button class="pagination-btn" ${srCurrentPage === totalPages ? 'disabled' : ''} onclick="App.goToSRPage(${srCurrentPage + 1})">Next &raquo;</button>`;
+
+                controlsEl.innerHTML = btnsHtml;
             }
-
-            for (let p = startPage; p <= endPage; p++) {
-                btnsHtml += `<button class="pagination-btn ${p === srCurrentPage ? 'active' : ''}" onclick="App.goToSRPage(${p})">${p}</button>`;
-            }
-
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(${srCurrentPage + 1})" ${srCurrentPage === totalPages ? 'disabled' : ''}>Berikutnya ›</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToSRPage(${totalPages})" ${srCurrentPage === totalPages ? 'disabled' : ''}>Akhir »</button>`;
-
-            controlsEl.innerHTML = btnsHtml;
         }
     }
 
@@ -1700,7 +1723,7 @@ const App = (() => {
                     countCb.style.opacity = !isActive ? '0.45' : '1';
                     const isCounted = row ? (row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0') : countCb.checked;
                     countCb.checked = isActive && isCounted;
-                    countCb.title = !isActive ? 'Site harus aktif terlebih dahulu' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik');
+                    countCb.title = !isActive ? 'Site harus aktif ' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik');
                 }
 
                 showToast('success', 'Status Diperbarui', `Status site diatur menjadi ${isActive ? 'Aktif' : 'Nonaktif'}`);
@@ -4288,7 +4311,7 @@ const App = (() => {
                     .then(res => {
                         if (res.success) summaryDataCache.set(cKey, res);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             }
             const scKey = `${summarySOType}_${cat}_${year}_${month}`;
             if (!scorecardDataCache.has(scKey)) {
@@ -4297,7 +4320,7 @@ const App = (() => {
                     .then(res => {
                         if (res.success) scorecardDataCache.set(scKey, res);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             }
             const sKey = `${summarySOType}_${cat}_all_all_${month}_${year}`;
             if (!subdeptResultsCache.has(sKey)) {
@@ -4306,7 +4329,7 @@ const App = (() => {
                     .then(res => {
                         if (res.success) subdeptResultsCache.set(sKey, res);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             }
         });
     }
@@ -5800,25 +5823,36 @@ const App = (() => {
 
     function renderRekapDbStatusPagination(container) {
         if (!container) return;
-        if (rdbStatusTotalPages <= 1) {
+        if (rdbStatusTotalPages <= 1 || rdbStatusPageSize === 'all') {
             container.innerHTML = '';
             return;
         }
 
         let html = '';
-        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === 1 ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage - 1})">&laquo;</button>`;
+        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === 1 ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage - 1})">&laquo; Prev</button>`;
 
-        let startP = Math.max(1, rdbStatusCurrentPage - 2);
-        let endP = Math.min(rdbStatusTotalPages, startP + 4);
-        if (endP - startP < 4) {
-            startP = Math.max(1, endP - 4);
+        const maxButtons = 5;
+        let startPage = Math.max(1, rdbStatusCurrentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(rdbStatusTotalPages, startPage + maxButtons - 1);
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
         }
 
-        for (let p = startP; p <= endP; p++) {
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="App.goToRekapDbStatusPage(1)">1</button>`;
+            if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
             html += `<button class="pagination-btn ${p === rdbStatusCurrentPage ? 'active' : ''}" onclick="App.goToRekapDbStatusPage(${p})">${p}</button>`;
         }
 
-        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === rdbStatusTotalPages ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage + 1})">&raquo;</button>`;
+        if (endPage < rdbStatusTotalPages) {
+            if (endPage < rdbStatusTotalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+            html += `<button class="pagination-btn" onclick="App.goToRekapDbStatusPage(${rdbStatusTotalPages})">${rdbStatusTotalPages}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${rdbStatusCurrentPage === rdbStatusTotalPages ? 'disabled' : ''} onclick="App.goToRekapDbStatusPage(${rdbStatusCurrentPage + 1})">Next &raquo;</button>`;
         container.innerHTML = html;
     }
 
@@ -7826,237 +7860,237 @@ const App = (() => {
                                 left: 6
                             }
                         },
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        trendTargetLine: {
-                            value: targetVal
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
                         },
-                        legend: {
-                            position: 'bottom',
-                            onClick: isDept ? onDeptLegendClick : onLegendClick,
-                            onHover: isDept ? onDeptLegendHover : (e, legendItem, legend) => {
-                                legend.chart.canvas.style.cursor = 'pointer';
-                                const chart = legend.chart;
-                                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
-                                    if (chart._highlightedIndex !== legendItem.datasetIndex) {
-                                        applyChartHighlight(chart, legendItem.datasetIndex);
-                                    }
-                                }
+                        plugins: {
+                            trendTargetLine: {
+                                value: targetVal
                             },
-                            onLeave: isDept ? onDeptLegendLeave : (e, legendItem, legend) => {
-                                legend.chart.canvas.style.cursor = 'default';
-                                const chart = legend.chart;
-                                if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
-                                    applyChartHighlight(chart, null);
-                                }
-                            },
-                            labels: {
-                                boxWidth: 12,
-                                boxHeight: 12,
-                                usePointStyle: true,
-                                padding: 12,
-                                font: { size: 11, weight: '600' },
-                                generateLabels: function (chart) {
-                                    const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                                    defaultLabels.sort((a, b) => a.datasetIndex - b.datasetIndex);
-
-                                    const highlighted = chart._highlightedIndex;
-                                    const activeGroup = chart._activeDeptGroup;
-                                    const allowedSubs = activeGroup ? (DEPT_SUBDEPTS_MAP[activeGroup] || []) : null;
-
-                                    defaultLabels.forEach((item) => {
-                                        item.hidden = false;
-                                        const ds = chart.data.datasets[item.datasetIndex];
-                                        const origColor = ds ? (ds._origBorderColor || ds.borderColor) : item.strokeStyle;
-
-                                        if (highlighted !== null && highlighted !== undefined) {
-                                            if (item.datasetIndex === highlighted) {
-                                                item.fontColor = '#0f172a';
-                                                item.fillStyle = origColor;
-                                                item.strokeStyle = origColor;
-                                            } else {
-                                                item.fontColor = '#94a3b8';
-                                                item.fillStyle = hexToRgba(origColor, 0.3);
-                                                item.strokeStyle = hexToRgba(origColor, 0.3);
-                                            }
-                                        } else if (allowedSubs) {
-                                            if (allowedSubs.includes(ds.label)) {
-                                                item.fontColor = '#0f172a';
-                                                item.fillStyle = origColor;
-                                                item.strokeStyle = origColor;
-                                            } else {
-                                                item.fontColor = '#cbd5e1';
-                                                item.fillStyle = hexToRgba(origColor, 0.2);
-                                                item.strokeStyle = hexToRgba(origColor, 0.2);
-                                            }
-                                        } else {
-                                            item.fontColor = '#475569';
-                                            item.fillStyle = origColor;
-                                            item.strokeStyle = origColor;
+                            legend: {
+                                position: 'bottom',
+                                onClick: isDept ? onDeptLegendClick : onLegendClick,
+                                onHover: isDept ? onDeptLegendHover : (e, legendItem, legend) => {
+                                    legend.chart.canvas.style.cursor = 'pointer';
+                                    const chart = legend.chart;
+                                    if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                                        if (chart._highlightedIndex !== legendItem.datasetIndex) {
+                                            applyChartHighlight(chart, legendItem.datasetIndex);
                                         }
-                                    });
-                                    return defaultLabels;
+                                    }
+                                },
+                                onLeave: isDept ? onDeptLegendLeave : (e, legendItem, legend) => {
+                                    legend.chart.canvas.style.cursor = 'default';
+                                    const chart = legend.chart;
+                                    if (chart._pinnedIndex === null || chart._pinnedIndex === undefined) {
+                                        applyChartHighlight(chart, null);
+                                    }
+                                },
+                                labels: {
+                                    boxWidth: 12,
+                                    boxHeight: 12,
+                                    usePointStyle: true,
+                                    padding: 12,
+                                    font: { size: 11, weight: '600' },
+                                    generateLabels: function (chart) {
+                                        const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                                        defaultLabels.sort((a, b) => a.datasetIndex - b.datasetIndex);
+
+                                        const highlighted = chart._highlightedIndex;
+                                        const activeGroup = chart._activeDeptGroup;
+                                        const allowedSubs = activeGroup ? (DEPT_SUBDEPTS_MAP[activeGroup] || []) : null;
+
+                                        defaultLabels.forEach((item) => {
+                                            item.hidden = false;
+                                            const ds = chart.data.datasets[item.datasetIndex];
+                                            const origColor = ds ? (ds._origBorderColor || ds.borderColor) : item.strokeStyle;
+
+                                            if (highlighted !== null && highlighted !== undefined) {
+                                                if (item.datasetIndex === highlighted) {
+                                                    item.fontColor = '#0f172a';
+                                                    item.fillStyle = origColor;
+                                                    item.strokeStyle = origColor;
+                                                } else {
+                                                    item.fontColor = '#94a3b8';
+                                                    item.fillStyle = hexToRgba(origColor, 0.3);
+                                                    item.strokeStyle = hexToRgba(origColor, 0.3);
+                                                }
+                                            } else if (allowedSubs) {
+                                                if (allowedSubs.includes(ds.label)) {
+                                                    item.fontColor = '#0f172a';
+                                                    item.fillStyle = origColor;
+                                                    item.strokeStyle = origColor;
+                                                } else {
+                                                    item.fontColor = '#cbd5e1';
+                                                    item.fillStyle = hexToRgba(origColor, 0.2);
+                                                    item.strokeStyle = hexToRgba(origColor, 0.2);
+                                                }
+                                            } else {
+                                                item.fontColor = '#475569';
+                                                item.fillStyle = origColor;
+                                                item.strokeStyle = origColor;
+                                            }
+                                        });
+                                        return defaultLabels;
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.94)',
+                                titleColor: '#fff',
+                                bodyColor: '#e2e8f0',
+                                borderColor: '#334155',
+                                borderWidth: 1,
+                                padding: 10,
+                                boxPadding: 4,
+                                usePointStyle: true,
+                                footerColor: '#fca5a5',
+                                footerFont: { size: 10, weight: '600' },
+                                footerMarginTop: 6,
+                                filter: function (tooltipItem) {
+                                    const chart = tooltipItem.chart;
+                                    const highlighted = chart ? chart._highlightedIndex : null;
+                                    if (highlighted !== null && highlighted !== undefined) {
+                                        return tooltipItem.datasetIndex === highlighted;
+                                    }
+                                    const activeGroup = chart ? chart._activeDeptGroup : null;
+                                    if (activeGroup && DEPT_SUBDEPTS_MAP[activeGroup]) {
+                                        const ds = chart.data.datasets[tooltipItem.datasetIndex];
+                                        return DEPT_SUBDEPTS_MAP[activeGroup].includes(ds.label);
+                                    }
+                                    return true;
+                                },
+                                itemSort: function (a, b) {
+                                    const chart = a.chart;
+                                    const highlighted = chart ? chart._highlightedIndex : null;
+                                    if (highlighted !== null && highlighted !== undefined) {
+                                        if (a.datasetIndex === highlighted) return -1;
+                                        if (b.datasetIndex === highlighted) return 1;
+                                    }
+                                    return (b.parsed.y || 0) - (a.parsed.y || 0);
+                                },
+                                callbacks: {
+                                    label: function (context) {
+                                        const chart = context.chart;
+                                        const highlighted = chart ? chart._highlightedIndex : null;
+                                        let label = context.dataset.label || '';
+                                        if (label) label += ': ';
+                                        if (context.parsed.y !== null && context.parsed.y !== undefined) {
+                                            label += Math.round(context.parsed.y) + '%';
+                                        } else {
+                                            label += '-';
+                                        }
+                                        if (highlighted !== null && highlighted !== undefined && context.datasetIndex === highlighted) {
+                                            label = '● ' + label + ' (Focused)';
+                                        }
+                                        return label;
+                                    },
+                                    footer: function () {
+                                        return `Target: ${targetVal}%`;
+                                    }
                                 }
                             }
                         },
-                        tooltip: {
-                            backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                            titleColor: '#fff',
-                            bodyColor: '#e2e8f0',
-                            borderColor: '#334155',
-                            borderWidth: 1,
-                            padding: 10,
-                            boxPadding: 4,
-                            usePointStyle: true,
-                            footerColor: '#fca5a5',
-                            footerFont: { size: 10, weight: '600' },
-                            footerMarginTop: 6,
-                            filter: function (tooltipItem) {
-                                const chart = tooltipItem.chart;
-                                const highlighted = chart ? chart._highlightedIndex : null;
-                                if (highlighted !== null && highlighted !== undefined) {
-                                    return tooltipItem.datasetIndex === highlighted;
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: '#64748b',
+                                    font: { size: 10, weight: '500' }
                                 }
-                                const activeGroup = chart ? chart._activeDeptGroup : null;
-                                if (activeGroup && DEPT_SUBDEPTS_MAP[activeGroup]) {
-                                    const ds = chart.data.datasets[tooltipItem.datasetIndex];
-                                    return DEPT_SUBDEPTS_MAP[activeGroup].includes(ds.label);
-                                }
-                                return true;
                             },
-                            itemSort: function (a, b) {
-                                const chart = a.chart;
-                                const highlighted = chart ? chart._highlightedIndex : null;
-                                if (highlighted !== null && highlighted !== undefined) {
-                                    if (a.datasetIndex === highlighted) return -1;
-                                    if (b.datasetIndex === highlighted) return 1;
-                                }
-                                return (b.parsed.y || 0) - (a.parsed.y || 0);
-                            },
-                            callbacks: {
-                                label: function (context) {
-                                    const chart = context.chart;
-                                    const highlighted = chart ? chart._highlightedIndex : null;
-                                    let label = context.dataset.label || '';
-                                    if (label) label += ': ';
-                                    if (context.parsed.y !== null && context.parsed.y !== undefined) {
-                                        label += Math.round(context.parsed.y) + '%';
-                                    } else {
-                                        label += '-';
-                                    }
-                                    if (highlighted !== null && highlighted !== undefined && context.datasetIndex === highlighted) {
-                                        label = '● ' + label + ' (Focused)';
-                                    }
-                                    return label;
+                            y: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    stepSize: 25,
+                                    color: '#64748b',
+                                    font: { size: 10 },
+                                    callback: val => val + '%'
                                 },
-                                footer: function () {
-                                    return `Target: ${targetVal}%`;
+                                grid: {
+                                    color: '#f1f5f9'
                                 }
                             }
                         }
                     },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: {
-                                color: '#64748b',
-                                font: { size: 10, weight: '500' }
+                    plugins: [{
+                        id: 'trendTargetLinePlugin',
+                        afterDraw(chart) {
+                            const target = chart.config.options?.plugins?.trendTargetLine?.value;
+                            if (target === undefined || target === null) return;
+
+                            const { ctx, chartArea, scales: { x, y } } = chart;
+                            if (!chartArea || !x || !y) return;
+
+                            const yPixel = y.getPixelForValue(target);
+                            if (isNaN(yPixel)) return;
+
+                            ctx.save();
+
+                            // 1. Draw dashed line across the chart width
+                            ctx.beginPath();
+                            ctx.setLineDash([5, 4]);
+                            ctx.strokeStyle = '#dc2626';
+                            ctx.lineWidth = 1.5;
+                            ctx.moveTo(chartArea.left, yPixel);
+                            ctx.lineTo(chartArea.right, yPixel);
+                            ctx.stroke();
+
+                            // 2. Target Label Badge on the right
+                            const text = `Target ${target}%`;
+                            ctx.font = '600 10px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+                            const textMetrics = ctx.measureText(text);
+                            const textWidth = textMetrics.width;
+                            const padX = 6;
+                            const badgeHeight = 17;
+                            const badgeWidth = textWidth + padX * 2;
+                            const badgeX = chartArea.right - badgeWidth - 2;
+
+                            let badgeY = yPixel - badgeHeight / 2;
+                            if (badgeY < chartArea.top - 2) {
+                                badgeY = chartArea.top - 2;
+                            } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
+                                badgeY = chartArea.bottom - badgeHeight;
                             }
-                        },
-                        y: {
-                            min: 0,
-                            max: 100,
-                            ticks: {
-                                stepSize: 25,
-                                color: '#64748b',
-                                font: { size: 10 },
-                                callback: val => val + '%'
-                            },
-                            grid: {
-                                color: '#f1f5f9'
+
+                            // Soft pill background (white with crisp red border)
+                            ctx.setLineDash([]);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.strokeStyle = '#dc2626';
+                            ctx.lineWidth = 1;
+
+                            const r = 3;
+                            ctx.beginPath();
+                            if (ctx.roundRect) {
+                                ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, r);
+                            } else {
+                                ctx.moveTo(badgeX + r, badgeY);
+                                ctx.lineTo(badgeX + badgeWidth - r, badgeY);
+                                ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY, badgeX + badgeWidth, badgeY + r);
+                                ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight - r);
+                                ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY + badgeHeight, badgeX + badgeWidth - r, badgeY + badgeHeight);
+                                ctx.lineTo(badgeX + r, badgeY + badgeHeight);
+                                ctx.quadraticCurveTo(badgeX, badgeY + badgeHeight, badgeX, badgeY + badgeHeight - r);
+                                ctx.lineTo(badgeX, badgeY + r);
+                                ctx.quadraticCurveTo(badgeX, badgeY, badgeX + r, badgeY);
                             }
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.stroke();
+
+                            // Badge text
+                            ctx.fillStyle = '#dc2626';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.5);
+
+                            ctx.restore();
                         }
-                    }
-                },
-                plugins: [{
-                    id: 'trendTargetLinePlugin',
-                    afterDraw(chart) {
-                        const target = chart.config.options?.plugins?.trendTargetLine?.value;
-                        if (target === undefined || target === null) return;
-
-                        const { ctx, chartArea, scales: { x, y } } = chart;
-                        if (!chartArea || !x || !y) return;
-
-                        const yPixel = y.getPixelForValue(target);
-                        if (isNaN(yPixel)) return;
-
-                        ctx.save();
-
-                        // 1. Draw dashed line across the chart width
-                        ctx.beginPath();
-                        ctx.setLineDash([5, 4]);
-                        ctx.strokeStyle = '#dc2626';
-                        ctx.lineWidth = 1.5;
-                        ctx.moveTo(chartArea.left, yPixel);
-                        ctx.lineTo(chartArea.right, yPixel);
-                        ctx.stroke();
-
-                        // 2. Target Label Badge on the right
-                        const text = `Target ${target}%`;
-                        ctx.font = '600 10px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
-                        const textMetrics = ctx.measureText(text);
-                        const textWidth = textMetrics.width;
-                        const padX = 6;
-                        const badgeHeight = 17;
-                        const badgeWidth = textWidth + padX * 2;
-                        const badgeX = chartArea.right - badgeWidth - 2;
-
-                        let badgeY = yPixel - badgeHeight / 2;
-                        if (badgeY < chartArea.top - 2) {
-                            badgeY = chartArea.top - 2;
-                        } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
-                            badgeY = chartArea.bottom - badgeHeight;
-                        }
-
-                        // Soft pill background (white with crisp red border)
-                        ctx.setLineDash([]);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.strokeStyle = '#dc2626';
-                        ctx.lineWidth = 1;
-
-                        const r = 3;
-                        ctx.beginPath();
-                        if (ctx.roundRect) {
-                            ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, r);
-                        } else {
-                            ctx.moveTo(badgeX + r, badgeY);
-                            ctx.lineTo(badgeX + badgeWidth - r, badgeY);
-                            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY, badgeX + badgeWidth, badgeY + r);
-                            ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight - r);
-                            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY + badgeHeight, badgeX + badgeWidth - r, badgeY + badgeHeight);
-                            ctx.lineTo(badgeX + r, badgeY + badgeHeight);
-                            ctx.quadraticCurveTo(badgeX, badgeY + badgeHeight, badgeX, badgeY + badgeHeight - r);
-                            ctx.lineTo(badgeX, badgeY + r);
-                            ctx.quadraticCurveTo(badgeX, badgeY, badgeX + r, badgeY);
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                        ctx.stroke();
-
-                        // Badge text
-                        ctx.fillStyle = '#dc2626';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.5);
-
-                        ctx.restore();
-                    }
-                }]
+                    }]
+                };
             };
-        };
 
             // 1. Render Card 1: DEPT Trends
             const isPmd = (summaryCategory === 'pmd');
@@ -8734,30 +8768,42 @@ const App = (() => {
 
         // Update info text
         if (infoEl) {
-            infoEl.textContent = `Showing ${(startIndex + 1).toLocaleString()} to ${endIndex.toLocaleString()} of ${totalItems.toLocaleString()} entries`;
+            infoEl.textContent = `Menampilkan ${totalItems > 0 ? (startIndex + 1).toLocaleString('id-ID') : 0} sampai ${endIndex.toLocaleString('id-ID')} dari ${totalItems.toLocaleString('id-ID')} data`;
         }
 
         // Generate pagination controls
         if (controlsEl) {
-            let btnsHtml = '';
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(1)" ${rekapCurrentPage === 1 ? 'disabled' : ''}>« First</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(${rekapCurrentPage - 1})" ${rekapCurrentPage === 1 ? 'disabled' : ''}>‹ Prev</button>`;
+            if (totalPages <= 1 || rekapPageSize === 0) {
+                controlsEl.innerHTML = '';
+            } else {
+                let btnsHtml = '';
+                btnsHtml += `<button class="pagination-btn" ${rekapCurrentPage === 1 ? 'disabled' : ''} onclick="App.goToRekapPage(${rekapCurrentPage - 1})">&laquo; Prev</button>`;
 
-            const maxButtons = 5;
-            let startPage = Math.max(1, rekapCurrentPage - Math.floor(maxButtons / 2));
-            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-            if (endPage - startPage + 1 < maxButtons) {
-                startPage = Math.max(1, endPage - maxButtons + 1);
+                const maxButtons = 5;
+                let startPage = Math.max(1, rekapCurrentPage - Math.floor(maxButtons / 2));
+                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                }
+
+                if (startPage > 1) {
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(1)">1</button>`;
+                    if (startPage > 2) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                }
+
+                for (let p = startPage; p <= endPage; p++) {
+                    btnsHtml += `<button class="pagination-btn ${p === rekapCurrentPage ? 'active' : ''}" onclick="App.goToRekapPage(${p})">${p}</button>`;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(${totalPages})">${totalPages}</button>`;
+                }
+
+                btnsHtml += `<button class="pagination-btn" ${rekapCurrentPage === totalPages ? 'disabled' : ''} onclick="App.goToRekapPage(${rekapCurrentPage + 1})">Next &raquo;</button>`;
+
+                controlsEl.innerHTML = btnsHtml;
             }
-
-            for (let p = startPage; p <= endPage; p++) {
-                btnsHtml += `<button class="pagination-btn ${p === rekapCurrentPage ? 'active' : ''}" onclick="App.goToRekapPage(${p})">${p}</button>`;
-            }
-
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(${rekapCurrentPage + 1})" ${rekapCurrentPage === totalPages ? 'disabled' : ''}>Next ›</button>`;
-            btnsHtml += `<button class="pagination-btn" onclick="App.goToRekapPage(${totalPages})" ${rekapCurrentPage === totalPages ? 'disabled' : ''}>Last »</button>`;
-
-            controlsEl.innerHTML = btnsHtml;
         }
     }
 
@@ -9632,7 +9678,7 @@ const App = (() => {
                                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.editExecutiveNote(${note.id})" title="Edit" style="padding: 2px 6px; font-size: 11px;">
                                     Edit
                                 </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="App.deleteExecutiveNote(${note.id})" title="Hapus" style="padding: 2px 6px; font-size: 11px;">
+                                <button type="button" class="btn btn-danger btn-sm btn-delete" onclick="App.deleteExecutiveNote(${note.id})" title="Hapus" style="padding: 2px 6px; font-size: 11px;">
                                     Hapus
                                 </button>
                             </div>
@@ -9998,6 +10044,993 @@ const App = (() => {
         }
     }
 
+    // ═════════════════════════════════════════════════════════════════
+    // ── PIC Sites Master Data ───────────────────────────────────────
+    // ═════════════════════════════════════════════════════════════════
+    let picSitesCurrentPage = 1;
+    let picSitesPageSize = '10';
+    let picSitesTotalPages = 1;
+    let picSitesTotalItems = 0;
+    let picSitesSearchQuery = '';
+    let picSitesDeptFilter = 'all';
+    let picSitesSubDeptFilter = 'all';
+    let picSitesSortCol = 'dept';
+    let picSitesSortDir = 'asc';
+    let picSitesDebounceTimer = null;
+    let picSitesCache = [];
+    let siteOptionsCache = [];
+
+    async function loadPicSites(page = picSitesCurrentPage) {
+        const tbody = document.getElementById('pic-sites-tbody');
+        const infoEl = document.getElementById('pic-sites-pagination-info');
+        const controlsEl = document.getElementById('pic-sites-pagination-controls');
+        if (!tbody) return;
+
+        picSitesCurrentPage = page;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                            <line x1="12" y1="2" x2="12" y2="6"></line>
+                            <line x1="12" y1="18" x2="12" y2="22"></line>
+                            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        </svg>
+                        <span>Memuat data PIC Sites...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                page: picSitesCurrentPage,
+                limit: picSitesPageSize,
+                dept: picSitesDeptFilter,
+                sub_dept: picSitesSubDeptFilter,
+                search: picSitesSearchQuery,
+                sort_col: picSitesSortCol,
+                sort_dir: picSitesSortDir
+            });
+
+            const res = await fetch(`api/site_pics.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.message || 'Gagal memuat data');
+            }
+
+            picSitesCache = json.data || [];
+            picSitesTotalItems = json.total || 0;
+            picSitesTotalPages = json.total_pages || 1;
+
+            populatePicSitesFilters(json.depts || [], json.sub_depts || []);
+            renderPicSitesTable(json.data || []);
+            updatePicSitesPagination(json.page, json.total, json.total_pages);
+            updatePicSitesSortIndicators();
+
+        } catch (err) {
+            console.error('Error loading PIC sites:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center" style="padding: 2.5rem; color: #ef4444;">
+                        Terjadi kesalahan saat memuat data: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            if (controlsEl) controlsEl.innerHTML = '';
+        }
+    }
+
+    function renderPicSitesTable(rows) {
+        const tbody = document.getElementById('pic-sites-tbody');
+        if (!tbody) return;
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                        Tidak ada data PIC Site yang ditemukan
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const startIndex = picSitesPageSize === 'all' ? 0 : (picSitesCurrentPage - 1) * parseInt(picSitesPageSize, 10);
+        let html = '';
+
+        rows.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const picDisplay = r.pic && r.pic.trim()
+                ? `<span style="font-weight: 600; color: #0f172a;">${escapeHtml(r.pic)}</span>`
+                : '<span style="color: #94a3b8; font-style: italic;">No data.</span>';
+
+            let phoneDisplay = '<span style="color: #94a3b8; font-style: italic;">-</span>';
+            if (r.no_telp && r.no_telp.trim()) {
+                const rawPhone = r.no_telp.trim();
+                const cleanNum = rawPhone.replace(/[^0-9]/g, '');
+                let waNum = cleanNum;
+                if (waNum.startsWith('0')) {
+                    waNum = '62' + waNum.substring(1);
+                }
+                phoneDisplay = `
+                    <div style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span style="font-weight: 500; color: #334155;">${escapeHtml(rawPhone)}</span>
+                        ${cleanNum.length >= 8 ? `
+                            <a href="https://wa.me/${waNum}" target="_blank" rel="noopener noreferrer" title="Hubungi via WhatsApp"
+                                style="color: #16a34a; display: inline-flex; align-items: center;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
+                                </svg>
+                            </a>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            html += `
+                <tr id="pic-site-row-${r.id}">
+                    <td class="text-center" style="color: #64748b;">${no}</td>
+                    <td class="text-center"><span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">${escapeHtml(r.dept || '-')}</span></td>
+                    <td class="text-center" style="font-size: 11.5px; font-weight: 600; color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
+                    <td class="text-center" style="font-weight: 700; color: #0284c7;">${escapeHtml(r.sitecode || '-')}</td>
+                    <td style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
+                    <td>${picDisplay}</td>
+                    <td>${phoneDisplay}</td>
+                    <td class="text-center">
+                        <div style="display: inline-flex; align-items: center; gap: 4px;">
+                            <button class="btn btn-outline-primary btn-sm" onclick="App.openEditPicSiteModal(${r.id})" title="Edit PIC"
+                                style="font-size: 11px; padding: 2px 7px;">
+                                Edit
+                            </button>
+                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deletePicSite(${r.id})" title="Hapus"
+                                style="font-size: 11px; padding: 2px 7px;">
+                                Hapus
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function updatePicSitesPagination(page, total, totalPages) {
+        const infoEl = document.getElementById('pic-sites-pagination-info');
+        const controlsEl = document.getElementById('pic-sites-pagination-controls');
+
+        if (infoEl) {
+            const start = total > 0 ? (page - 1) * (picSitesPageSize === 'all' ? total : parseInt(picSitesPageSize, 10)) + 1 : 0;
+            const end = picSitesPageSize === 'all' ? total : Math.min(page * parseInt(picSitesPageSize, 10), total);
+            infoEl.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
+        }
+
+        if (controlsEl) {
+            if (totalPages <= 1 || picSitesPageSize === 'all') {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            html += `<button class="pagination-btn" ${page === 1 ? 'disabled' : ''} onclick="App.goToPicSitesPage(${page - 1})">&laquo; Prev</button>`;
+
+            const maxButtons = 5;
+            let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="App.goToPicSitesPage(1)">1</button>`;
+                if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                html += `<button class="pagination-btn ${p === page ? 'active' : ''}" onclick="App.goToPicSitesPage(${p})">${p}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+                html += `<button class="pagination-btn" onclick="App.goToPicSitesPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            html += `<button class="pagination-btn" ${page === totalPages ? 'disabled' : ''} onclick="App.goToPicSitesPage(${page + 1})">Next &raquo;</button>`;
+            controlsEl.innerHTML = html;
+        }
+    }
+
+    function goToPicSitesPage(p) {
+        if (p < 1) p = 1;
+        if (p > picSitesTotalPages) p = picSitesTotalPages;
+        loadPicSites(p);
+    }
+
+    function changePicSitesPageSize(sz) {
+        picSitesPageSize = sz;
+        picSitesCurrentPage = 1;
+        loadPicSites(1);
+    }
+
+    function handlePicSitesSearch(val) {
+        clearTimeout(picSitesDebounceTimer);
+        picSitesDebounceTimer = setTimeout(() => {
+            picSitesSearchQuery = (val || '').trim();
+            picSitesCurrentPage = 1;
+            loadPicSites(1);
+        }, 300);
+    }
+
+    function onPicSitesDeptFilterChange() {
+        const el = document.getElementById('pic-sites-filter-dept');
+        picSitesDeptFilter = el ? el.value : 'all';
+        picSitesCurrentPage = 1;
+        loadPicSites(1);
+    }
+
+    function onPicSitesSubDeptFilterChange() {
+        const el = document.getElementById('pic-sites-filter-subdept');
+        picSitesSubDeptFilter = el ? el.value : 'all';
+        picSitesCurrentPage = 1;
+        loadPicSites(1);
+    }
+
+    function populatePicSitesFilters(depts, subDepts) {
+        const deptSelect = document.getElementById('pic-sites-filter-dept');
+        const subDeptSelect = document.getElementById('pic-sites-filter-subdept');
+
+        if (deptSelect && deptSelect.options.length <= 1 && Array.isArray(depts)) {
+            const currentVal = deptSelect.value;
+            deptSelect.innerHTML = '<option value="all">Semua Dept</option>';
+            depts.forEach(d => {
+                if (d && d.trim()) {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    opt.textContent = d;
+                    if (d === currentVal) opt.selected = true;
+                    deptSelect.appendChild(opt);
+                }
+            });
+        }
+
+        if (subDeptSelect && subDeptSelect.options.length <= 1 && Array.isArray(subDepts)) {
+            const currentVal = subDeptSelect.value;
+            subDeptSelect.innerHTML = '<option value="all">Semua Sub Dept</option>';
+            subDepts.forEach(s => {
+                if (s && s.trim()) {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    if (s === currentVal) opt.selected = true;
+                    subDeptSelect.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    function togglePicSitesSort(col) {
+        if (picSitesSortCol === col) {
+            picSitesSortDir = picSitesSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            picSitesSortCol = col;
+            picSitesSortDir = 'asc';
+        }
+        loadPicSites(1);
+    }
+
+    function updatePicSitesSortIndicators() {
+        document.querySelectorAll('#pic-sites-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#pic-sites-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (picSitesSortCol) {
+            const activeTh = document.querySelector(`#pic-sites-table th.sortable[onclick*="'${picSitesSortCol}'"]`);
+            if (activeTh) activeTh.classList.add(picSitesSortDir);
+            const activeInd = document.querySelector(`#pic-sites-table .sort-indicator[data-pics-col="${picSitesSortCol}"]`);
+            if (activeInd) activeInd.textContent = picSitesSortDir === 'asc' ? '▲' : '▼';
+        }
+    }
+
+    function exportPicSitesExcel() {
+        const params = new URLSearchParams({
+            action: 'export',
+            dept: picSitesDeptFilter,
+            sub_dept: picSitesSubDeptFilter,
+            search: picSitesSearchQuery
+        });
+        window.location.href = `api/site_pics.php?${params.toString()}`;
+    }
+
+    async function loadSiteOptionsForModal() {
+        if (siteOptionsCache.length > 0) return siteOptionsCache;
+        try {
+            const res = await fetch('api/site_pics.php?action=site_options');
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+                siteOptionsCache = json.data;
+            }
+        } catch (e) {
+            console.error('Failed to load site options:', e);
+        }
+        return siteOptionsCache;
+    }
+
+    async function populateSiteSelectOptions(selectEl) {
+        if (!selectEl) return;
+        const sites = await loadSiteOptionsForModal();
+        if (selectEl.options.length <= 1 && Array.isArray(sites)) {
+            selectEl.innerHTML = '<option value="">Pilih Site atau Input Manual</option>';
+            sites.forEach(s => {
+                if (s.sitecode) {
+                    const opt = document.createElement('option');
+                    opt.value = s.sitecode;
+                    opt.textContent = `${s.sitecode} - ${s.name_site || ''} (${s.dept || '-'}/${s.sub_dept || '-'})`;
+                    selectEl.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    async function openAddPicSiteModal() {
+        document.getElementById('pic-site-modal-title').textContent = 'Tambah PIC Site';
+        document.getElementById('pic-site-id').value = '';
+        document.getElementById('pic-site-sitecode').value = '';
+        document.getElementById('pic-site-dept').value = '';
+        document.getElementById('pic-site-subdept').value = '';
+        document.getElementById('pic-site-name').value = '';
+        document.getElementById('pic-site-pic').value = '';
+        document.getElementById('pic-site-notelp').value = '';
+
+        const selectEl = document.getElementById('pic-site-select-sitecode');
+        if (selectEl) {
+            selectEl.parentElement.style.display = 'block';
+            await populateSiteSelectOptions(selectEl);
+            selectEl.value = '';
+        }
+
+        const modal = document.getElementById('pic-site-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function openEditPicSiteModal(id) {
+        const item = picSitesCache.find(x => x.id === id);
+        if (!item) return;
+
+        document.getElementById('pic-site-modal-title').textContent = 'Edit PIC Site';
+        document.getElementById('pic-site-id').value = item.id;
+        document.getElementById('pic-site-sitecode').value = item.sitecode || '';
+        document.getElementById('pic-site-dept').value = item.dept || '';
+        document.getElementById('pic-site-subdept').value = item.sub_dept || '';
+        document.getElementById('pic-site-name').value = item.name_site || '';
+        document.getElementById('pic-site-pic').value = item.pic || '';
+        document.getElementById('pic-site-notelp').value = item.no_telp || '';
+
+        const selectEl = document.getElementById('pic-site-select-sitecode');
+        if (selectEl) {
+            selectEl.parentElement.style.display = 'none';
+        }
+
+        const modal = document.getElementById('pic-site-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closePicSiteModal() {
+        const modal = document.getElementById('pic-site-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function onPicSitecodeSelected(sc) {
+        if (!sc) return;
+        const opt = siteOptionsCache.find(s => s.sitecode === sc);
+        if (opt) {
+            document.getElementById('pic-site-sitecode').value = opt.sitecode || '';
+            document.getElementById('pic-site-name').value = opt.name_site || '';
+            document.getElementById('pic-site-dept').value = opt.dept || '';
+            document.getElementById('pic-site-subdept').value = opt.sub_dept || '';
+        }
+    }
+
+    async function submitPicSiteForm(e) {
+        if (e) e.preventDefault();
+        const btn = document.getElementById('btn-save-pic-site');
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+        }
+
+        try {
+            const payload = {
+                id: document.getElementById('pic-site-id').value || null,
+                sitecode: document.getElementById('pic-site-sitecode').value.trim(),
+                name_site: document.getElementById('pic-site-name').value.trim(),
+                dept: document.getElementById('pic-site-dept').value.trim(),
+                sub_dept: document.getElementById('pic-site-subdept').value.trim(),
+                pic: document.getElementById('pic-site-pic').value.trim(),
+                no_telp: document.getElementById('pic-site-notelp').value.trim()
+            };
+
+            const res = await fetch('api/site_pics.php?action=save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                alert(json.message || 'Gagal menyimpan data');
+                return;
+            }
+
+            closePicSiteModal();
+            loadPicSites(picSitesCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error saving PIC site:', err);
+            alert('Terjadi kesalahan jaringan saat menyimpan data');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origText;
+            }
+        }
+    }
+
+    async function deletePicSite(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus data PIC site ini?')) return;
+        try {
+            const res = await fetch('api/site_pics.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                alert(json.message || 'Gagal menghapus data');
+                return;
+            }
+            loadPicSites(picSitesCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error deleting PIC site:', err);
+            alert('Gagal menghapus data');
+        }
+    }
+
+    // ── PIC Sites Import Excel ───────────────────────────────────────
+    let picSitesSelectedFile = null;
+    let picSitesFileToken = null;
+
+    function setupPicSitesDragAndDrop() {
+        const dropZone = document.getElementById('pic-sites-drag-drop-zone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handlePicSitesFileSelect(dt.files);
+            }
+        });
+    }
+
+    function openPicSitesImportModal() {
+        clearPicSitesSelectedFile();
+        const statusDiv = document.getElementById('pic-sites-modal-import-status');
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.textContent = '';
+        }
+        const chk = document.getElementById('pic-sites-import-replace-existing');
+        if (chk) chk.checked = false;
+
+        const modal = document.getElementById('pic-sites-import-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closePicSitesImportModal() {
+        const modal = document.getElementById('pic-sites-import-modal');
+        if (modal) modal.style.display = 'none';
+        clearPicSitesSelectedFile();
+    }
+
+    async function handlePicSitesFileSelect(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        const validExts = ['.xlsx', '.xls', '.csv'];
+        const nameLower = file.name.toLowerCase();
+        const isValid = validExts.some(ext => nameLower.endsWith(ext));
+
+        if (!isValid) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'Format File Salah', 'Hanya file .xlsx, .xls, atau .csv yang didukung.');
+            } else {
+                alert('Hanya file .xlsx, .xls, atau .csv yang didukung.');
+            }
+            return;
+        }
+
+        picSitesSelectedFile = file;
+
+        // Update selected file display
+        const displayEl = document.getElementById('pic-sites-selected-file-display');
+        const nameEl = document.getElementById('pic-sites-selected-file-name');
+        const sizeEl = document.getElementById('pic-sites-selected-file-size');
+        if (displayEl && nameEl && sizeEl) {
+            nameEl.textContent = file.name;
+            sizeEl.textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
+            displayEl.style.display = 'block';
+        }
+
+        // Show sheet selection and set loading state
+        const sheetGroup = document.getElementById('pic-sites-import-sheet-group');
+        const sheetSelect = document.getElementById('pic-sites-import-sheet-select');
+        const sheetHint = document.getElementById('pic-sites-import-sheet-hint');
+        const submitBtn = document.getElementById('pic-sites-modal-import-btn');
+
+        if (sheetGroup && sheetSelect) {
+            sheetGroup.style.display = 'block';
+            sheetSelect.innerHTML = '<option value="">Membaca sheet dari file...</option>';
+            sheetSelect.disabled = true;
+            if (sheetHint) sheetHint.textContent = 'Mohon tunggu saat membaca sheet...';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Membaca sheet...';
+        }
+
+        try {
+            const json = await fetchExcelSheets(file);
+            if (json.success && json.sheets && json.sheets.length > 0) {
+                picSitesFileToken = json.file_token || null;
+                sheetSelect.innerHTML = '';
+                json.sheets.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    sheetSelect.appendChild(opt);
+                });
+                sheetSelect.selectedIndex = 0;
+                sheetSelect.disabled = false;
+                if (sheetHint) {
+                    sheetHint.textContent = json.sheets.length === 1
+                        ? '1 sheet terdeteksi pada file.'
+                        : `${json.sheets.length} sheet ditemukan. Silakan pilih sheet untuk diimpor.`;
+                }
+            } else {
+                sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+                sheetSelect.disabled = false;
+                if (sheetHint) sheetHint.textContent = 'Sheet default akan digunakan.';
+            }
+        } catch (err) {
+            if (sheetSelect) {
+                sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+                sheetSelect.disabled = false;
+            }
+            if (sheetHint) sheetHint.textContent = 'Sheet default akan digunakan.';
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    function clearPicSitesSelectedFile() {
+        picSitesSelectedFile = null;
+        picSitesFileToken = null;
+        const fileInput = document.getElementById('pic-sites-import-file-input');
+        if (fileInput) fileInput.value = '';
+
+        const displayEl = document.getElementById('pic-sites-selected-file-display');
+        if (displayEl) displayEl.style.display = 'none';
+
+        const sheetGroup = document.getElementById('pic-sites-import-sheet-group');
+        const sheetSelect = document.getElementById('pic-sites-import-sheet-select');
+        const sheetHint = document.getElementById('pic-sites-import-sheet-hint');
+        if (sheetGroup) sheetGroup.style.display = 'none';
+        if (sheetSelect) {
+            sheetSelect.innerHTML = '<option value="">Pilih Sheet...</option>';
+            sheetSelect.disabled = false;
+        }
+        if (sheetHint) sheetHint.textContent = '';
+
+        const submitBtn = document.getElementById('pic-sites-modal-import-btn');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unggah & Impor';
+        }
+    }
+
+    async function submitPicSitesImport() {
+        if (!picSitesSelectedFile) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'File Belum Dipilih', 'Silakan pilih atau seret & lepas file Excel.');
+            } else {
+                alert('Silakan pilih atau seret & lepas file Excel.');
+            }
+            return;
+        }
+
+        const submitBtn = document.getElementById('pic-sites-modal-import-btn');
+        const statusDiv = document.getElementById('pic-sites-modal-import-status');
+        const replaceExisting = document.getElementById('pic-sites-import-replace-existing')?.checked ? '1' : '0';
+        const sheetSelect = document.getElementById('pic-sites-import-sheet-select');
+        const sheetName = sheetSelect ? sheetSelect.value : '';
+
+        const formData = new FormData();
+        formData.append('action', 'import');
+        formData.append('replace_existing', replaceExisting);
+        formData.append('sheet_name', sheetName);
+        if (picSitesFileToken) {
+            formData.append('file_token', picSitesFileToken);
+        } else {
+            formData.append('excel_file', picSitesSelectedFile);
+        }
+        formData.append('csrf_token', csrfToken);
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mengunggah & Memproses...';
+        }
+
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#eff6ff';
+            statusDiv.style.color = '#1d4ed8';
+            statusDiv.style.border = '1px solid #bfdbfe';
+            statusDiv.textContent = 'Mengunggah dan mengimpor data PIC Sites...';
+        }
+
+        try {
+            const res = await fetch('api/site_pics.php?action=import', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
+            });
+
+            const json = await res.json();
+
+            if (json.success) {
+                if (statusDiv) {
+                    statusDiv.style.background = '#f0fdf4';
+                    statusDiv.style.color = '#15803d';
+                    statusDiv.style.border = '1px solid #bbf7d0';
+                    statusDiv.textContent = json.message || 'Impor berhasil!';
+                }
+
+                if (typeof showToast === 'function') {
+                    showToast('success', 'Impor Selesai', json.message || 'Data berhasil diimpor.');
+                }
+
+                loadPicSites(1);
+
+                setTimeout(() => {
+                    closePicSitesImportModal();
+                }, 1200);
+            } else {
+                if (statusDiv) {
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = json.message || 'Impor gagal.';
+                }
+                if (typeof showToast === 'function') {
+                    showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor data.');
+                } else {
+                    alert(json.message || 'Gagal mengimpor data.');
+                }
+            }
+        } catch (err) {
+            console.error('Error importing PIC sites:', err);
+            if (statusDiv) {
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = 'Kesalahan jaringan: ' + err.message;
+            }
+            if (typeof showToast === 'function') {
+                showToast('error', 'Kesalahan Sistem', 'Terjadi kesalahan jaringan.');
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // ── Chat Room PIC Sites (WhatsApp Direct) ────────────────────────
+    // ═════════════════════════════════════════════════════════════════
+    let chatRoomSitesData = [];
+    let chatRoomLoaded = false;
+    let chatRoomLoadingPromise = null;
+
+    async function loadChatRoomSites() {
+        if (chatRoomLoaded) return chatRoomSitesData;
+        if (chatRoomLoadingPromise) return chatRoomLoadingPromise;
+
+        chatRoomLoadingPromise = (async () => {
+            try {
+                const res = await fetch('api/site_pics.php?action=chat_sites');
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data)) {
+                    chatRoomSitesData = json.data;
+                    chatRoomLoaded = true;
+                }
+            } catch (err) {
+                console.error('Failed to load chat room sites:', err);
+            } finally {
+                chatRoomLoadingPromise = null;
+            }
+            return chatRoomSitesData;
+        })();
+
+        return chatRoomLoadingPromise;
+    }
+
+    async function openChatRoomModal() {
+        const modal = document.getElementById('chat-room-modal');
+        if (!modal) return;
+
+        // Reset inputs
+        const deptSelect = document.getElementById('chat-room-dept');
+        const subDeptSelect = document.getElementById('chat-room-subdept');
+        const siteSelect = document.getElementById('chat-room-sitecode');
+        const picInput = document.getElementById('chat-room-pic');
+        const phoneInput = document.getElementById('chat-room-notelp');
+        const alertEl = document.getElementById('chat-room-no-phone-alert');
+        const msgInput = document.getElementById('chat-room-message');
+        const sendBtn = document.getElementById('btn-chat-room-send');
+
+        if (deptSelect) {
+            deptSelect.innerHTML = '<option value="">Memuat Dept...</option>';
+            deptSelect.disabled = true;
+        }
+        if (subDeptSelect) {
+            subDeptSelect.innerHTML = '<option value="">Pilih Dept </option>';
+            subDeptSelect.disabled = true;
+        }
+        if (siteSelect) {
+            siteSelect.innerHTML = '<option value="">Pilih Sub Dept </option>';
+            siteSelect.disabled = true;
+        }
+        if (picInput) picInput.value = '';
+        if (phoneInput) phoneInput.value = '';
+        if (alertEl) alertEl.style.display = 'none';
+        if (msgInput) msgInput.value = '';
+        if (sendBtn) sendBtn.disabled = false;
+
+        modal.style.display = 'flex';
+
+        // Load data and populate DEPTs
+        const sites = await loadChatRoomSites();
+        if (deptSelect) {
+            const depts = [...new Set(sites.map(s => (s.dept || '').trim()).filter(Boolean))].sort();
+            deptSelect.innerHTML = '<option value="">Pilih Dept</option>';
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                deptSelect.appendChild(opt);
+            });
+            deptSelect.disabled = false;
+        }
+    }
+
+    function closeChatRoomModal() {
+        const modal = document.getElementById('chat-room-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function onChatRoomDeptChange(selectedDept) {
+        const subDeptSelect = document.getElementById('chat-room-subdept');
+        const siteSelect = document.getElementById('chat-room-sitecode');
+        const picInput = document.getElementById('chat-room-pic');
+        const phoneInput = document.getElementById('chat-room-notelp');
+        const alertEl = document.getElementById('chat-room-no-phone-alert');
+        const sendBtn = document.getElementById('btn-chat-room-send');
+
+        if (picInput) picInput.value = '';
+        if (phoneInput) phoneInput.value = '';
+        if (alertEl) alertEl.style.display = 'none';
+        if (sendBtn) sendBtn.disabled = false;
+
+        if (!selectedDept) {
+            if (subDeptSelect) {
+                subDeptSelect.innerHTML = '<option value="">Pilih Sub Dept</option>';
+                subDeptSelect.disabled = true;
+            }
+            if (siteSelect) {
+                siteSelect.innerHTML = '<option value="">Pilih Sub Dept </option>';
+                siteSelect.disabled = true;
+            }
+            return;
+        }
+
+        const filtered = chatRoomSitesData.filter(s => (s.dept || '').trim() === selectedDept);
+        const subDepts = [...new Set(filtered.map(s => (s.sub_dept || '').trim()).filter(Boolean))].sort();
+
+        if (subDeptSelect) {
+            subDeptSelect.innerHTML = '<option value="">Pilih Sub Dept</option>';
+            subDepts.forEach(sd => {
+                const opt = document.createElement('option');
+                opt.value = sd;
+                opt.textContent = sd;
+                subDeptSelect.appendChild(opt);
+            });
+            subDeptSelect.disabled = false;
+        }
+
+        if (siteSelect) {
+            siteSelect.innerHTML = '<option value="">Pilih Sub Dept </option>';
+            siteSelect.disabled = true;
+        }
+    }
+
+    function onChatRoomSubDeptChange(selectedSubDept) {
+        const deptSelect = document.getElementById('chat-room-dept');
+        const siteSelect = document.getElementById('chat-room-sitecode');
+        const picInput = document.getElementById('chat-room-pic');
+        const phoneInput = document.getElementById('chat-room-notelp');
+        const alertEl = document.getElementById('chat-room-no-phone-alert');
+        const sendBtn = document.getElementById('btn-chat-room-send');
+
+        if (picInput) picInput.value = '';
+        if (phoneInput) phoneInput.value = '';
+        if (alertEl) alertEl.style.display = 'none';
+        if (sendBtn) sendBtn.disabled = false;
+
+        if (!selectedSubDept) {
+            if (siteSelect) {
+                siteSelect.innerHTML = '<option value="">Pilih Sub Dept </option>';
+                siteSelect.disabled = true;
+            }
+            return;
+        }
+
+        const selectedDept = deptSelect ? deptSelect.value : '';
+        const filtered = chatRoomSitesData.filter(s =>
+            (s.dept || '').trim() === selectedDept &&
+            (s.sub_dept || '').trim() === selectedSubDept
+        );
+
+        if (siteSelect) {
+            siteSelect.innerHTML = '<option value="">Pilih Sitecode</option>';
+            filtered.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.sitecode;
+                opt.textContent = `${s.sitecode} - ${s.name_site || ''}`;
+                siteSelect.appendChild(opt);
+            });
+            siteSelect.disabled = false;
+        }
+    }
+
+    function onChatRoomSitecodeChange(selectedSitecode) {
+        const picInput = document.getElementById('chat-room-pic');
+        const phoneInput = document.getElementById('chat-room-notelp');
+        const alertEl = document.getElementById('chat-room-no-phone-alert');
+        const sendBtn = document.getElementById('btn-chat-room-send');
+
+        if (!selectedSitecode) {
+            if (picInput) picInput.value = '';
+            if (phoneInput) phoneInput.value = '';
+            if (alertEl) alertEl.style.display = 'none';
+            if (sendBtn) sendBtn.disabled = false;
+            return;
+        }
+
+        const site = chatRoomSitesData.find(s => s.sitecode === selectedSitecode);
+        if (!site) return;
+
+        if (picInput) {
+            picInput.value = site.pic && site.pic.trim() ? site.pic.trim() : 'No data PIC.';
+        }
+
+        const rawPhone = (site.no_telp || '').trim();
+        if (phoneInput) {
+            phoneInput.value = rawPhone;
+        }
+
+        const cleanDigits = rawPhone.replace(/[^0-9]/g, '');
+        if (!cleanDigits || cleanDigits.length < 8) {
+            if (alertEl) alertEl.style.display = 'block';
+            if (sendBtn) sendBtn.disabled = true;
+        } else {
+            if (alertEl) alertEl.style.display = 'none';
+            if (sendBtn) sendBtn.disabled = false;
+        }
+    }
+
+    function submitChatRoomMessage() {
+        const siteSelect = document.getElementById('chat-room-sitecode');
+        const sitecode = siteSelect ? siteSelect.value : '';
+        if (!sitecode) {
+            if (typeof showToast === 'function') {
+                showToast('warning', 'Peringatan', 'Silakan pilih DEPT, SUB DEPT, dan SITECODE .');
+            } else {
+                alert('Silakan pilih DEPT, SUB DEPT, dan SITECODE .');
+            }
+            return;
+        }
+
+        const phoneInput = document.getElementById('chat-room-notelp');
+        const rawPhone = phoneInput ? phoneInput.value.trim() : '';
+        let cleanNum = rawPhone.replace(/[^0-9]/g, '');
+
+        if (!cleanNum || cleanNum.length < 8) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'Nomor Tidak Tersedia', 'Site ini belum memiliki nomor WhatsApp PIC terdaftar.');
+            } else {
+                alert('Site ini belum memiliki nomor WhatsApp PIC terdaftar.');
+            }
+            return;
+        }
+
+        const msgInput = document.getElementById('chat-room-message');
+        const message = msgInput ? msgInput.value.trim() : '';
+        if (!message) {
+            if (typeof showToast === 'function') {
+                showToast('warning', 'Pesan Kosong', 'Silakan tuliskan pesan yang ingin dikirimkan.');
+            } else {
+                alert('Silakan tuliskan pesan yang ingin dikirimkan.');
+            }
+            if (msgInput) msgInput.focus();
+            return;
+        }
+
+        // Format into international WhatsApp number
+        if (cleanNum.startsWith('0')) {
+            cleanNum = '62' + cleanNum.substring(1);
+        } else if (cleanNum.startsWith('8')) {
+            cleanNum = '62' + cleanNum;
+        }
+
+        const waUrl = `https://api.whatsapp.com/send?phone=${cleanNum}&text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank');
+
+        closeChatRoomModal();
+
+        if (typeof showToast === 'function') {
+            showToast('success', 'WhatsApp Dibuka', 'Mengalihkan pesan ke WhatsApp...');
+        }
+    }
+
     // ── Public Interface ───────────────────────────────────────
 
     return {
@@ -10151,6 +11184,35 @@ const App = (() => {
         toggleSubdeptResultsSort,
         toggleMasterCatatanSort,
         toggleExecCatatanSort,
+        // PIC Sites Master Data exports
+        loadPicSites,
+        renderPicSitesTable,
+        updatePicSitesPagination,
+        goToPicSitesPage,
+        changePicSitesPageSize,
+        handlePicSitesSearch,
+        onPicSitesDeptFilterChange,
+        onPicSitesSubDeptFilterChange,
+        togglePicSitesSort,
+        exportPicSitesExcel,
+        openAddPicSiteModal,
+        openEditPicSiteModal,
+        closePicSiteModal,
+        onPicSitecodeSelected,
+        submitPicSiteForm,
+        deletePicSite,
+        openPicSitesImportModal,
+        closePicSitesImportModal,
+        handlePicSitesFileSelect,
+        clearPicSitesSelectedFile,
+        submitPicSitesImport,
+        // Chat Room PIC Sites exports
+        openChatRoomModal,
+        closeChatRoomModal,
+        onChatRoomDeptChange,
+        onChatRoomSubDeptChange,
+        onChatRoomSitecodeChange,
+        submitChatRoomMessage,
         // Quick Access & User Dropdown exports
         toggleQuickAccess,
         openQuickAccess,

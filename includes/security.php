@@ -94,7 +94,7 @@ function requireAuth(bool $exitOnError = true): bool
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'success' => false,
-                'message' => 'Akses ditolak. Silakan login sebagai administrator terlebih dahulu.',
+                'message' => 'Akses ditolak. Silakan login sebagai administrator .',
                 'error_code' => 'UNAUTHORIZED'
             ]);
             exit;
