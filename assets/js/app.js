@@ -3,6 +3,89 @@
  * Stock Opname Master Data with Pagination, Column Filters & Delete
  */
 
+// Universal prevention of browser hover text tooltips
+(function disableAllHoverTooltips() {
+    try {
+        if (typeof HTMLElement !== 'undefined' && HTMLElement.prototype) {
+            Object.defineProperty(HTMLElement.prototype, 'title', {
+                get: function () { return ''; },
+                set: function () { this.removeAttribute('title'); },
+                configurable: true
+            });
+        }
+        if (typeof SVGElement !== 'undefined' && SVGElement.prototype) {
+            Object.defineProperty(SVGElement.prototype, 'title', {
+                get: function () { return ''; },
+                set: function () { this.removeAttribute('title'); },
+                configurable: true
+            });
+        }
+    } catch (e) { }
+
+    function removeTitles(root) {
+        if (!root) return;
+        if (root.nodeType === 1 && root.hasAttribute('title')) {
+            root.removeAttribute('title');
+        }
+        if (root.querySelectorAll) {
+            root.querySelectorAll('[title]').forEach(function (el) {
+                el.removeAttribute('title');
+            });
+        }
+    }
+
+    document.addEventListener('mouseover', function (e) {
+        let el = e.target;
+        while (el && el !== document && el.nodeType === 1) {
+            if (el.hasAttribute('title')) {
+                el.removeAttribute('title');
+            }
+            el = el.parentElement;
+        }
+    }, true);
+
+    document.addEventListener('pointerover', function (e) {
+        let el = e.target;
+        while (el && el !== document && el.nodeType === 1) {
+            if (el.hasAttribute('title')) {
+                el.removeAttribute('title');
+            }
+            el = el.parentElement;
+        }
+    }, true);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            removeTitles(document.body || document.documentElement);
+        });
+    } else {
+        removeTitles(document.body || document.documentElement);
+    }
+
+    if (window.MutationObserver) {
+        var observer = new MutationObserver(function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var m = mutations[i];
+                if (m.type === 'attributes' && m.attributeName === 'title') {
+                    if (m.target && m.target.hasAttribute && m.target.hasAttribute('title')) {
+                        m.target.removeAttribute('title');
+                    }
+                } else if (m.addedNodes && m.addedNodes.length > 0) {
+                    for (var j = 0; j < m.addedNodes.length; j++) {
+                        removeTitles(m.addedNodes[j]);
+                    }
+                }
+            }
+        });
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['title']
+        });
+    }
+})();
+
 const App = (() => {
     let allMasterRows = [];
     let filteredMasterRows = [];
@@ -139,17 +222,18 @@ const App = (() => {
         setupSRDragAndDrop();
         setupRekapDbDragAndDrop();
         setupPicSitesDragAndDrop();
+        setupWeeklyDragAndDrop();
 
         // Clean legacy localStorage to prevent stale storage hijacking default landing page
         try {
             localStorage.removeItem('active_page');
         } catch (e) { }
 
-        // Clean URL enforcer: strips any .php, query strings or hash so URL stays wmsdev.my.id/amora/
+        // Clean URL enforcer: strips any .php, query strings or hash so URL stays clean (e.g. amora.wmsdev.my.id/)
         keepCleanUrl();
 
         let initialPage = window.AUTH_USER ? 'all-summary' : 'summary';
-        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
+        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'weekly-summary' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'master-data-weekly' || window.INITIAL_PAGE === 'user-management' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
             if (window.INITIAL_PAGE === 'login') {
                 initialPage = window.AUTH_USER ? 'all-summary' : 'login';
             } else {
@@ -157,7 +241,7 @@ const App = (() => {
             }
         } else {
             const savedPage = sessionStorage.getItem('active_page');
-            if (savedPage && (savedPage === 'all-summary' || savedPage === 'master-data' || savedPage === 'summary' || savedPage === 'login')) {
+            if (savedPage && (savedPage === 'all-summary' || savedPage === 'weekly-summary' || savedPage === 'master-data' || savedPage === 'master-data-weekly' || savedPage === 'user-management' || savedPage === 'summary' || savedPage === 'login')) {
                 if (savedPage === 'login') {
                     initialPage = window.AUTH_USER ? 'all-summary' : 'login';
                 } else {
@@ -166,7 +250,12 @@ const App = (() => {
             }
         }
         if (window.AUTH_USER && (initialPage === 'summary' || !initialPage)) {
-            initialPage = 'all-summary';
+            const perms = window.AUTH_USER.permissions || {};
+            const canAll = perms.can_access_all_summary !== false;
+            const canWk = perms.can_access_weekly_summary !== false;
+            const canMst = perms.can_access_master_data !== false;
+            const canMstWk = perms.can_access_master_data_weekly !== false;
+            initialPage = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : 'user-management')));
         }
 
         // Restore active SO Type & Category from sessionStorage
@@ -214,7 +303,7 @@ const App = (() => {
     function keepCleanUrl() {
         try {
             let path = window.location.pathname;
-            let cleanPath = path.replace(/(index|login|summary|all-summary|master-data)\.php.*$/i, '');
+            let cleanPath = path.replace(/(index|login|summary|all-summary|weekly-summary|master-data-weekly|master-data|user-management)\.php.*$/i, '');
             if (!cleanPath.endsWith('/')) {
                 cleanPath += '/';
             }
@@ -224,7 +313,61 @@ const App = (() => {
         } catch (e) { }
     }
 
-    // ── Navigation (SPA Core: Summary vs All Summary vs Master Data) ─────
+    // ── Apply UAC (User Access Control) Permissions ───────────────────
+    function applyUacPermissions() {
+        if (!window.AUTH_USER || !window.AUTH_USER.permissions) return;
+        const perms = window.AUTH_USER.permissions;
+
+        // Navbar Tabs (Use !== false so missing/uninitialized keys default to visible)
+        const tabAllSummary = document.getElementById('tab-all-summary');
+        if (tabAllSummary) {
+            tabAllSummary.style.display = perms.can_access_all_summary !== false ? '' : 'none';
+        }
+        const tabWeeklySummary = document.getElementById('tab-weekly-summary');
+        if (tabWeeklySummary) {
+            tabWeeklySummary.style.display = perms.can_access_weekly_summary !== false ? '' : 'none';
+        }
+        const tabMasterData = document.getElementById('tab-master-data');
+        if (tabMasterData) {
+            tabMasterData.style.display = perms.can_access_master_data !== false ? '' : 'none';
+        }
+        const tabMasterDataWeekly = document.getElementById('tab-master-data-weekly');
+        if (tabMasterDataWeekly) {
+            tabMasterDataWeekly.style.display = perms.can_access_master_data_weekly !== false ? '' : 'none';
+        }
+
+        // Master Data (Monthly) Buttons: Add / Import
+        document.querySelectorAll('[data-uac="master-add-import"]').forEach(el => {
+            const can = perms.can_master_add_import !== false;
+            el.style.setProperty('display', can ? '' : 'none', can ? '' : 'important');
+        });
+
+        // Master Data (Monthly) Buttons: Edit
+        document.querySelectorAll('[data-uac="master-edit"]').forEach(el => {
+            const can = perms.can_master_edit !== false;
+            el.style.setProperty('display', can ? '' : 'none', can ? '' : 'important');
+        });
+
+        // Master Data (Monthly) Buttons: Delete
+        document.querySelectorAll('[data-uac="master-delete"]').forEach(el => {
+            const can = perms.can_master_delete !== false;
+            el.style.setProperty('display', can ? '' : 'none', can ? '' : 'important');
+        });
+
+        // Master Data Weekly Buttons: Add / Import
+        document.querySelectorAll('[data-uac="master-weekly-add-import"]').forEach(el => {
+            const can = perms.can_master_weekly_add_import !== false;
+            el.style.setProperty('display', can ? '' : 'none', can ? '' : 'important');
+        });
+
+        // Master Data Weekly Buttons: Delete
+        document.querySelectorAll('[data-uac="master-weekly-delete"]').forEach(el => {
+            const can = perms.can_master_weekly_delete !== false;
+            el.style.setProperty('display', can ? '' : 'none', can ? '' : 'important');
+        });
+    }
+
+    // ── Navigation (SPA Core: Summary vs All Summary vs Weekly Summary vs Master Data vs Master Data Weekly vs User Management) ──
     let pendingTargetPage = 'all-summary';
 
     function navigateTo(page, isInit = false) {
@@ -232,14 +375,45 @@ const App = (() => {
 
         // Summary page is removed on session logged in
         if (page === 'summary' && window.AUTH_USER) {
-            page = 'all-summary';
+            const perms = window.AUTH_USER.permissions || {};
+            const canAll = perms.can_access_all_summary !== false;
+            const canWk = perms.can_access_weekly_summary !== false;
+            const canMst = perms.can_access_master_data !== false;
+            const canMstWk = perms.can_access_master_data_weekly !== false;
+            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : 'user-management')));
         }
 
         // Protected pages require authenticated session
-        if ((page === 'all-summary' || page === 'master-data') && !window.AUTH_USER) {
+        if ((page === 'all-summary' || page === 'weekly-summary' || page === 'master-data' || page === 'master-data-weekly' || page === 'user-management') && !window.AUTH_USER) {
             showToast('info', 'Akses Terbatas', 'Silakan login untuk mengakses menu Administrator.');
             openLoginModal(page);
             return;
+        }
+
+        // Check UAC permissions for protected pages
+        if (window.AUTH_USER && window.AUTH_USER.permissions) {
+            const perms = window.AUTH_USER.permissions;
+            if (page === 'all-summary' && perms.can_access_all_summary === false) {
+                if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
+                else page = 'user-management';
+            } else if (page === 'weekly-summary' && perms.can_access_weekly_summary === false) {
+                if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
+                else page = 'user-management';
+            } else if (page === 'master-data' && perms.can_access_master_data === false) {
+                if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
+                else if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else page = 'user-management';
+            } else if (page === 'master-data-weekly' && perms.can_access_master_data_weekly === false) {
+                if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else page = 'user-management';
+            }
         }
 
         // Hide all page sections
@@ -263,13 +437,12 @@ const App = (() => {
         const activeNavTab = document.getElementById('tab-' + page);
         if (activeNavTab) activeNavTab.classList.add('active');
 
-
         // Persist page in sessionStorage
         try {
             sessionStorage.setItem('active_page', page);
         } catch (e) { }
 
-        // Keep address bar URL strictly wmsdev.my.id/amora/
+        // Keep address bar URL clean
         keepCleanUrl();
 
         // Update drawer quick jump links for this active page
@@ -291,6 +464,8 @@ const App = (() => {
             if (typeof AllSummaryApp !== 'undefined' && typeof AllSummaryApp.init === 'function') {
                 AllSummaryApp.init();
             }
+        } else if (page === 'weekly-summary') {
+            loadWeeklySummary();
         } else if (page === 'master-data') {
             loadMasterData();
             loadSiteRegional();
@@ -298,7 +473,14 @@ const App = (() => {
             loadScorecardKpi();
             loadMasterCatatan();
             loadPicSites();
+        } else if (page === 'master-data-weekly') {
+            loadMasterDataWeekly();
+        } else if (page === 'user-management') {
+            loadUsers();
         }
+
+        // Apply UAC rules (button visibility)
+        applyUacPermissions();
 
         // Scroll to top on page switch
         if (!isInit) {
@@ -308,7 +490,6 @@ const App = (() => {
 
     // ── Quick Access Sidebar & Smooth Scroll Navigation ────────
     const QUICK_ACCESS_ITEMS_SUMMARY = [
-        { id: 'card-summary-controls', title: 'Filter & Tipe SO' },
         { id: 'card-executive-summary', title: 'Executive Summary' },
         { id: 'card-executive-catatan', title: 'Catatan & Evaluasi' },
         { id: 'card-executive-db-analysis', title: 'Result DB Analysis' },
@@ -321,7 +502,6 @@ const App = (() => {
     ];
 
     const QUICK_ACCESS_ITEMS_ALL_SUMMARY = [
-        { id: 'card-all-summary-controls', title: 'Filter & SO Type' },
         { id: 'all-card-executive-summary', title: 'Executive Summary (All)' },
         { id: 'all-card-executive-db-analysis', title: 'Result DB Analysis (All)' },
         { id: 'all-card-scorecard-summary', title: 'Score Card Summary (All)' },
@@ -332,6 +512,16 @@ const App = (() => {
         { id: 'all-card-site-movements', title: 'Log Pergerakan Site' }
     ];
 
+    const QUICK_ACCESS_ITEMS_WEEKLY_SUMMARY = [
+        { id: 'weekly-card-executive-summary', title: 'Executive Summary (Weekly)' },
+        { id: 'weekly-card-scorecard-summary', title: 'Score Card Summary (Weekly)' },
+        { id: 'weekly-card-hasil-so', title: 'Report SO (Weekly)' }
+    ];
+
+    const QUICK_ACCESS_ITEMS_USER_MANAGEMENT = [
+        { id: 'card-user-management', title: 'User Management & UAC' }
+    ];
+
     const QUICK_ACCESS_ITEMS_MASTER = [
         { id: 'card-master-opname', title: 'Stock Opname Raw Data' },
         { id: 'card-site-regional', title: 'Master Site Regional' },
@@ -340,6 +530,10 @@ const App = (() => {
         { id: 'card-pic-sites', title: 'PIC Sites Master Data' },
         { id: 'card-scorecard-rating-kpi', title: 'KPI Rating Master' },
         { id: 'card-scorecard-exec-kpi', title: 'KPI Execution Master' }
+    ];
+
+    const QUICK_ACCESS_ITEMS_MASTER_WEEKLY = [
+        { id: 'card-master-opname-weekly', title: 'SO Profile Weekly' }
     ];
 
     function toggleQuickAccess() {
@@ -376,8 +570,14 @@ const App = (() => {
         let items = QUICK_ACCESS_ITEMS_SUMMARY;
         if (page === 'all-summary') {
             items = QUICK_ACCESS_ITEMS_ALL_SUMMARY;
+        } else if (page === 'weekly-summary') {
+            items = QUICK_ACCESS_ITEMS_WEEKLY_SUMMARY;
         } else if (page === 'master-data') {
             items = QUICK_ACCESS_ITEMS_MASTER;
+        } else if (page === 'master-data-weekly') {
+            items = QUICK_ACCESS_ITEMS_MASTER_WEEKLY;
+        } else if (page === 'user-management') {
+            items = QUICK_ACCESS_ITEMS_USER_MANAGEMENT;
         }
 
         let html = '';
@@ -398,8 +598,20 @@ const App = (() => {
             const el = document.getElementById(cardId);
             if (!el) return;
 
-            // Scroll with offset for sticky navbar (height: 56px + margin)
-            const yOffset = -72;
+            // Determine if sticky controls bar is visible on the active page
+            const activePage = sessionStorage.getItem('active_page') || 'summary';
+            let controlsHeight = 0;
+            const controlsEl = (activePage === 'all-summary')
+                ? document.getElementById('card-all-summary-controls')
+                : document.getElementById('card-summary-controls');
+
+            if (controlsEl && controlsEl.offsetParent !== null) {
+                controlsHeight = controlsEl.offsetHeight || 0;
+            }
+
+            // Scroll with offset for sticky navbar (height: 56px / 52px) + sticky controls + spacing
+            const navHeight = (window.innerWidth <= 768) ? 52 : 56;
+            const yOffset = -(navHeight + controlsHeight + 16);
             const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
             window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
         }, 120);
@@ -479,27 +691,29 @@ const App = (() => {
             const json = await res.json();
             if (json.success) {
                 // Update client session state
-                window.AUTH_USER = {
+                window.AUTH_USER = json.user || {
                     name: username,
-                    role: 'admin'
+                    role: 'admin',
+                    permissions: {}
                 };
 
                 // Update Navbar UI
                 const tabSummary = document.getElementById('tab-summary');
-                const tabAllSummary = document.getElementById('tab-all-summary');
-                const tabMasterData = document.getElementById('tab-master-data');
                 const userDropdown = document.getElementById('user-dropdown-container');
                 const btnNavLogin = document.getElementById('btn-navbar-login');
                 const userDisplayName = document.getElementById('user-display-name');
                 const userAvatarText = document.getElementById('user-avatar-text');
+                const tabUserManagement = document.getElementById('tab-user-management');
 
                 if (tabSummary) tabSummary.style.display = 'none';
-                if (tabAllSummary) tabAllSummary.style.display = 'inline-flex';
-                if (tabMasterData) tabMasterData.style.display = 'inline-flex';
+                if (tabUserManagement) tabUserManagement.style.display = 'inline-flex';
                 if (userDropdown) userDropdown.style.display = 'inline-block';
                 if (btnNavLogin) btnNavLogin.style.display = 'none';
-                if (userDisplayName) userDisplayName.textContent = 'ASSET MANAGEMENT ADMINISTRATOR';
-                if (userAvatarText) userAvatarText.textContent = 'A';
+                if (userDisplayName) userDisplayName.textContent = (window.AUTH_USER.name || 'ASSET MANAGEMENT ADMINISTRATOR').toUpperCase();
+                if (userAvatarText) userAvatarText.textContent = (window.AUTH_USER.name || 'A').charAt(0).toUpperCase();
+
+                // Apply UAC permissions for tabs & buttons
+                applyUacPermissions();
 
                 // Update Quick Access Drawer Header Login button
                 const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
@@ -524,7 +738,7 @@ const App = (() => {
             }
         } finally {
             if (submitBtn) submitBtn.disabled = false;
-            if (submitText) submitText.textContent = 'Masuk ke Sistem';
+            if (submitText) submitText.textContent = 'Login';
             if (spinner) spinner.style.display = 'none';
             keepCleanUrl();
         }
@@ -544,13 +758,19 @@ const App = (() => {
         // Update Navbar UI
         const tabSummary = document.getElementById('tab-summary');
         const tabAllSummary = document.getElementById('tab-all-summary');
+        const tabWeeklySummary = document.getElementById('tab-weekly-summary');
         const tabMasterData = document.getElementById('tab-master-data');
+        const tabMasterDataWeekly = document.getElementById('tab-master-data-weekly');
+        const tabUserManagement = document.getElementById('tab-user-management');
         const userDropdown = document.getElementById('user-dropdown-container');
         const btnNavLogin = document.getElementById('btn-navbar-login');
 
         if (tabSummary) tabSummary.style.display = 'inline-flex';
         if (tabAllSummary) tabAllSummary.style.display = 'none';
+        if (tabWeeklySummary) tabWeeklySummary.style.display = 'none';
         if (tabMasterData) tabMasterData.style.display = 'none';
+        if (tabMasterDataWeekly) tabMasterDataWeekly.style.display = 'none';
+        if (tabUserManagement) tabUserManagement.style.display = 'none';
         if (userDropdown) userDropdown.style.display = 'none';
         if (btnNavLogin) btnNavLogin.style.display = 'inline-flex';
 
@@ -1364,17 +1584,16 @@ const App = (() => {
                 <tr class="${isChecked ? 'row-selected' : ''}">
                     <td class="text-center col-action-select">
                         <input type="checkbox" class="sr-row-checkbox" value="${row.id}" ${isChecked ? 'checked' : ''}
-                            onchange="App.toggleSRSelection(${row.id}, this.checked)" title="Pilih baris">
+                            onchange="App.toggleSRSelection(${row.id}, this.checked)">
                     </td>
                     <td class="text-center col-action-delete">
-                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteSRRecord(${row.id})" title="Hapus data ini">
+                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteSRRecord(${row.id})">
                             Hapus
                         </button>
                     </td>
                     <td class="text-center col-action-active" style="padding: 4px;">
                         <input type="checkbox" class="sr-active-checkbox" ${isActive ? 'checked' : ''}
                             onchange="App.toggleSRActive(${row.id}, this.checked, this)"
-                            title="${isActive ? 'Aktif' : 'Nonaktif'}"
                             style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
                     </td>
                     <td class="text-center col-action-counted" style="padding: 4px;">
@@ -1382,14 +1601,12 @@ const App = (() => {
                             ${isActive && isCounted ? 'checked' : ''}
                             ${!isActive ? 'disabled' : ''}
                             onchange="App.toggleSRCounted(${row.id}, this.checked, this)"
-                            title="${!isActive ? 'Site harus aktif ' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik')}"
                             style="cursor: ${!isActive ? 'not-allowed' : 'pointer'}; width: 16px; height: 16px; accent-color: #16a34a; opacity: ${!isActive ? '0.45' : '1'};">
                     </td>
                     <td class="text-center col-action-sync" id="sr-sync-cell-${row.id}" style="padding: 3px 6px;">
                         ${!isSynced ? `
                             <button class="btn btn-primary btn-sm btn-sync-profile" id="sr-sync-btn-${row.id}"
                                 onclick="App.syncSiteProfile(${row.id}, '${escapeHtml(row.sitecode || '')}', this)"
-                                title="Sinkronisasi Group Type tiap periode dari Profil Rekonsiliasi"
                                 style="padding: 2px 7px; font-size: 11px; font-weight: 600; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="23 4 23 10 17 10"></polyline>
@@ -1420,13 +1637,11 @@ const App = (() => {
                     </td>
                     <td class="text-center" style="white-space: nowrap;">
                         <div style="display: inline-flex; align-items: center; gap: 6px;">
-                            <span title="Tipe grup terbaru dari aturan edit (${histCount} aturan aktif)"
-                                style="min-width: 82px; display: inline-block; padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; text-align: center; color: ${currentGt === 'quarterly' ? '#0284c7' : '#16a34a'}; background: ${currentGt === 'quarterly' ? '#e0f2fe' : '#dcfce7'}; border: 1px solid ${currentGt === 'quarterly' ? '#bae6fd' : '#bbf7d0'}; line-height: 16px;">
+                            <span style="min-width: 82px; display: inline-block; padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; text-align: center; color: ${currentGt === 'quarterly' ? '#0284c7' : '#16a34a'}; background: ${currentGt === 'quarterly' ? '#e0f2fe' : '#dcfce7'}; border: 1px solid ${currentGt === 'quarterly' ? '#bae6fd' : '#bbf7d0'}; line-height: 16px;">
                                 ${currentGt === 'quarterly' ? 'Quarterly' : 'Monthly'}
                             </span>
                             <button class="btn btn-outline-secondary btn-sm"
                                 onclick="App.openSRHistoryModal('${escapeHtml(row.sitecode || '')}', '${escapeHtml(row.name_site || '')}')"
-                                title="Atur Aturan Periode Dinamis (${histCount} aturan aktif)"
                                 style="padding: 2px 8px; font-size: 11px; border-radius: 6px; white-space: nowrap; height: 26px;">
                                 Edit
                             </button>
@@ -1713,7 +1928,6 @@ const App = (() => {
             if (json.success) {
                 const row = allSRRows.find(r => r.id == id);
                 if (row) row.is_active = isActive;
-                if (checkboxEl) checkboxEl.title = isActive ? 'Aktif' : 'Nonaktif';
 
                 // Update Count checkbox state for this row
                 const countCb = document.getElementById(`sr-counted-${id}`) || checkboxEl?.closest('tr')?.querySelector('.sr-counted-checkbox');
@@ -1723,7 +1937,6 @@ const App = (() => {
                     countCb.style.opacity = !isActive ? '0.45' : '1';
                     const isCounted = row ? (row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0') : countCb.checked;
                     countCb.checked = isActive && isCounted;
-                    countCb.title = !isActive ? 'Site harus aktif ' : (isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik');
                 }
 
                 showToast('success', 'Status Diperbarui', `Status site diatur menjadi ${isActive ? 'Aktif' : 'Nonaktif'}`);
@@ -1753,9 +1966,6 @@ const App = (() => {
             if (json.success) {
                 const row = allSRRows.find(r => r.id == id);
                 if (row) row.is_counted = isCounted;
-                if (checkboxEl) {
-                    checkboxEl.title = isCounted ? 'Dihitung dalam Ringkasan & Grafik' : 'Tidak Dihitung dalam Ringkasan & Grafik';
-                }
                 showToast('success', 'Status Hitung Diperbarui', `Site ${isCounted ? 'dihitung' : 'tidak dihitung'} dalam ringkasan & grafik`);
                 if (typeof loadSummaryData === 'function') loadSummaryData();
                 if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
@@ -2380,7 +2590,7 @@ const App = (() => {
                         <td class="text-center" style="font-weight: 500; color: #475569;">${sn}</td>
                         <td class="text-right" style="font-weight: 700; color: #0f172a; white-space: nowrap;">Rp ${nbvFormatted}</td>
                         <td class="text-center col-action">
-                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRekapDbItem(${r.id})" title="Hapus data ini">
+                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteRekapDbItem(${r.id})">
                                 Hapus
                             </button>
                         </td>
@@ -4004,23 +4214,34 @@ const App = (() => {
                 if (total === 0) {
                     trendEl.innerHTML = '';
                 } else {
-                    const roundedPct = Math.round(pct);
-                    const roundedTarget = Math.round(targetThreshold);
-                    const isAbove = (roundedPct >= roundedTarget);
-                    const diff = roundedPct - roundedTarget;
-                    const formattedDiff = (diff >= 0 ? '+' : '') + diff + '%';
+                    let diff = null;
+                    if (item && item.diff_pct !== undefined && item.diff_pct !== null) {
+                        diff = Math.round(Number(item.diff_pct));
+                    } else if (item && item.prev_pct !== undefined && item.prev_pct !== null && item.pct !== null && item.pct !== undefined) {
+                        diff = Math.round(Number(item.pct)) - Math.round(Number(item.prev_pct));
+                    }
 
-                    // Solid triangle style: up (green) if >= threshold, down (red) if < threshold
-                    const triangleSvg = isAbove
-                        ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
-                        : `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
+                    if (diff === null) {
+                        trendEl.innerHTML = '<span class="kpi-target-indicator target-neutral"><span>-</span></span>';
+                    } else {
+                        const isUp = diff > 0;
+                        const isDown = diff < 0;
+                        const sign = isUp ? '+' : '';
+                        const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
+                        const formattedDiff = `${sign}${diff}%`;
 
-                    trendEl.innerHTML = `
-                        <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: ${roundedTarget}% (Gap: ${formattedDiff})">
-                            ${triangleSvg}
-                            <span>${formattedDiff}</span>
-                        </span>
-                    `;
+                        // Solid triangle style: up (green) if > 0, down (red) if < 0
+                        const triangleSvg = isUp
+                            ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                            : (isDown ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
+
+                        trendEl.innerHTML = `
+                            <span class="kpi-target-indicator ${trendClass}">
+                                ${triangleSvg}
+                                <span>${formattedDiff}</span>
+                            </span>
+                        `;
+                    }
                 }
             }
         };
@@ -4079,7 +4300,7 @@ const App = (() => {
                     'kpi-it-tbs-subtext',
                     'kpi-it-tbs-trend',
                     'kpi-it-tbs-status',
-                    { pct: tbsSite ? tbsSite.pct : null, count: (tbsSite && tbsSite.has_data) ? 1 : 0, total_sites: 1 },
+                    tbsSite ? { ...tbsSite, count: (tbsSite && tbsSite.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                     '50002001384',
                     false,
                     98
@@ -4090,7 +4311,7 @@ const App = (() => {
                     'kpi-it-arcadia-subtext',
                     'kpi-it-arcadia-trend',
                     'kpi-it-arcadia-status',
-                    { pct: arcadiaSite ? arcadiaSite.pct : null, count: (arcadiaSite && arcadiaSite.has_data) ? 1 : 0, total_sites: 1 },
+                    arcadiaSite ? { ...arcadiaSite, count: (arcadiaSite && arcadiaSite.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                     '50002003133',
                     false,
                     98
@@ -4113,7 +4334,7 @@ const App = (() => {
                         'kpi-tekno-buffer-subtext',
                         'kpi-tekno-buffer-trend',
                         'kpi-tekno-buffer-status',
-                        { pct: teknoBuffer ? teknoBuffer.pct : null, count: (teknoBuffer && teknoBuffer.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoBuffer ? { ...teknoBuffer, count: (teknoBuffer && teknoBuffer.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003305',
                         false,
                         98
@@ -4124,7 +4345,7 @@ const App = (() => {
                         'kpi-tekno-storage2-subtext',
                         'kpi-tekno-storage2-trend',
                         'kpi-tekno-storage2-status',
-                        { pct: teknoStorage2 ? teknoStorage2.pct : null, count: (teknoStorage2 && teknoStorage2.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoStorage2 ? { ...teknoStorage2, count: (teknoStorage2 && teknoStorage2.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003448',
                         false,
                         98
@@ -4135,7 +4356,7 @@ const App = (() => {
                         'kpi-tekno-storage1-subtext',
                         'kpi-tekno-storage1-trend',
                         'kpi-tekno-storage1-status',
-                        { pct: teknoStorage1 ? teknoStorage1.pct : null, count: (teknoStorage1 && teknoStorage1.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoStorage1 ? { ...teknoStorage1, count: (teknoStorage1 && teknoStorage1.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003922',
                         false,
                         98
@@ -4146,7 +4367,7 @@ const App = (() => {
                         'kpi-tekno-persiapan-subtext',
                         'kpi-tekno-persiapan-trend',
                         'kpi-tekno-persiapan-status',
-                        { pct: teknoPersiapan ? teknoPersiapan.pct : null, count: (teknoPersiapan && teknoPersiapan.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoPersiapan ? { ...teknoPersiapan, count: (teknoPersiapan && teknoPersiapan.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003599',
                         false,
                         98
@@ -4160,7 +4381,7 @@ const App = (() => {
                         'kpi-tekno-gudang-subtext',
                         'kpi-tekno-gudang-trend',
                         'kpi-tekno-gudang-status',
-                        { pct: teknoGudang ? teknoGudang.pct : null, count: (teknoGudang && teknoGudang.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoGudang ? { ...teknoGudang, count: (teknoGudang && teknoGudang.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003289',
                         false,
                         98
@@ -4171,7 +4392,7 @@ const App = (() => {
                         'kpi-tekno-khusus-subtext',
                         'kpi-tekno-khusus-trend',
                         'kpi-tekno-khusus-status',
-                        { pct: teknoKhusus ? teknoKhusus.pct : null, count: (teknoKhusus && teknoKhusus.has_data) ? 1 : 0, total_sites: 1 },
+                        teknoKhusus ? { ...teknoKhusus, count: (teknoKhusus && teknoKhusus.has_data) ? 1 : 0, total_sites: 1 } : { pct: null, count: 0, total_sites: 1 },
                         '50002003307',
                         false,
                         98
@@ -4207,19 +4428,32 @@ const App = (() => {
                     if (total === 0) {
                         trendEl.innerHTML = '';
                     } else {
-                        const isAbove = (pct >= targetThreshold);
-                        const diff = pct - targetThreshold;
-                        const formattedDiff = (diff >= 0 ? '+' : '') + diff + '%';
-                        const triangleSvg = isAbove
-                            ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
-                            : `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>`;
+                        let diff = null;
+                        if (sData && sData.diff_pct !== undefined && sData.diff_pct !== null) {
+                            diff = Math.round(Number(sData.diff_pct));
+                        } else if (sData && sData.prev_pct !== undefined && sData.prev_pct !== null && sData.pct !== null && sData.pct !== undefined) {
+                            diff = Math.round(Number(sData.pct)) - Math.round(Number(sData.prev_pct));
+                        }
 
-                        trendEl.innerHTML = `
-                            <span class="kpi-target-indicator ${isAbove ? 'target-up' : 'target-down'}" title="Target: ${targetThreshold}% (Gap: ${formattedDiff})">
-                                ${triangleSvg}
-                                <span>${formattedDiff}</span>
-                            </span>
-                        `;
+                        if (diff === null) {
+                            trendEl.innerHTML = '<span class="kpi-target-indicator target-neutral"><span>-</span></span>';
+                        } else {
+                            const isUp = diff > 0;
+                            const isDown = diff < 0;
+                            const sign = isUp ? '+' : '';
+                            const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
+                            const formattedDiff = `${sign}${diff}%`;
+                            const triangleSvg = isUp
+                                ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                                : (isDown ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
+
+                            trendEl.innerHTML = `
+                                <span class="kpi-target-indicator ${trendClass}">
+                                    ${triangleSvg}
+                                    <span>${formattedDiff}</span>
+                                </span>
+                            `;
+                        }
                     }
                 }
 
@@ -4435,7 +4669,7 @@ const App = (() => {
     function renderDbTrendBadge(item, isSmall = false) {
         if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || !item || item.diff_qty === undefined || item.diff_qty === null) {
             return `
-                <span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya">
+                <span class="db-trend-indicator db-trend-neutral">
                     <span>-</span>
                 </span>
             `;
@@ -4454,7 +4688,7 @@ const App = (() => {
         if (diff > 0) {
             const formatted = `+${formatQty(diff)}`;
             return `
-                <span class="db-trend-indicator db-trend-up" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})${statusDetail}">
+                <span class="db-trend-indicator db-trend-up">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,4 21,20 3,20"/>
                     </svg>
@@ -4464,7 +4698,7 @@ const App = (() => {
         } else if (diff < 0) {
             const formatted = `${formatQty(diff)}`;
             return `
-                <span class="db-trend-indicator db-trend-down" title="${formatted} QTY vs ${prevLabel} (Prev: ${formatQty(prevQty)})${statusDetail}">
+                <span class="db-trend-indicator db-trend-down">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,20 3,4 21,4"/>
                     </svg>
@@ -4473,7 +4707,7 @@ const App = (() => {
             `;
         } else {
             return `
-                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 QTY selisih)${statusDetail}">
+                <span class="db-trend-indicator db-trend-neutral">
                     <span>-</span>
                 </span>
             `;
@@ -4483,7 +4717,7 @@ const App = (() => {
     function renderStatusTrendBadge(diff, prevVal, isSmall = false, statusType = 'unsolved') {
         if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || diff === undefined || diff === null) {
             return `
-                <span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya">
+                <span class="db-trend-indicator db-trend-neutral">
                     <span>-</span>
                 </span>
             `;
@@ -4499,7 +4733,7 @@ const App = (() => {
             // Solved bertambah: hijau (membaik). Unsolved / New DB bertambah: merah (buruk)
             const trendClass = isSolved ? 'db-trend-good-up' : 'db-trend-bad-up';
             return `
-                <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
+                <span class="db-trend-indicator ${trendClass}">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,4 21,20 3,20"/>
                     </svg>
@@ -4512,7 +4746,7 @@ const App = (() => {
             // Unsolved / New DB berkurang: warna hijau (karena berkurang = membaik)
             const trendClass = isSolved ? 'db-trend-good-down' : 'db-trend-good-down';
             return `
-                <span class="db-trend-indicator ${trendClass}" title="${formatted} vs ${prevLabel} (Prev: ${formatQty(prevVal || 0)})">
+                <span class="db-trend-indicator ${trendClass}">
                     <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="12,20 3,4 21,4"/>
                     </svg>
@@ -4521,7 +4755,7 @@ const App = (() => {
             `;
         } else {
             return `
-                <span class="db-trend-indicator db-trend-neutral" title="Sama dengan ${prevLabel} (0 selisih)">
+                <span class="db-trend-indicator db-trend-neutral">
                     <span>-</span>
                 </span>
             `;
@@ -4553,15 +4787,50 @@ const App = (() => {
             activeItem = currentDbAnalysisData.outlet_national || currentDbAnalysisData.national || {};
             totalQty = activeItem.qty || 0;
         }
-        ['db-analysis-grand-total', 'db-status-grand-total', 'all-db-status-grand-total'].forEach(id => {
+        // Result DB Analysis Grand Total
+        const elDbAnalysisGrand = document.getElementById('db-analysis-grand-total');
+        if (elDbAnalysisGrand) elDbAnalysisGrand.textContent = Number(totalQty).toLocaleString();
+
+        // Status Penyelesaian DB: Total DB is counted Solved DB, Unsolved DB and New DB
+        const statusSolved = Number(activeItem?.solved || 0);
+        const statusUnsolved = Number(activeItem?.unsolved || 0);
+        const statusNew = Number(activeItem?.new_db || 0);
+        const totalStatusDb = (activeItem?.total_status !== undefined && activeItem?.total_status !== null)
+            ? Number(activeItem.total_status)
+            : (statusSolved + statusUnsolved + statusNew);
+
+        ['db-status-grand-total', 'all-db-status-grand-total'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.textContent = Number(totalQty).toLocaleString();
+            if (el) el.textContent = Number(totalStatusDb).toLocaleString();
         });
+
         if (activeItem) {
+            // Trend badge for Result DB Analysis
             const trendBadgeHtml = renderDbTrendBadge(activeItem, false);
-            ['db-grand-trend', 'db-status-grand-trend', 'all-db-status-grand-trend'].forEach(id => {
+            const elGrandTrend = document.getElementById('db-grand-trend');
+            if (elGrandTrend) elGrandTrend.innerHTML = trendBadgeHtml;
+
+            // Trend badge for Status Penyelesaian DB (Total DB Solved + Unsolved + New DB vs previous period)
+            let prevStatusTotal = null;
+            if (activeItem.prev_total_status !== undefined && activeItem.prev_total_status !== null) {
+                prevStatusTotal = Number(activeItem.prev_total_status);
+            } else if (activeItem.prev_solved !== undefined && activeItem.prev_solved !== null &&
+                activeItem.prev_unsolved !== undefined && activeItem.prev_unsolved !== null &&
+                activeItem.prev_new_db !== undefined && activeItem.prev_new_db !== null) {
+                prevStatusTotal = Number(activeItem.prev_solved) + Number(activeItem.prev_unsolved) + Number(activeItem.prev_new_db);
+            }
+
+            let diffStatusTotal = null;
+            if (activeItem.diff_total_status !== undefined && activeItem.diff_total_status !== null) {
+                diffStatusTotal = Number(activeItem.diff_total_status);
+            } else if (prevStatusTotal !== null) {
+                diffStatusTotal = totalStatusDb - prevStatusTotal;
+            }
+
+            const statusTrendBadgeHtml = renderStatusTrendBadge(diffStatusTotal, prevStatusTotal, false, 'unsolved');
+            ['db-status-grand-trend', 'all-db-status-grand-trend'].forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerHTML = trendBadgeHtml;
+                if (el) el.innerHTML = statusTrendBadgeHtml;
             });
         }
 
@@ -4766,7 +5035,7 @@ const App = (() => {
                 const siteName = s.name_site || siteCode;
                 html += `
                     <div class="kpi-card kpi-card-split">
-                        <div class="kpi-title" title="${escapeHtml(siteName)}">${escapeHtml(siteName)}</div>
+                        <div class="kpi-title">${escapeHtml(siteName)}</div>
                         <div class="kpi-card-main">
                             <div class="kpi-split-value" style="color: #0f172a;">${formatQty(s.qty || 0)}</div>
                             <div class="kpi-split-badges">
@@ -4791,7 +5060,7 @@ const App = (() => {
                 return `
                     <div class="kpi-subdept-item">
                         <div class="kpi-subdept-header">
-                            <span class="kpi-subdept-name" title="${escapeHtml(s.name_site || s.sitecode)}">${escapeHtml(displayName)}</span>
+                            <span class="kpi-subdept-name">${escapeHtml(displayName)}</span>
                             <span class="db-subdept-trend">${renderStatusTrendBadge(diffVal, prevVal, true, type)}</span>
                         </div>
                         <div class="kpi-subdept-val" style="color: ${color};">${formatQty(countVal || 0)}</div>
@@ -4886,7 +5155,7 @@ const App = (() => {
 
             const renderDiffBadge = (diff, invertColors = false) => {
                 if (diff === null || diff === undefined || diff === 0) {
-                    return `<span class="kpi-target-indicator target-neutral" title="Tidak ada perubahan"><span>-</span></span>`;
+                    return `<span class="kpi-target-indicator target-neutral"><span>-</span></span>`;
                 }
                 const isGood = invertColors ? (diff < 0) : (diff > 0);
                 const cls = isGood ? 'target-up' : 'target-down';
@@ -4895,7 +5164,7 @@ const App = (() => {
                     ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"></polygon></svg>`
                     : `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"></polygon></svg>`;
                 return `
-                    <span class="kpi-target-indicator ${cls}" title="${formatted} vs bulan sebelumnya">
+                    <span class="kpi-target-indicator ${cls}">
                         ${arrowSvg}
                         <span>${formatted}</span>
                     </span>
@@ -5495,7 +5764,7 @@ const App = (() => {
 
         if (sites.length === 0) {
             const noDataMsg = (period && period.is_uploaded === false)
-                ? `Data DB periode ${escapeHtml(period.current_label || '')} belum diupload oleh Admin.`
+                ? `Data DB periode ${escapeHtml(period.current_label || '')} no data.`
                 : 'Tidak ada data Site yang sesuai dengan filter atau pencarian.';
             container.innerHTML = `
                 <div style="text-align: center; color: #94a3b8; padding: 2.5rem;">
@@ -5649,7 +5918,7 @@ const App = (() => {
 
         if (items.length === 0) {
             const noDataMsg = (period && period.is_uploaded === false)
-                ? `Data DB periode ${escapeHtml(period.current_label || '')} belum diupload oleh Admin.`
+                ? `Data DB periode ${escapeHtml(period.current_label || '')} no data.`
                 : 'No data.';
             tbody.innerHTML = `
                 <tr>
@@ -6268,9 +6537,9 @@ const App = (() => {
                 html += `
                     <tr>
                         <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
-                        <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(r.sub_dept || '-')}">${escapeHtml(r.sub_dept || '-')}</td>
+                        <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
                         <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
-                        <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
+                        <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
                         <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
                         <td class="scorecard-col-status">${ratingBadge}</td>
                     </tr>
@@ -6313,11 +6582,10 @@ const App = (() => {
 
         const renderCountTrendBadge = (diff, prevLabel, isBaseline = false) => {
             if (isBaseline || diff === null || diff === undefined) {
-                const tip = prevLabel ? `Tidak ada data perbandingan vs ${prevLabel}` : 'Bulan acuan (baseline)';
-                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="${tip}"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">-</span></span>`;
+                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">-</span></span>`;
             }
             if (diff === 0) {
-                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="Tidak ada perubahan vs ${prevLabel}"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">0</span></span>`;
+                return `<span class="kpi-target-indicator target-neutral" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;"><span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">0</span></span>`;
             }
 
             const isUp = diff > 0;
@@ -6331,7 +6599,7 @@ const App = (() => {
                 : `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor" style="display: block; flex-shrink: 0;"><polygon points="12,20 3,4 21,4"/></svg>`;
 
             return `
-                <span class="kpi-target-indicator ${cls}" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;" title="${formatted} Sites vs ${prevLabel}">
+                <span class="kpi-target-indicator ${cls}" style="font-size: 10px; padding: 2.5px 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle;">
                     ${triangleSvg}
                     <span style="display: inline-flex; align-items: center; justify-content: center; line-height: 1;">${formatted}</span>
                 </span>
@@ -6430,9 +6698,9 @@ const App = (() => {
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
-                    <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(r.sub_dept || '-')}">${escapeHtml(r.sub_dept || '-')}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
-                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(r.name_site || '-')}">${escapeHtml(r.name_site || '-')}</td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
                     <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
                     <td class="scorecard-col-status">${renderRatingBadge(r.rating)}</td>
                 </tr>
@@ -6489,9 +6757,9 @@ const App = (() => {
             html += `
                 <tr>
                     <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
-                    <td class="scorecard-col-subdept" style="color: #475569;" title="${escapeHtml(e.sub_dept || '-')}">${escapeHtml(e.sub_dept || '-')}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(e.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(e.sitecode)}</td>
-                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;" title="${escapeHtml(e.name_site || '-')}">${escapeHtml(e.name_site || '-')}</td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(e.name_site || '-')}</td>
                     <td class="scorecard-col-month">${formatPercent(pctVal)}</td>
                     <td class="scorecard-col-status">${renderExecutionBadge(e.execution_status)}</td>
                 </tr>
@@ -7440,7 +7708,7 @@ const App = (() => {
             const activeAll = (curStatus === 'all') ? ' active' : '';
 
             let statsHtml = `
-                <div class="so-pie-stat-row${activeTercapai}" onclick="App.toggleSubDeptStatusFilter('tercapai')" title="Klik untuk filter status Tercapai">
+                <div class="so-pie-stat-row${activeTercapai}" onclick="App.toggleSubDeptStatusFilter('tercapai')">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #16a34a;"></span>
                         Tercapai (≥${thresholdLabel})
@@ -7449,7 +7717,7 @@ const App = (() => {
                         ${tercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
                     </span>
                 </div>
-                <div class="so-pie-stat-row${activeTidak}" onclick="App.toggleSubDeptStatusFilter('tidak_tercapai')" title="Klik untuk filter status Tidak Tercapai">
+                <div class="so-pie-stat-row${activeTidak}" onclick="App.toggleSubDeptStatusFilter('tidak_tercapai')">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
                         Tidak Tercapai (<${thresholdLabel})
@@ -7458,7 +7726,7 @@ const App = (() => {
                         ${tidakTercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
                     </span>
                 </div>
-                <div class="so-pie-stat-row${activeAll}" onclick="App.toggleSubDeptStatusFilter('all')" title="Klik untuk tampilkan Semua Status" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
+                <div class="so-pie-stat-row${activeAll}" onclick="App.toggleSubDeptStatusFilter('all')" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
                     <span class="so-pie-stat-label" style="font-weight: 600; color: #1e293b;">
                         Total Sites
                     </span>
@@ -9392,7 +9660,7 @@ const App = (() => {
         const mLabel = m ? (monthNames[parseInt(m, 10)] || `Bulan ${m}`) : 'Semua Bulan';
         const periodStr = `${mLabel} ${y}`;
 
-        if (subtitleEl) subtitleEl.textContent = `Kesimpulan hasil evaluasi stock opname area`;
+        if (subtitleEl) subtitleEl.textContent = `Kesimpulan hasil evaluasi stock opname`;
 
         const thPeriod = document.getElementById('exec-catatan-th-period');
         if (thPeriod) {
@@ -9675,10 +9943,10 @@ const App = (() => {
                         <td style="max-width: 420px; white-space: normal; line-height: 1.45; word-break: break-word;">${escapeHtml(note.keterangan || '')}</td>
                         <td class="text-center">
                             <div style="display: inline-flex; gap: 4px;">
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.editExecutiveNote(${note.id})" title="Edit" style="padding: 2px 6px; font-size: 11px;">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.editExecutiveNote(${note.id})" style="padding: 2px 6px; font-size: 11px;">
                                     Edit
                                 </button>
-                                <button type="button" class="btn btn-danger btn-sm btn-delete" onclick="App.deleteExecutiveNote(${note.id})" title="Hapus" style="padding: 2px 6px; font-size: 11px;">
+                                <button type="button" class="btn btn-danger btn-sm btn-delete" onclick="App.deleteExecutiveNote(${note.id})" style="padding: 2px 6px; font-size: 11px;">
                                     Hapus
                                 </button>
                             </div>
@@ -9778,7 +10046,7 @@ const App = (() => {
                 <span class="note-row-num" style="font-size: 11px; font-weight: 700; color: #2563eb; padding: 2px 7px; border-radius: 4px;">
                     Catatan No.${rowCount}
                 </span>
-                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-row" onclick="App.removeExecutiveNoteRow(this)" style="font-size: 11px; padding: 2px 6px; line-height: 1;" title="Hapus baris ini">
+                <button type="button" class="btn btn-outline-danger btn-sm btn-remove-row" onclick="App.removeExecutiveNoteRow(this)" style="font-size: 11px; padding: 2px 6px; line-height: 1;">
                     ✕
                 </button>
             </div>
@@ -10161,7 +10429,7 @@ const App = (() => {
                     <div style="display: inline-flex; align-items: center; gap: 6px;">
                         <span style="font-weight: 500; color: #334155;">${escapeHtml(rawPhone)}</span>
                         ${cleanNum.length >= 8 ? `
-                            <a href="https://wa.me/${waNum}" target="_blank" rel="noopener noreferrer" title="Hubungi via WhatsApp"
+                            <a href="https://wa.me/${waNum}" target="_blank" rel="noopener noreferrer"
                                 style="color: #16a34a; display: inline-flex; align-items: center;">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
@@ -10183,11 +10451,11 @@ const App = (() => {
                     <td>${phoneDisplay}</td>
                     <td class="text-center">
                         <div style="display: inline-flex; align-items: center; gap: 4px;">
-                            <button class="btn btn-outline-primary btn-sm" onclick="App.openEditPicSiteModal(${r.id})" title="Edit PIC"
+                            <button class="btn btn-outline-primary btn-sm" onclick="App.openEditPicSiteModal(${r.id})"
                                 style="font-size: 11px; padding: 2px 7px;">
                                 Edit
                             </button>
-                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deletePicSite(${r.id})" title="Hapus"
+                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deletePicSite(${r.id})"
                                 style="font-size: 11px; padding: 2px 7px;">
                                 Hapus
                             </button>
@@ -11031,6 +11299,1641 @@ const App = (() => {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // USER MANAGEMENT & USER ACCESS CONTROL (UAC) MODULE
+    // ═══════════════════════════════════════════════════════════════
+
+    let allUsersList = [];
+    let userSearchQuery = '';
+    let deleteUserTargetId = null;
+
+    async function loadUsers() {
+        const tbody = document.getElementById('user-table-tbody');
+        const badge = document.getElementById('user-count-badge');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                    Memuat data user administrator...
+                </td>
+            </tr>
+        `;
+
+        try {
+            const res = await fetch('api/users.php?action=list');
+            const json = await res.json();
+
+            if (!json.success) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: #dc2626;">
+                            ${escapeHtml(json.message || 'Gagal memuat data user')}
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allUsersList = json.data || [];
+            if (badge) {
+                badge.textContent = `Total: ${allUsersList.length} user`;
+            }
+            renderUsersTable();
+        } catch (err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: #dc2626;">
+                        Network error: ${escapeHtml(err.message || 'Gagal terhubung')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function handleUserSearch(val) {
+        userSearchQuery = (val || '').toLowerCase().trim();
+        renderUsersTable();
+    }
+
+    function renderUsersTable() {
+        const tbody = document.getElementById('user-table-tbody');
+        const badge = document.getElementById('user-count-badge');
+        if (!tbody) return;
+
+        let filtered = allUsersList;
+        if (userSearchQuery) {
+            filtered = allUsersList.filter(u => {
+                const name = (u.name || '').toLowerCase();
+                const username = (u.username || '').toLowerCase();
+                return name.includes(userSearchQuery) || username.includes(userSearchQuery);
+            });
+        }
+
+        if (badge) {
+            badge.textContent = `Total: ${filtered.length} user${userSearchQuery ? ' (difilter)' : ''}`;
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                        ${allUsersList.length === 0 ? 'Belum ada data user administrator.' : 'Data user tidak ditemukan.'}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((u, idx) => {
+            const isSuperadmin = (u.username || '').toLowerCase() === 'd3utsch';
+            const isSelf = window.AUTH_USER && (window.AUTH_USER.id === u.id);
+
+            // Badges for UAC
+            const uacBadges = [];
+            if (u.can_access_all_summary !== false) {
+                uacBadges.push(`<span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">All Summary</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">All Summary</span>`);
+            }
+
+            if (u.can_access_weekly_summary !== false) {
+                uacBadges.push(`<span class="badge" style="background: #f5f3ff; color: #6b21a8; border: 1px solid #ddd6fe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Weekly Summary</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Weekly Summary</span>`);
+            }
+
+            if (u.can_access_master_data !== false) {
+                uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master Data</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Master Data</span>`);
+            }
+
+            if (u.can_access_master_data_weekly !== false) {
+                uacBadges.push(`<span class="badge" style="background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master Weekly</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Master Weekly</span>`);
+            }
+
+            if (u.can_master_add_import !== false) {
+                uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master: Add</span>`);
+            }
+            if (u.can_master_edit !== false) {
+                uacBadges.push(`<span class="badge" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master: Edit</span>`);
+            }
+            if (u.can_master_delete !== false) {
+                uacBadges.push(`<span class="badge" style="background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master: Del</span>`);
+            }
+
+            if (u.can_master_weekly_add_import !== false) {
+                uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Mst Wk: Add</span>`);
+            }
+            if (u.can_master_weekly_delete !== false) {
+                uacBadges.push(`<span class="badge" style="background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Mst Wk: Del</span>`);
+            }
+
+            const updatedAt = u.updated_at ? new Date(u.updated_at).toLocaleString('id-ID', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            }) : '-';
+
+            html += `
+                <tr>
+                    <td class="text-center" style="font-weight: 600; color: #64748b; vertical-align: middle;">${idx + 1}</td>
+                    <td style="font-weight: 600; color: #1e293b; vertical-align: middle;">
+                        ${escapeHtml(u.name || '-')}
+                        ${isSelf ? '<span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 10px; margin-left: 6px; padding: 1px 6px; border-radius: 4px;">Anda</span>' : ''}
+                    </td>
+                    <td style="font-family: monospace; font-size: 12.5px; color: #334155; vertical-align: middle;">
+                        ${escapeHtml(u.username || '-')}
+                        ${isSuperadmin ? '<span class="badge" style="background: #fef3c7; color: #92400e; font-size: 10px; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-weight: 700;">Superadmin</span>' : ''}
+                    </td>
+                    <td style="vertical-align: middle;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                            ${uacBadges.join('')}
+                        </div>
+                    </td>
+                    <td class="text-center" style="font-size: 12px; color: #64748b; vertical-align: middle;">${updatedAt}</td>
+                    <td class="text-center" style="vertical-align: middle;">
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="App.openEditUserModal(${u.id})"
+                                style="padding: 2px 8px; font-size: 11.5px; font-weight: 600;">
+                                Edit
+                            </button>
+                            ${!isSuperadmin ? `
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="App.openDeleteUserModal(${u.id}, '${escapeHtml(u.username)}')"
+                                    style="padding: 2px 8px; font-size: 11.5px; font-weight: 600;">
+                                    Hapus
+                                </button>
+                            ` : `
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Superadmin tidak dapat dihapus"
+                                    style="padding: 2px 8px; font-size: 11.5px; opacity: 0.5; cursor: not-allowed;">
+                                    Hapus
+                                </button>
+                            `}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function openAddUserModal() {
+        const form = document.getElementById('user-management-form');
+        if (form) form.reset();
+
+        document.getElementById('user-form-id').value = '';
+        document.getElementById('user-form-name').value = '';
+        document.getElementById('user-form-username').value = '';
+        document.getElementById('user-form-password').value = '';
+        document.getElementById('user-form-password').required = true;
+        document.getElementById('user-form-password-required').style.display = 'inline';
+        document.getElementById('user-form-password-hint').style.display = 'none';
+
+        document.getElementById('user-uac-all-summary').checked = true;
+        document.getElementById('user-uac-weekly-summary').checked = true;
+        document.getElementById('user-uac-master-data').checked = true;
+        document.getElementById('user-uac-master-data-weekly').checked = true;
+        document.getElementById('user-uac-master-add-import').checked = true;
+        document.getElementById('user-uac-master-edit').checked = true;
+        document.getElementById('user-uac-master-delete').checked = true;
+        document.getElementById('user-uac-master-weekly-add-import').checked = true;
+        document.getElementById('user-uac-master-weekly-delete').checked = true;
+
+        document.getElementById('user-form-modal-title').textContent = 'Tambah User Administrator';
+        document.getElementById('btn-submit-user').textContent = 'Simpan User';
+        document.getElementById('user-form-modal').style.display = 'flex';
+    }
+
+    function openEditUserModal(id) {
+        const user = allUsersList.find(u => u.id === id);
+        if (!user) {
+            showToast('error', 'Error', 'Data user tidak ditemukan.');
+            return;
+        }
+
+        document.getElementById('user-form-id').value = user.id;
+        document.getElementById('user-form-name').value = user.name || '';
+        document.getElementById('user-form-username').value = user.username || '';
+        document.getElementById('user-form-password').value = '';
+        document.getElementById('user-form-password').required = false;
+        document.getElementById('user-form-password-required').style.display = 'none';
+        document.getElementById('user-form-password-hint').style.display = 'block';
+
+        document.getElementById('user-uac-all-summary').checked = user.can_access_all_summary !== false;
+        document.getElementById('user-uac-weekly-summary').checked = user.can_access_weekly_summary !== false;
+        document.getElementById('user-uac-master-data').checked = user.can_access_master_data !== false;
+        document.getElementById('user-uac-master-data-weekly').checked = user.can_access_master_data_weekly !== false;
+        document.getElementById('user-uac-master-add-import').checked = user.can_master_add_import !== false;
+        document.getElementById('user-uac-master-edit').checked = user.can_master_edit !== false;
+        document.getElementById('user-uac-master-delete').checked = user.can_master_delete !== false;
+        document.getElementById('user-uac-master-weekly-add-import').checked = user.can_master_weekly_add_import !== false;
+        document.getElementById('user-uac-master-weekly-delete').checked = user.can_master_weekly_delete !== false;
+
+        const isSuperadmin = (user.username || '').toLowerCase() === 'd3utsch';
+        document.getElementById('user-form-modal-title').textContent = isSuperadmin ? 'Edit Superadmin: D3utsch' : `Edit User: ${user.username}`;
+        document.getElementById('btn-submit-user').textContent = 'Perbarui User';
+        document.getElementById('user-form-modal').style.display = 'flex';
+    }
+
+    function closeUserModal() {
+        const modal = document.getElementById('user-form-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function submitUserForm(event) {
+        if (event) event.preventDefault();
+
+        const id = document.getElementById('user-form-id').value;
+        const name = document.getElementById('user-form-name').value.trim();
+        const username = document.getElementById('user-form-username').value.trim();
+        const password = document.getElementById('user-form-password').value;
+
+        if (!name || !username) {
+            showToast('error', 'Validasi Gagal', 'Nama lengkap dan Username wajib diisi.');
+            return;
+        }
+
+        if (!id && !password) {
+            showToast('error', 'Validasi Gagal', 'Password wajib diisi untuk user baru.');
+            return;
+        }
+
+        const payload = {
+            id: id ? parseInt(id, 10) : null,
+            name: name,
+            username: username,
+            password: password,
+            can_access_all_summary: document.getElementById('user-uac-all-summary').checked,
+            can_access_weekly_summary: document.getElementById('user-uac-weekly-summary').checked,
+            can_access_master_data: document.getElementById('user-uac-master-data').checked,
+            can_access_master_data_weekly: document.getElementById('user-uac-master-data-weekly').checked,
+            can_master_add_import: document.getElementById('user-uac-master-add-import').checked,
+            can_master_edit: document.getElementById('user-uac-master-edit').checked,
+            can_master_delete: document.getElementById('user-uac-master-delete').checked,
+            can_master_weekly_add_import: document.getElementById('user-uac-master-weekly-add-import').checked,
+            can_master_weekly_delete: document.getElementById('user-uac-master-weekly-delete').checked,
+        };
+
+        const submitBtn = document.getElementById('btn-submit-user');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Menyimpan...';
+        }
+
+        const action = id ? 'update' : 'create';
+
+        try {
+            const res = await fetch(`api/users.php?action=${action}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Berhasil', json.message || 'User berhasil disimpan.');
+                closeUserModal();
+
+                // If editing self, update local session permissions and apply immediately
+                if (window.AUTH_USER && id && parseInt(id, 10) === window.AUTH_USER.id) {
+                    window.AUTH_USER.name = name;
+                    window.AUTH_USER.username = username;
+                    window.AUTH_USER.permissions = {
+                        can_access_all_summary: payload.can_access_all_summary,
+                        can_access_weekly_summary: payload.can_access_weekly_summary,
+                        can_access_master_data: payload.can_access_master_data,
+                        can_access_master_data_weekly: payload.can_access_master_data_weekly,
+                        can_master_add_import: payload.can_master_add_import,
+                        can_master_edit: payload.can_master_edit,
+                        can_master_delete: payload.can_master_delete,
+                        can_master_weekly_add_import: payload.can_master_weekly_add_import,
+                        can_master_weekly_delete: payload.can_master_weekly_delete,
+                    };
+                    applyUacPermissions();
+                }
+
+                loadUsers();
+            } else {
+                showToast('error', 'Gagal', json.message || 'Gagal menyimpan user.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan', err.message || 'Terjadi kesalahan sistem.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = id ? 'Perbarui User' : 'Simpan User';
+            }
+        }
+    }
+
+    function openDeleteUserModal(id, username) {
+        deleteUserTargetId = id;
+        const displayEl = document.getElementById('delete-user-username-display');
+        if (displayEl) displayEl.textContent = `"${username}"`;
+        const modal = document.getElementById('user-delete-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeUserDeleteModal() {
+        deleteUserTargetId = null;
+        const modal = document.getElementById('user-delete-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmDeleteUser() {
+        if (!deleteUserTargetId) return;
+
+        const btn = document.getElementById('btn-confirm-delete-user');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Menghapus...';
+        }
+
+        try {
+            const res = await fetch('api/users.php?action=delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ id: deleteUserTargetId })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Berhasil', json.message || 'User berhasil dihapus.');
+                closeUserDeleteModal();
+                loadUsers();
+            } else {
+                showToast('error', 'Gagal', json.message || 'Gagal menghapus user.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan', err.message || 'Terjadi kesalahan sistem.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Hapus User';
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MASTER DATA: SO PROFILE WEEKLY (21 COLUMNS)
+    // ═══════════════════════════════════════════════════════════════
+
+    let allMasterWeeklyRows = [];
+    let filteredMasterWeeklyRows = [];
+    let currentMasterWeeklyPage = 1;
+    let masterWeeklyPageSize = 10;
+    let masterWeeklySearchQuery = '';
+    let masterWeeklySortColumn = null;
+    let masterWeeklySortDirection = 'asc';
+    let selectedFileWeekly = null;
+    let importFileTokenWeekly = null;
+
+    async function loadMasterDataWeekly() {
+        const tbody = document.getElementById('master-opname-weekly-tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="21" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    Memuat data SO Profile Weekly...
+                </td>
+            </tr>
+        `;
+
+        try {
+            const res = await fetch('api/reconciliation_weekly.php?action=list&page=1&page_size=all');
+            const json = await res.json();
+
+            if (!json.success) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="21" class="text-center" style="padding: 2rem; color: #dc2626;">
+                            ${json.message || 'Gagal memuat data dari database'}
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allMasterWeeklyRows = json.data || [];
+            applyFilterWeeklyAndRender();
+        } catch (err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="21" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        Network error: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function handleSearchWeekly(query) {
+        masterWeeklySearchQuery = (query || '').toLowerCase().trim();
+        currentMasterWeeklyPage = 1;
+        applyFilterWeeklyAndRender();
+    }
+
+    function changePageSizeWeekly(size) {
+        masterWeeklyPageSize = size === 'all' ? allMasterWeeklyRows.length : parseInt(size, 10);
+        currentMasterWeeklyPage = 1;
+        applyFilterWeeklyAndRender();
+    }
+
+    function goToPageWeekly(page) {
+        const totalPages = Math.ceil(filteredMasterWeeklyRows.length / masterWeeklyPageSize) || 1;
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentMasterWeeklyPage = page;
+        renderMasterTableWeekly();
+    }
+
+    function applyFilterWeeklyAndRender() {
+        let rows = allMasterWeeklyRows.slice();
+
+        // Month filter
+        const mFilter = document.getElementById('filter-weekly-month');
+        if (mFilter && mFilter.value) {
+            const m = parseInt(mFilter.value, 10);
+            rows = rows.filter(r => parseInt(r.period_month, 10) === m);
+        }
+
+        // Week filter (Week 1, Week 2, Week 3, Week 4)
+        const wFilter = document.getElementById('filter-weekly-week');
+        if (wFilter && wFilter.value) {
+            const w = parseInt(wFilter.value, 10);
+            rows = rows.filter(r => parseInt(r.period_week, 10) === w);
+        }
+
+        // Year filter
+        const yFilter = document.getElementById('filter-weekly-year');
+        if (yFilter && yFilter.value) {
+            const y = parseInt(yFilter.value, 10);
+            rows = rows.filter(r => parseInt(r.period_year, 10) === y);
+        }
+
+        // Search query
+        if (masterWeeklySearchQuery) {
+            rows = rows.filter(r => (r.profile || '').toLowerCase().includes(masterWeeklySearchQuery));
+        }
+
+        // Sort
+        if (masterWeeklySortColumn) {
+            const isNumeric = [
+                'match_physic_qty', 'match_physic_pct', 'match_nbv_value', 'match_nbv_pct',
+                'physic_physic_qty', 'physic_physic_pct', 'physic_nbv_value', 'physic_nbv_pct',
+                'db_physic_qty', 'db_physic_pct', 'db_nbv_value', 'db_nbv_pct',
+                'total_physic_actual', 'total_physic_target', 'total_physic_pct',
+                'total_nbv_actual', 'total_nbv_target', 'total_nbv_pct'
+            ].includes(masterWeeklySortColumn);
+
+            rows.sort((a, b) => {
+                let valA = a[masterWeeklySortColumn];
+                let valB = b[masterWeeklySortColumn];
+
+                if (isNumeric) {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                    return masterWeeklySortDirection === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    valA = (valA || '').toString();
+                    valB = (valB || '').toString();
+                    return masterWeeklySortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+            });
+        }
+
+        filteredMasterWeeklyRows = rows;
+        currentMasterWeeklyPage = 1;
+        renderMasterTableWeekly();
+    }
+
+    function toggleSortWeekly(col) {
+        if (masterWeeklySortColumn === col) {
+            masterWeeklySortDirection = masterWeeklySortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            masterWeeklySortColumn = col;
+            masterWeeklySortDirection = 'asc';
+        }
+        applyFilterWeeklyAndRender();
+        updateSortIndicatorsWeekly();
+    }
+
+    function updateSortIndicatorsWeekly() {
+        document.querySelectorAll('#master-opname-weekly-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#master-opname-weekly-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (masterWeeklySortColumn) {
+            const activeTh = document.querySelector(`#master-opname-weekly-table th.sortable[onclick*="'${masterWeeklySortColumn}'"]`);
+            if (activeTh) {
+                activeTh.classList.add(masterWeeklySortDirection);
+            }
+            const activeInd = document.querySelector(`#master-opname-weekly-table .sort-indicator[data-col-weekly="${masterWeeklySortColumn}"]`);
+            if (activeInd) {
+                activeInd.textContent = masterWeeklySortDirection === 'asc' ? '▲' : '▼';
+            }
+        }
+    }
+
+    function renderMasterTableWeekly() {
+        const tbody = document.getElementById('master-opname-weekly-tbody');
+        const infoEl = document.getElementById('master-weekly-pagination-info');
+        const controlsEl = document.getElementById('master-weekly-pagination-controls');
+        if (!tbody) return;
+
+        const totalItems = filteredMasterWeeklyRows.length;
+
+        if (totalItems === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="21" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                        ${allMasterWeeklyRows.length === 0 ? "Tidak ada data SO Profile Weekly." : "Data SO Profile Weekly tidak ditemukan."}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            if (controlsEl) controlsEl.innerHTML = '';
+            return;
+        }
+
+        const effectivePageSize = masterWeeklyPageSize > 0 ? masterWeeklyPageSize : totalItems;
+        const totalPages = Math.ceil(totalItems / effectivePageSize) || 1;
+        if (currentMasterWeeklyPage > totalPages) currentMasterWeeklyPage = totalPages;
+
+        const startIndex = (currentMasterWeeklyPage - 1) * effectivePageSize;
+        const endIndex = Math.min(startIndex + effectivePageSize, totalItems);
+        const pageRows = filteredMasterWeeklyRows.slice(startIndex, endIndex);
+
+        let html = '';
+        pageRows.forEach(row => {
+            html += `
+                <tr>
+                    <td class="text-left" style="font-weight: 500; max-width: 320px; white-space: normal;">
+                        ${escapeHtml(row.profile)}
+                    </td>
+                    <td class="text-center">${escapeHtml(row.period_start)}</td>
+                    <td class="text-center">${escapeHtml(row.period_end)}</td>
+
+                    <!-- RESULT MATCH -->
+                    <td class="text-right">${formatNumber(row.match_physic_qty)}</td>
+                    <td class="text-right">${formatPercent(row.match_physic_pct)}</td>
+                    <td class="text-right">${formatNumber(row.match_nbv_value)}</td>
+                    <td class="text-right">${formatPercent(row.match_nbv_pct)}</td>
+
+                    <!-- RESULT PHYSIC -->
+                    <td class="text-right">${formatNumber(row.physic_physic_qty)}</td>
+                    <td class="text-right">${formatPercent(row.physic_physic_pct)}</td>
+                    <td class="text-right">${formatNumber(row.physic_nbv_value)}</td>
+                    <td class="text-right">${formatPercent(row.physic_nbv_pct)}</td>
+
+                    <!-- RESULT DB -->
+                    <td class="text-right">${formatNumber(row.db_physic_qty)}</td>
+                    <td class="text-right">${formatPercent(row.db_physic_pct)}</td>
+                    <td class="text-right">${formatNumber(row.db_nbv_value)}</td>
+                    <td class="text-right">${formatPercent(row.db_nbv_pct)}</td>
+
+                    <!-- TOTAL -->
+                    <td class="text-right" style="font-weight: 600;">${formatNumber(row.total_physic_actual)}</td>
+                    <td class="text-right">${formatNumber(row.total_physic_target)}</td>
+                    <td class="text-right" style="font-weight: 600;">${formatPercent(row.total_physic_pct)}</td>
+                    <td class="text-right" style="font-weight: 600;">${formatNumber(row.total_nbv_actual)}</td>
+                    <td class="text-right">${formatNumber(row.total_nbv_target)}</td>
+                    <td class="text-right" style="font-weight: 600;">${formatPercent(row.total_nbv_pct)}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+
+        if (infoEl) {
+            infoEl.textContent = `Menampilkan ${totalItems > 0 ? (startIndex + 1).toLocaleString('id-ID') : 0} sampai ${endIndex.toLocaleString('id-ID')} dari ${totalItems.toLocaleString('id-ID')} data`;
+        }
+
+        if (controlsEl) {
+            if (totalPages <= 1 || masterWeeklyPageSize === 'all') {
+                controlsEl.innerHTML = '';
+            } else {
+                let btnsHtml = '';
+                btnsHtml += `<button class="pagination-btn" ${currentMasterWeeklyPage === 1 ? 'disabled' : ''} onclick="App.goToPageWeekly(${currentMasterWeeklyPage - 1})">&laquo; Prev</button>`;
+
+                const maxButtons = 5;
+                let startPage = Math.max(1, currentMasterWeeklyPage - Math.floor(maxButtons / 2));
+                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                if (endPage - startPage + 1 < maxButtons) {
+                    startPage = Math.max(1, endPage - maxButtons + 1);
+                }
+
+                if (startPage > 1) {
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToPageWeekly(1)">1</button>`;
+                    if (startPage > 2) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                }
+
+                for (let p = startPage; p <= endPage; p++) {
+                    btnsHtml += `<button class="pagination-btn ${p === currentMasterWeeklyPage ? 'active' : ''}" onclick="App.goToPageWeekly(${p})">${p}</button>`;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) btnsHtml += `<span class="pagination-ellipsis">...</span>`;
+                    btnsHtml += `<button class="pagination-btn" onclick="App.goToPageWeekly(${totalPages})">${totalPages}</button>`;
+                }
+
+                btnsHtml += `<button class="pagination-btn" ${currentMasterWeeklyPage === totalPages ? 'disabled' : ''} onclick="App.goToPageWeekly(${currentMasterWeeklyPage + 1})">Next &raquo;</button>`;
+
+                controlsEl.innerHTML = btnsHtml;
+            }
+        }
+
+        // Apply UAC permissions to dynamic buttons if any
+        applyUacPermissions();
+    }
+
+    // Weekly Drag and Drop Setup
+    function setupWeeklyDragAndDrop() {
+        const dropZone = document.getElementById('drag-drop-zone-weekly');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleFileSelectWeekly(dt.files);
+            }
+        });
+    }
+
+    function openImportModalWeekly() {
+        clearSelectedFileWeekly();
+        const statusDiv = document.getElementById('modal-import-weekly-status');
+        if (statusDiv) statusDiv.style.display = 'none';
+        const modal = document.getElementById('import-weekly-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeImportModalWeekly() {
+        const modal = document.getElementById('import-weekly-modal');
+        if (modal) modal.style.display = 'none';
+        clearSelectedFileWeekly();
+    }
+
+    async function handleFileSelectWeekly(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            showToast('error', 'File Tidak Valid', 'Hanya file Excel (.xlsx, .xls) yang diperbolehkan.');
+            return;
+        }
+
+        selectedFileWeekly = file;
+        importFileTokenWeekly = null;
+
+        const displayEl = document.getElementById('selected-weekly-file-display');
+        const nameEl = document.getElementById('selected-weekly-file-name');
+        const sizeEl = document.getElementById('selected-weekly-file-size');
+
+        if (displayEl && nameEl && sizeEl) {
+            nameEl.textContent = file.name;
+            const sizeKb = Math.round(file.size / 1024);
+            sizeEl.textContent = `(${sizeKb.toLocaleString()} KB)`;
+            displayEl.style.display = 'block';
+        }
+
+        const sheetGroup = document.getElementById('import-weekly-sheet-group');
+        const sheetSelect = document.getElementById('import-weekly-sheet-select');
+        const sheetHint = document.getElementById('import-weekly-sheet-hint');
+        const submitBtn = document.getElementById('modal-weekly-upload-btn');
+
+        if (sheetGroup && sheetSelect) {
+            sheetGroup.style.display = 'block';
+            sheetSelect.innerHTML = '<option value="">Membaca sheet dari file...</option>';
+            sheetSelect.disabled = true;
+            if (sheetHint) sheetHint.textContent = 'Mohon tunggu saat membaca nama lembar kerja...';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Membaca sheet...';
+        }
+
+        try {
+            const json = await fetchExcelSheets(file);
+            if (json.success && json.sheets && json.sheets.length > 0) {
+                importFileTokenWeekly = json.file_token || null;
+                sheetSelect.innerHTML = '';
+                json.sheets.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    sheetSelect.appendChild(opt);
+                });
+                sheetSelect.disabled = false;
+                if (sheetHint) {
+                    sheetHint.textContent = json.sheets.length === 1
+                        ? '1 sheet terdeteksi pada file.'
+                        : `${json.sheets.length} sheet ditemukan. Silakan pilih sheet untuk diimpor.`;
+                }
+            } else {
+                sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+                sheetSelect.disabled = false;
+                if (sheetHint) sheetHint.textContent = json.message || 'Tidak dapat membaca sheet; sheet default akan digunakan.';
+            }
+        } catch (err) {
+            sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+            sheetSelect.disabled = false;
+            if (sheetHint) sheetHint.textContent = 'Tidak dapat membaca sheet; sheet default akan digunakan.';
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    function clearSelectedFileWeekly() {
+        selectedFileWeekly = null;
+        importFileTokenWeekly = null;
+        const fileInput = document.getElementById('import-weekly-file-input');
+        if (fileInput) fileInput.value = '';
+
+        const displayEl = document.getElementById('selected-weekly-file-display');
+        if (displayEl) displayEl.style.display = 'none';
+
+        const sheetGroup = document.getElementById('import-weekly-sheet-group');
+        const sheetSelect = document.getElementById('import-weekly-sheet-select');
+        const sheetHint = document.getElementById('import-weekly-sheet-hint');
+        if (sheetGroup) sheetGroup.style.display = 'none';
+        if (sheetSelect) {
+            sheetSelect.innerHTML = '<option value="">Pilih Sheet...</option>';
+            sheetSelect.disabled = false;
+        }
+        if (sheetHint) sheetHint.textContent = '';
+
+        const submitBtn = document.getElementById('modal-weekly-upload-btn');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unggah & Impor';
+        }
+    }
+
+    async function submitImportWeekly() {
+        if (!selectedFileWeekly) {
+            showToast('error', 'File Belum Dipilih', 'Silakan pilih atau seret & lepas file Excel.');
+            return;
+        }
+
+        const monthSelect = document.getElementById('import-weekly-month');
+        const weekSelect = document.getElementById('import-weekly-week');
+        const yearSelect = document.getElementById('import-weekly-year');
+        const submitBtn = document.getElementById('modal-weekly-upload-btn');
+        const statusDiv = document.getElementById('modal-import-weekly-status');
+
+        const month = monthSelect ? monthSelect.value : '';
+        const week = weekSelect ? weekSelect.value : '1';
+        const year = yearSelect ? yearSelect.value : '';
+
+        const replaceExisting = document.getElementById('import-weekly-replace-existing')?.checked ? '1' : '0';
+        const sheetSelect = document.getElementById('import-weekly-sheet-select');
+        const sheetName = sheetSelect ? sheetSelect.value : '';
+
+        const formData = new FormData();
+        formData.append('month', month);
+        formData.append('week', week);
+        formData.append('year', year);
+        formData.append('replace_existing', replaceExisting);
+        formData.append('sheet_name', sheetName);
+        if (importFileTokenWeekly) {
+            formData.append('file_token', importFileTokenWeekly);
+        } else {
+            formData.append('excel_file', selectedFileWeekly);
+        }
+        formData.append('csrf_token', csrfToken);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Mengunggah...';
+
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#eff6ff';
+        statusDiv.style.color = '#1d4ed8';
+        statusDiv.style.border = '1px solid #bfdbfe';
+        statusDiv.textContent = 'Mengunggah dan memproses data SO Weekly...';
+
+        try {
+            const res = await fetch('api/import_weekly.php', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
+            });
+
+            const rawText = await res.text();
+            let json;
+            try {
+                json = JSON.parse(rawText);
+            } catch (parseErr) {
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = 'Kesalahan server: ' + (rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 150) || 'Respon tidak valid');
+                showToast('error', 'Kesalahan Server', 'Respon server tidak valid.');
+                return;
+            }
+
+            if (json.success) {
+                statusDiv.style.background = '#f0fdf4';
+                statusDiv.style.color = '#15803d';
+                statusDiv.style.border = '1px solid #bbf7d0';
+                statusDiv.textContent = json.message || 'Impor SO Weekly berhasil!';
+
+                showToast('success', 'Impor Selesai', json.message || 'Data SO Weekly berhasil diimpor.');
+
+                loadMasterDataWeekly();
+                loadWeeklySummary();
+
+                setTimeout(() => {
+                    closeImportModalWeekly();
+                }, 1200);
+            } else {
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = json.message || 'Impor gagal.';
+                showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor file.');
+            }
+        } catch (err) {
+            statusDiv.style.background = '#fef2f2';
+            statusDiv.style.color = '#b91c1c';
+            statusDiv.style.border = '1px solid #fecaca';
+            statusDiv.textContent = 'Kesalahan koneksi: ' + (err.message || 'Gagal terhubung');
+            showToast('error', 'Kesalahan Server', err.message || 'Gagal terhubung ke server.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unggah & Impor';
+        }
+    }
+
+    function openBulkDeleteModalWeekly() {
+        const statusDiv = document.getElementById('bulk-delete-weekly-status');
+        if (statusDiv) statusDiv.style.display = 'none';
+        const modal = document.getElementById('bulk-delete-weekly-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeBulkDeleteModalWeekly() {
+        const modal = document.getElementById('bulk-delete-weekly-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function submitBulkDeleteWeekly() {
+        const month = document.getElementById('bulk-delete-weekly-month')?.value || '';
+        const week = document.getElementById('bulk-delete-weekly-week')?.value || '';
+        const year = document.getElementById('bulk-delete-weekly-year')?.value || '';
+        const btn = document.getElementById('bulk-delete-weekly-submit-btn');
+        const statusDiv = document.getElementById('bulk-delete-weekly-status');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Menghapus...';
+        }
+
+        try {
+            const res = await fetch('api/reconciliation_weekly.php?action=bulk_delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    month: month ? parseInt(month, 10) : '',
+                    week: week ? parseInt(week, 10) : '',
+                    year: year ? parseInt(year, 10) : ''
+                })
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                showToast('success', 'Berhasil', json.message || 'Data SO Weekly berhasil dihapus.');
+                closeBulkDeleteModalWeekly();
+                loadMasterDataWeekly();
+                loadWeeklySummary();
+            } else {
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = json.message || 'Gagal menghapus data.';
+                }
+                showToast('error', 'Gagal', json.message || 'Gagal menghapus data.');
+            }
+        } catch (err) {
+            showToast('error', 'Kesalahan', err.message || 'Gagal terhubung ke server.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Ya, Hapus Data';
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // WEEKLY SUMMARY MODULE
+    // Only displays:
+    // 1. Achievements Cards (with vs previous period trend comparison ▲/▼ +/- %)
+    // 2. Score Card Summary (Rating & Execution pie charts & tables)
+    // 3. Report SO (data table)
+    // Controls: ONLY switch of PMD and Outlet Regional, Bulan, Week, Tahun
+    // ═══════════════════════════════════════════════════════════════
+
+    let currentWeeklyCategory = 'pmd';
+    let weeklySummaryData = null;
+    let currentWeeklyRatingFilter = 'very_poor';
+    let currentWeeklyExecutionFilter = 'not_executed';
+    let weeklyReportSortColumn = null;
+    let weeklyReportSortDirection = 'asc';
+    let weeklyScorecardRatingPieChart = null;
+    let weeklyScorecardExecPieChart = null;
+
+    function switchWeeklyCategory(cat) {
+        currentWeeklyCategory = cat === 'outlet' ? 'outlet' : 'pmd';
+
+        // Update slider button states
+        const btnPmd = document.getElementById('btn-weekly-cat-pmd');
+        const btnOutlet = document.getElementById('btn-weekly-cat-outlet');
+        if (btnPmd) btnPmd.classList.toggle('active', currentWeeklyCategory === 'pmd');
+        if (btnOutlet) btnOutlet.classList.toggle('active', currentWeeklyCategory === 'outlet');
+
+        // Update category status label
+        const statusEl = document.getElementById('weekly-cat-status');
+        if (statusEl) {
+            if (currentWeeklyCategory === 'pmd') {
+                statusEl.innerHTML = `(<strong style="color: #9333ea;">PMD</strong> Target 98%)`;
+            } else {
+                statusEl.innerHTML = `(<strong style="color: #2563eb;">Outlet Regional</strong> Target 97%)`;
+            }
+        }
+
+        // Update card titles
+        const execTitle = document.getElementById('weekly-executive-title');
+        if (execTitle) {
+            execTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Executive Summary (Weekly PMD)' : 'Executive Summary (Weekly Outlet Regional)';
+        }
+
+        const reportTitle = document.getElementById('weekly-hasil-so-title');
+        if (reportTitle) {
+            reportTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Report SO PMD (Weekly)' : 'Report SO Outlet Regional (Weekly)';
+        }
+
+        // Toggle card groups in achievements
+        const isPmd = (currentWeeklyCategory === 'pmd');
+        const pmdCard = document.getElementById('weekly-kpi-card-pmd');
+        const dnoCard = document.getElementById('weekly-kpi-card-dno');
+        const dsoCard = document.getElementById('weekly-kpi-card-dso');
+
+        if (pmdCard) pmdCard.style.display = isPmd ? '' : 'none';
+        if (dnoCard) dnoCard.style.display = isPmd ? '' : 'none';
+        if (dsoCard) dsoCard.style.display = isPmd ? '' : 'none';
+
+        const outletCard = document.getElementById('weekly-kpi-card-outlet-national');
+        const wroGroup = document.getElementById('weekly-kpi-group-wro');
+        const croGroup = document.getElementById('weekly-kpi-group-cro');
+        const eroGroup = document.getElementById('weekly-kpi-group-ero');
+
+        if (outletCard) outletCard.style.display = !isPmd ? '' : 'none';
+        if (wroGroup) wroGroup.style.display = !isPmd ? '' : 'none';
+        if (croGroup) croGroup.style.display = !isPmd ? '' : 'none';
+        if (eroGroup) eroGroup.style.display = !isPmd ? '' : 'none';
+
+        loadWeeklySummary();
+    }
+
+    async function loadWeeklySummary() {
+        const m = document.getElementById('weekly-filter-month')?.value || 9;
+        const w = document.getElementById('weekly-filter-week')?.value || 1;
+        const y = document.getElementById('weekly-filter-year')?.value || 2026;
+
+        const monthNames = {
+            1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
+            5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
+            9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
+        };
+        const periodStr = `${monthNames[parseInt(m, 10)] || 'Bulan ' + m} - Week ${w} ${y}`;
+
+        // Update period badges
+        const badges = [
+            'weekly-executive-period-badge',
+            'weekly-scorecard-rating-period-badge',
+            'weekly-scorecard-exec-period-badge',
+            'weekly-report-period-badge'
+        ];
+        badges.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = periodStr;
+        });
+
+        try {
+            const res = await fetch(`api/reconciliation_weekly.php?action=summary&month=${m}&week=${w}&year=${y}&category=${currentWeeklyCategory}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Error', json.message || 'Gagal memuat data Weekly Summary.');
+                return;
+            }
+
+            weeklySummaryData = json;
+
+            // 1. Render Achievements Cards
+            renderWeeklyAchievements(json.achievements);
+
+            // 2. Render Score Card Summary
+            renderWeeklyScorecard(json.scorecard);
+
+            // 3. Populate Dept filter and render Report SO
+            populateWeeklyDeptFilter(json.report_so || []);
+            applyWeeklyReportSoFilter();
+
+        } catch (err) {
+            console.error('loadWeeklySummary error:', err);
+            showToast('error', 'Error', 'Gagal memuat data Weekly Summary.');
+        }
+    }
+
+    function renderWeeklyAchievements(achievements) {
+        if (!achievements) return;
+
+        const targetPct = achievements.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+
+        // Helper for trend arrow
+        // Rule: Achievement Cards Trend Comparison: display only the trend arrow with +/- % (no "vs Prev" label).
+        const renderTrend = (diff) => {
+            if (diff === null || diff === undefined) return '';
+            const num = parseFloat(diff);
+            if (isNaN(num)) return '';
+            if (num > 0) {
+                return `<span class="trend-up" style="color: #16a34a; font-weight: 700; font-size: 11px;">▲ +${num.toFixed(1)}%</span>`;
+            } else if (num < 0) {
+                return `<span class="trend-down" style="color: #dc2626; font-weight: 700; font-size: 11px;">▼ ${num.toFixed(1)}%</span>`;
+            } else {
+                return `<span class="trend-flat" style="color: #64748b; font-weight: 600; font-size: 11px;">0.0%</span>`;
+            }
+        };
+
+        const renderStatusBadge = (counted, pct) => {
+            if (!counted || counted <= 0) {
+                return `<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">-</span>`;
+            }
+            if (pct >= targetPct) {
+                return `<span class="badge badge-success" style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tercapai</span>`;
+            }
+            return `<span class="badge badge-danger" style="background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tidak Tercapai</span>`;
+        };
+
+        if (currentWeeklyCategory === 'pmd') {
+            // Main PMD
+            const main = achievements.main || {};
+            const pmdVal = document.getElementById('weekly-kpi-pmd-achievement');
+            const pmdStatus = document.getElementById('weekly-kpi-pmd-status');
+            const pmdTrend = document.getElementById('weekly-kpi-pmd-trend');
+            const pmdSubtext = document.getElementById('weekly-kpi-pmd-subtext');
+
+            if (pmdVal) pmdVal.textContent = formatPercent(main.pct);
+            if (pmdStatus) pmdStatus.innerHTML = renderStatusBadge(main.sites_counted, main.pct);
+            if (pmdTrend) pmdTrend.innerHTML = renderTrend(main.diff_pct);
+            if (pmdSubtext) pmdSubtext.textContent = `Avg PMD Divisi (${main.sites_counted || 0} Sites)`;
+
+            // DNO
+            const dno = achievements.sub_depts ? (achievements.sub_depts['DNO'] || {}) : {};
+            const dnoVal = document.getElementById('weekly-kpi-dno-achievement');
+            const dnoStatus = document.getElementById('weekly-kpi-dno-status');
+            const dnoTrend = document.getElementById('weekly-kpi-dno-trend');
+            const dnoSubtext = document.getElementById('weekly-kpi-dno-subtext');
+
+            if (dnoVal) dnoVal.textContent = formatPercent(dno.pct);
+            if (dnoStatus) dnoStatus.innerHTML = renderStatusBadge(dno.sites_counted, dno.pct);
+            if (dnoTrend) dnoTrend.innerHTML = renderTrend(dno.diff_pct);
+            if (dnoSubtext) dnoSubtext.textContent = `Avg DEPT DNO (${dno.sites_counted || 0} Sites)`;
+
+            // DSO
+            const dso = achievements.sub_depts ? (achievements.sub_depts['DSO'] || {}) : {};
+            const dsoVal = document.getElementById('weekly-kpi-dso-achievement');
+            const dsoStatus = document.getElementById('weekly-kpi-dso-status');
+            const dsoTrend = document.getElementById('weekly-kpi-dso-trend');
+            const dsoSubtext = document.getElementById('weekly-kpi-dso-subtext');
+
+            if (dsoVal) dsoVal.textContent = formatPercent(dso.pct);
+            if (dsoStatus) dsoStatus.innerHTML = renderStatusBadge(dso.sites_counted, dso.pct);
+            if (dsoTrend) dsoTrend.innerHTML = renderTrend(dso.diff_pct);
+            if (dsoSubtext) dsoSubtext.textContent = `Avg DEPT DSO (${dso.sites_counted || 0} Sites)`;
+
+        } else {
+            // Outlet Regional Main
+            const main = achievements.main || {};
+            const outletVal = document.getElementById('weekly-kpi-outlet-achievement');
+            const outletStatus = document.getElementById('weekly-kpi-outlet-status');
+            const outletTrend = document.getElementById('weekly-kpi-outlet-trend');
+            const outletSubtext = document.getElementById('weekly-kpi-outlet-subtext');
+
+            if (outletVal) outletVal.textContent = formatPercent(main.pct);
+            if (outletStatus) outletStatus.innerHTML = renderStatusBadge(main.sites_counted, main.pct);
+            if (outletTrend) outletTrend.innerHTML = renderTrend(main.diff_pct);
+            if (outletSubtext) outletSubtext.textContent = `Avg Outlet Regional (${main.sites_counted || 0} Sites)`;
+
+            // Depts & Subdepts
+            const depts = achievements.depts || {};
+            const subdepts = achievements.sub_depts || {};
+
+            const deptKeys = ['wro', 'cro', 'ero'];
+            const subdeptMap = {
+                wro: ['cso', 'nso', 'sso'],
+                cro: ['cco', 'wco', 'eco'],
+                ero: ['eeo', 'neo', 'seo']
+            };
+
+            deptKeys.forEach(dk => {
+                const upperDk = dk.toUpperCase();
+                const dData = depts[upperDk] || {};
+
+                const valEl = document.getElementById(`weekly-kpi-${dk}-achievement`);
+                const statusEl = document.getElementById(`weekly-kpi-${dk}-status`);
+                const trendEl = document.getElementById(`weekly-kpi-${dk}-trend`);
+                const subtextEl = document.getElementById(`weekly-kpi-${dk}-subtext`);
+
+                if (valEl) valEl.textContent = formatPercent(dData.pct);
+                if (statusEl) statusEl.innerHTML = renderStatusBadge(dData.sites_counted, dData.pct);
+                if (trendEl) trendEl.innerHTML = renderTrend(dData.diff_pct);
+                if (subtextEl) subtextEl.textContent = `Avg DEPT ${upperDk} (${dData.sites_counted || 0} Sites)`;
+
+                // Subdepts
+                (subdeptMap[dk] || []).forEach(sk => {
+                    const upperSk = sk.toUpperCase();
+                    const sData = subdepts[upperSk] || {};
+
+                    const sVal = document.getElementById(`weekly-kpi-subdept-val-${sk}`);
+                    const sTrend = document.getElementById(`weekly-kpi-subdept-trend-${sk}`);
+                    const sMeta = document.getElementById(`weekly-kpi-subdept-meta-${sk}`);
+                    const sStatus = document.getElementById(`weekly-kpi-subdept-status-${sk}`);
+
+                    if (sVal) sVal.textContent = formatPercent(sData.pct);
+                    if (sTrend) sTrend.innerHTML = renderTrend(sData.diff_pct);
+                    if (sMeta) sMeta.textContent = `${sData.sites_counted || 0} Sites`;
+                    if (sStatus) sStatus.innerHTML = renderStatusBadge(sData.sites_counted, sData.pct);
+                });
+            });
+        }
+    }
+
+    function renderWeeklyScorecard(scorecard) {
+        if (!scorecard) return;
+
+        // Render Pie Charts
+        renderWeeklyScorecardRatingPieChart(scorecard.rating);
+        renderWeeklyScorecardExecPieChart(scorecard.execution);
+
+        // Render Tables
+        renderWeeklyScorecardRatingTable();
+        renderWeeklyScorecardExecTable();
+    }
+
+    function renderWeeklyScorecardRatingPieChart(counts) {
+        const canvas = document.getElementById('chart-weekly-scorecard-rating-pie');
+        if (!canvas) return;
+
+        if (weeklyScorecardRatingPieChart) {
+            weeklyScorecardRatingPieChart.destroy();
+            weeklyScorecardRatingPieChart = null;
+        }
+
+        const labels = ['Very Good', 'Good', 'Moderate', 'Poor', 'Very Poor'];
+        const colors = ['#047857', '#0284c7', '#d97706', '#ea580c', '#b91c1c'];
+        const data = counts ? [
+            counts.very_good || 0,
+            counts.good || 0,
+            counts.moderate || 0,
+            counts.poor || 0,
+            counts.very_poor || 0
+        ] : [0, 0, 0, 0, 0];
+
+        const total = data.reduce((a, b) => a + b, 0);
+
+        const elVg = document.getElementById('weekly-sc-stat-vg');
+        const elG = document.getElementById('weekly-sc-stat-g');
+        const elM = document.getElementById('weekly-sc-stat-m');
+        const elP = document.getElementById('weekly-sc-stat-p');
+        const elVp = document.getElementById('weekly-sc-stat-vp');
+
+        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
+        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
+        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${Math.round((data[2] / total) * 100)}%)` : '0 sites (0%)';
+        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${Math.round((data[3] / total) * 100)}%)` : '0 sites (0%)';
+        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${Math.round((data[4] / total) * 100)}%)` : '0 sites (0%)';
+
+        const ctx = canvas.getContext('2d');
+        if (total === 0) {
+            weeklyScorecardRatingPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Belum Ada Data'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '60%'
+                }
+            });
+            return;
+        }
+
+        weeklyScorecardRatingPieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: '#ffffff',
+                    borderWidth: 1.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    function renderWeeklyScorecardExecPieChart(counts) {
+        const canvas = document.getElementById('chart-weekly-scorecard-exec-pie');
+        if (!canvas) return;
+
+        if (weeklyScorecardExecPieChart) {
+            weeklyScorecardExecPieChart.destroy();
+            weeklyScorecardExecPieChart = null;
+        }
+
+        const labels = ['Executed', 'Not Executed'];
+        const colors = ['#047857', '#b91c1c'];
+        const data = counts ? [
+            counts.executed || 0,
+            counts.not_executed || 0
+        ] : [0, 0];
+
+        const total = data.reduce((a, b) => a + b, 0);
+
+        const elExec = document.getElementById('weekly-sc-stat-exec');
+        const elNotExec = document.getElementById('weekly-sc-stat-not-exec');
+
+        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
+        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
+
+        const ctx = canvas.getContext('2d');
+        if (total === 0) {
+            weeklyScorecardExecPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Belum Ada Data'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '60%'
+                }
+            });
+            return;
+        }
+
+        weeklyScorecardExecPieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: '#ffffff',
+                    borderWidth: 1.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    function onWeeklyScorecardRatingFilterChange(val) {
+        currentWeeklyRatingFilter = val;
+        renderWeeklyScorecardRatingTable();
+    }
+
+    function toggleWeeklyScorecardRatingFilter(rating) {
+        const select = document.getElementById('weekly-scorecard-rating-filter');
+        if (currentWeeklyRatingFilter === rating) {
+            currentWeeklyRatingFilter = 'all';
+        } else {
+            currentWeeklyRatingFilter = rating;
+        }
+        if (select) select.value = currentWeeklyRatingFilter;
+        renderWeeklyScorecardRatingTable();
+    }
+
+    function renderWeeklyScorecardRatingTable() {
+        const tbody = document.getElementById('weekly-scorecard-rating-tbody');
+        if (!tbody || !weeklySummaryData || !weeklySummaryData.scorecard) return;
+
+        const sites = weeklySummaryData.scorecard.sites || [];
+        let filtered = sites;
+        if (currentWeeklyRatingFilter && currentWeeklyRatingFilter !== 'all') {
+            filtered = sites.filter(s => s.rating_code === currentWeeklyRatingFilter);
+        }
+
+        // Highlight selected stat row
+        document.querySelectorAll('#weekly-scorecard-rating-pie-stats .scorecard-pie-stat-row').forEach(row => {
+            const r = row.getAttribute('data-rating');
+            row.classList.toggle('active', r === currentWeeklyRatingFilter);
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                        <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Tidak Ada Data</div>
+                        <div style="font-size: 11px;">Tidak ditemukan site dengan kriteria rating ini.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((s, idx) => {
+            const ratingBadge = renderRatingBadge(s.rating);
+            html += `
+                <tr>
+                    <td class="scorecard-col-no text-center">${idx + 1}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(s.sub_dept || s.dept || '-')}</td>
+                    <td class="scorecard-col-sitecode">${escapeHtml(s.sitecode)}</td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(s.name_site || '-')}</td>
+                    <td class="scorecard-col-month">${formatPercent(s.pct)}</td>
+                    <td class="scorecard-col-status">${ratingBadge}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function onWeeklyScorecardExecutionFilterChange(val) {
+        currentWeeklyExecutionFilter = val;
+        renderWeeklyScorecardExecTable();
+    }
+
+    function toggleWeeklyScorecardExecutionFilter(status) {
+        const select = document.getElementById('weekly-scorecard-execution-filter');
+        if (currentWeeklyExecutionFilter === status) {
+            currentWeeklyExecutionFilter = 'all';
+        } else {
+            currentWeeklyExecutionFilter = status;
+        }
+        if (select) select.value = currentWeeklyExecutionFilter;
+        renderWeeklyScorecardExecTable();
+    }
+
+    function renderWeeklyScorecardExecTable() {
+        const tbody = document.getElementById('weekly-scorecard-exec-tbody');
+        if (!tbody || !weeklySummaryData || !weeklySummaryData.scorecard) return;
+
+        const sites = weeklySummaryData.scorecard.sites || [];
+        let filtered = sites;
+        if (currentWeeklyExecutionFilter && currentWeeklyExecutionFilter !== 'all') {
+            if (currentWeeklyExecutionFilter === 'executed') {
+                filtered = sites.filter(s => s.executed);
+            } else {
+                filtered = sites.filter(s => !s.executed);
+            }
+        }
+
+        // Highlight selected stat row
+        document.querySelectorAll('#weekly-scorecard-exec-pie-stats .scorecard-pie-stat-row').forEach(row => {
+            const e = row.getAttribute('data-exec');
+            row.classList.toggle('active', e === currentWeeklyExecutionFilter);
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                        <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Tidak Ada Data</div>
+                        <div style="font-size: 11px;">Tidak ditemukan site dengan status eksekusi ini.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((s, idx) => {
+            const execBadge = renderExecutionBadge(s.execution_status);
+            html += `
+                <tr>
+                    <td class="scorecard-col-no text-center">${idx + 1}</td>
+                    <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(s.sub_dept || s.dept || '-')}</td>
+                    <td class="scorecard-col-sitecode">${escapeHtml(s.sitecode)}</td>
+                    <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(s.name_site || '-')}</td>
+                    <td class="scorecard-col-month">${formatPercent(s.pct)}</td>
+                    <td class="scorecard-col-status">${execBadge}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    // Report SO Weekly Data Table
+    function populateWeeklyDeptFilter(reportData) {
+        const select = document.getElementById('weekly-report-so-dept-filter');
+        if (!select) return;
+
+        const currentVal = select.value;
+        const depts = new Set();
+        reportData.forEach(r => {
+            if (r.dept) depts.add(r.dept.trim());
+        });
+
+        const sortedDepts = Array.from(depts).sort();
+        let optionsHtml = '<option value="all" selected>Semua Dept</option>';
+        sortedDepts.forEach(d => {
+            optionsHtml += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
+        });
+        select.innerHTML = optionsHtml;
+        if (depts.has(currentVal)) {
+            select.value = currentVal;
+        }
+    }
+
+    function toggleWeeklyReportSort(col) {
+        if (weeklyReportSortColumn === col) {
+            weeklyReportSortDirection = weeklyReportSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            weeklyReportSortColumn = col;
+            weeklyReportSortDirection = 'asc';
+        }
+
+        document.querySelectorAll('#weekly-report-so-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+        const activeInd = document.querySelector(`#weekly-report-so-table .sort-indicator[data-weekly-col="${col}"]`);
+        if (activeInd) {
+            activeInd.textContent = weeklyReportSortDirection === 'asc' ? '▲' : '▼';
+        }
+
+        applyWeeklyReportSoFilter();
+    }
+
+    function applyWeeklyReportSoFilter() {
+        const tbody = document.getElementById('weekly-report-so-tbody');
+        if (!tbody || !weeklySummaryData) return;
+
+        const reportData = weeklySummaryData.report_so || [];
+        const deptFilter = document.getElementById('weekly-report-so-dept-filter')?.value || 'all';
+        const statusFilter = document.getElementById('weekly-report-so-status-filter')?.value || 'all';
+        const searchInput = document.getElementById('weekly-report-so-search');
+        const query = (searchInput?.value || '').toLowerCase().trim();
+
+        const targetPct = weeklySummaryData.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+
+        let filtered = reportData.slice();
+
+        if (deptFilter !== 'all') {
+            filtered = filtered.filter(r => (r.dept || '').toUpperCase() === deptFilter.toUpperCase());
+        }
+
+        if (statusFilter !== 'all') {
+            if (statusFilter === 'tercapai') {
+                filtered = filtered.filter(r => r.pct >= targetPct);
+            } else {
+                filtered = filtered.filter(r => r.pct < targetPct);
+            }
+        }
+
+        if (query) {
+            filtered = filtered.filter(r => {
+                const sc = (r.sitecode || '').toLowerCase();
+                const ns = (r.name_site || '').toLowerCase();
+                const dp = (r.dept || '').toLowerCase();
+                return sc.includes(query) || ns.includes(query) || dp.includes(query);
+            });
+        }
+
+        if (weeklyReportSortColumn) {
+            const isNumeric = ['match_qty', 'physic_qty', 'db_qty', 'target_qty', 'pct'].includes(weeklyReportSortColumn);
+            filtered.sort((a, b) => {
+                let valA = a[weeklyReportSortColumn];
+                let valB = b[weeklyReportSortColumn];
+
+                if (isNumeric) {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                    return weeklyReportSortDirection === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    valA = (valA || '').toString();
+                    valB = (valB || '').toString();
+                    return weeklyReportSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+            });
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                        Data Report SO Weekly tidak ditemukan.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(r => {
+            const isTercapai = r.pct >= targetPct;
+            const statusBadge = isTercapai
+                ? `<span class="badge badge-success" style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tercapai</span>`
+                : `<span class="badge badge-danger" style="background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tidak Tercapai</span>`;
+
+            html += `
+                <tr>
+                    <td class="text-center font-mono" style="font-weight: 600; font-size: 12px; color: #1e293b;">
+                        ${escapeHtml(r.sitecode)}
+                    </td>
+                    <td class="text-left" style="font-weight: 500; color: #0f172a; max-width: 260px; white-space: normal;">
+                        ${escapeHtml(r.name_site || '-')}
+                    </td>
+                    <td class="text-center" style="font-size: 12px; font-weight: 600; color: #475569;">
+                        ${escapeHtml(r.dept || '-')}
+                    </td>
+                    <td class="text-right">${formatNumber(r.match_qty)}</td>
+                    <td class="text-right">${formatNumber(r.physic_qty)}</td>
+                    <td class="text-right">${formatNumber(r.db_qty)}</td>
+                    <td class="text-right" style="font-weight: 600;">${formatNumber(r.target_qty)}</td>
+                    <td class="text-right" style="font-weight: 700; color: ${isTercapai ? '#16a34a' : '#dc2626'};">
+                        ${formatPercent(r.pct)}
+                    </td>
+                    <td class="text-center">${statusBadge}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
     // ── Public Interface ───────────────────────────────────────
 
     return {
@@ -11228,6 +13131,45 @@ const App = (() => {
         closeUserDropdown,
         navigateTo,
         keepCleanUrl,
+        applyUacPermissions,
+        // User Management exports
+        loadUsers,
+        renderUsersTable,
+        handleUserSearch,
+        openAddUserModal,
+        openEditUserModal,
+        closeUserModal,
+        submitUserForm,
+        openDeleteUserModal,
+        closeUserDeleteModal,
+        confirmDeleteUser,
+        // Master Data SO Profile Weekly exports
+        loadMasterDataWeekly,
+        applyFilterWeeklyAndRender,
+        renderMasterTableWeekly,
+        changePageSizeWeekly,
+        goToPageWeekly,
+        handleSearchWeekly,
+        toggleSortWeekly,
+        openImportModalWeekly,
+        closeImportModalWeekly,
+        handleFileSelectWeekly,
+        clearSelectedFileWeekly,
+        submitImportWeekly,
+        openBulkDeleteModalWeekly,
+        closeBulkDeleteModalWeekly,
+        submitBulkDeleteWeekly,
+        // Weekly Summary exports
+        switchWeeklyCategory,
+        loadWeeklySummary,
+        renderWeeklyAchievements,
+        renderWeeklyScorecard,
+        onWeeklyScorecardRatingFilterChange,
+        toggleWeeklyScorecardRatingFilter,
+        onWeeklyScorecardExecutionFilterChange,
+        toggleWeeklyScorecardExecutionFilter,
+        applyWeeklyReportSoFilter,
+        toggleWeeklyReportSort,
     };
 })();
 

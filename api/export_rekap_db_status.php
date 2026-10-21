@@ -54,9 +54,14 @@ try {
         }
     }
 
-    $soType         = strtolower(trim($payload['so_type'] ?? $_GET['so_type'] ?? 'monthly'));
-    $isQuarterly    = ($soType === 'quarterly' || in_array($category, [
-        'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+    $soType = strtolower(trim($payload['so_type'] ?? $_GET['so_type'] ?? 'monthly'));
+    $isQuarterly = ($soType === 'quarterly' || in_array($category, [
+        'quarterly_outlet',
+        'quarterly_subarep',
+        'quarterly_warehouse',
+        'quarterly_warehouse_hub',
+        'quarterly_tekno',
+        'quarterly_warehouse_tekno'
     ], true));
 
     if (isset($payload['compare_month']) && $payload['compare_month'] !== '') {
@@ -69,16 +74,16 @@ try {
         if ($isQuarterly) {
             if ($currMonth <= 3) {
                 $prevMonth = 12;
-                $prevYear  = $currYear - 1;
+                $prevYear = $currYear - 1;
             } elseif ($currMonth <= 6) {
                 $prevMonth = 3;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             } elseif ($currMonth <= 9) {
                 $prevMonth = 6;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             } else {
                 $prevMonth = 9;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             }
         } else {
             if ($currMonth === 1) {
@@ -91,13 +96,13 @@ try {
         }
     }
 
-    $deptFilter     = trim($payload['dept'] ?? $_GET['dept'] ?? 'all');
-    $subDeptFilter  = trim($payload['sub_dept'] ?? $_GET['sub_dept'] ?? 'all');
+    $deptFilter = trim($payload['dept'] ?? $_GET['dept'] ?? 'all');
+    $subDeptFilter = trim($payload['sub_dept'] ?? $_GET['sub_dept'] ?? 'all');
     $sitecodeFilter = trim($payload['sitecode'] ?? $_GET['sitecode'] ?? 'all');
-    $statusFilter   = strtolower(trim($payload['status'] ?? $_GET['status'] ?? 'all'));
-    $search         = trim($payload['search'] ?? $_GET['search'] ?? '');
-    $sortCol        = trim($payload['sort_col'] ?? $_GET['sort_col'] ?? '');
-    $sortDir        = strtolower(trim($payload['sort_dir'] ?? $_GET['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
+    $statusFilter = strtolower(trim($payload['status'] ?? $_GET['status'] ?? 'all'));
+    $search = trim($payload['search'] ?? $_GET['search'] ?? '');
+    $sortCol = trim($payload['sort_col'] ?? $_GET['sort_col'] ?? '');
+    $sortDir = strtolower(trim($payload['sort_dir'] ?? $_GET['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
 
     $monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     $currMonthLabel = ($monthNames[$currMonth] ?? '') . " " . $currYear;
@@ -185,9 +190,11 @@ try {
         $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
         if ($category === 'all') {
             if ($isQuarterly) {
-                if ($effGroup !== 'quarterly') continue;
+                if ($effGroup !== 'quarterly')
+                    continue;
             } else {
-                if ($effGroup !== 'monthly') continue;
+                if ($effGroup !== 'monthly')
+                    continue;
             }
         } elseif ($isQuarterly) {
             if ($isPmd) {
@@ -245,7 +252,7 @@ try {
     // Check if the current selected period has been uploaded to rekap_db_master
     $checkCurrStmt = $db->prepare("SELECT 1 FROM rekap_db_master WHERE period_month = :m AND period_year = :y LIMIT 1");
     $checkCurrStmt->execute([':m' => $currMonth, ':y' => $currYear]);
-    $hasCurrData = (bool)$checkCurrStmt->fetchColumn();
+    $hasCurrData = (bool) $checkCurrStmt->fetchColumn();
 
     if (!$hasCurrData) {
         $stats = [
@@ -298,31 +305,31 @@ try {
         )
     ";
 
-    $baseParams = [
-        ':prev_m' => $prevMonth,
-        ':prev_y' => $prevYear,
-        ':curr_m' => $currMonth,
-        ':curr_y' => $currYear
-    ];
+        $baseParams = [
+            ':prev_m' => $prevMonth,
+            ':prev_y' => $prevYear,
+            ':curr_m' => $currMonth,
+            ':curr_y' => $currYear
+        ];
 
-    // Compute Summary Stats following the selected DEPT, SUB DEPT, and SITECODE filters
-    $statsWhere = [];
-    $statsParams = $baseParams;
-    if ($deptFilter !== 'all' && $deptFilter !== '') {
-        $statsWhere[] = "sr.dept = :dept";
-        $statsParams[':dept'] = $deptFilter;
-    }
-    if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
-        $statsWhere[] = "sr.sub_dept = :sub_dept";
-        $statsParams[':sub_dept'] = $subDeptFilter;
-    }
-    if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
-        $statsWhere[] = "sr.sitecode = :sitecode";
-        $statsParams[':sitecode'] = $sitecodeFilter;
-    }
-    $statsWhereSql = !empty($statsWhere) ? " WHERE " . implode(" AND ", $statsWhere) : "";
+        // Compute Summary Stats following the selected DEPT, SUB DEPT, and SITECODE filters
+        $statsWhere = [];
+        $statsParams = $baseParams;
+        if ($deptFilter !== 'all' && $deptFilter !== '') {
+            $statsWhere[] = "sr.dept = :dept";
+            $statsParams[':dept'] = $deptFilter;
+        }
+        if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
+            $statsWhere[] = "sr.sub_dept = :sub_dept";
+            $statsParams[':sub_dept'] = $subDeptFilter;
+        }
+        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
+            $statsWhere[] = "sr.sitecode = :sitecode";
+            $statsParams[':sitecode'] = $sitecodeFilter;
+        }
+        $statsWhereSql = !empty($statsWhere) ? " WHERE " . implode(" AND ", $statsWhere) : "";
 
-    $sqlStats = $sqlBase . "
+        $sqlStats = $sqlBase . "
         SELECT 
             COUNT(DISTINCT cb.sitecode) as total_sites,
             COUNT(*) as total_items,
@@ -338,73 +345,73 @@ try {
         $statsWhereSql
     ";
 
-    $statsStmt = $db->prepare($sqlStats);
-    $statsStmt->execute($statsParams);
-    $stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $statsStmt = $db->prepare($sqlStats);
+        $statsStmt->execute($statsParams);
+        $stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    // Filter master sites count
-    $filteredMasterSites = array_filter($categoryMasterSites, function ($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
-        if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter)
-            return false;
-        if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter)
-            return false;
-        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter)
-            return false;
-        return true;
-    });
-    $totalMasterSites = count($filteredMasterSites);
+        // Filter master sites count
+        $filteredMasterSites = array_filter($categoryMasterSites, function ($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
+            if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter)
+                return false;
+            if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter)
+                return false;
+            if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter)
+                return false;
+            return true;
+        });
+        $totalMasterSites = count($filteredMasterSites);
 
-    // Build WHERE clauses for item query (with DEPT, SUB DEPT, SITECODE, STATUS, SEARCH)
-    $params = $baseParams;
-    $whereConditions = [];
-    if ($deptFilter !== 'all' && $deptFilter !== '') {
-        $whereConditions[] = "sr.dept = :dept";
-        $params[':dept'] = $deptFilter;
-    }
-    if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
-        $whereConditions[] = "sr.sub_dept = :sub_dept";
-        $params[':sub_dept'] = $subDeptFilter;
-    }
-    if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
-        $whereConditions[] = "sr.sitecode = :sitecode";
-        $params[':sitecode'] = $sitecodeFilter;
-    }
-    if ($statusFilter !== 'all' && in_array($statusFilter, ['solved', 'unsolved', 'new_db'], true)) {
-        $whereConditions[] = "cb.status = :status";
-        $params[':status'] = $statusFilter;
-    }
-    if ($search !== '') {
-        $whereConditions[] = "(
+        // Build WHERE clauses for item query (with DEPT, SUB DEPT, SITECODE, STATUS, SEARCH)
+        $params = $baseParams;
+        $whereConditions = [];
+        if ($deptFilter !== 'all' && $deptFilter !== '') {
+            $whereConditions[] = "sr.dept = :dept";
+            $params[':dept'] = $deptFilter;
+        }
+        if ($subDeptFilter !== 'all' && $subDeptFilter !== '') {
+            $whereConditions[] = "sr.sub_dept = :sub_dept";
+            $params[':sub_dept'] = $subDeptFilter;
+        }
+        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '') {
+            $whereConditions[] = "sr.sitecode = :sitecode";
+            $params[':sitecode'] = $sitecodeFilter;
+        }
+        if ($statusFilter !== 'all' && in_array($statusFilter, ['solved', 'unsolved', 'new_db'], true)) {
+            $whereConditions[] = "cb.status = :status";
+            $params[':status'] = $statusFilter;
+        }
+        if ($search !== '') {
+            $whereConditions[] = "(
             cb.sitecode ILIKE :search OR 
             sr.name_site ILIKE :search OR 
             cb.reg_no ILIKE :search OR 
             cb.name ILIKE :search OR 
             cb.sn ILIKE :search
         )";
-        $params[':search'] = '%' . $search . '%';
-    }
+            $params[':search'] = '%' . $search . '%';
+        }
 
-    $whereSql = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
+        $whereSql = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
 
-    $allowedSortCols = [
-        'dept' => 'sr.dept',
-        'sub_dept' => 'sr.sub_dept',
-        'sitecode' => 'cb.sitecode',
-        'name_site' => 'sr.name_site',
-        'reg_no' => 'cb.reg_no',
-        'name' => 'cb.name',
-        'sn' => 'cb.sn',
-        'nbv' => 'cb.nbv',
-        'status' => 'cb.status',
-    ];
+        $allowedSortCols = [
+            'dept' => 'sr.dept',
+            'sub_dept' => 'sr.sub_dept',
+            'sitecode' => 'cb.sitecode',
+            'name_site' => 'sr.name_site',
+            'reg_no' => 'cb.reg_no',
+            'name' => 'cb.name',
+            'sn' => 'cb.sn',
+            'nbv' => 'cb.nbv',
+            'status' => 'cb.status',
+        ];
 
-    $orderBySql = "ORDER BY sr.dept ASC, sr.sub_dept ASC, cb.sitecode ASC, cb.reg_no ASC";
-    if (isset($allowedSortCols[$sortCol])) {
-        $dbCol = $allowedSortCols[$sortCol];
-        $orderBySql = "ORDER BY {$dbCol} {$sortDir}, cb.reg_no ASC";
-    }
+        $orderBySql = "ORDER BY sr.dept ASC, sr.sub_dept ASC, cb.sitecode ASC, cb.reg_no ASC";
+        if (isset($allowedSortCols[$sortCol])) {
+            $dbCol = $allowedSortCols[$sortCol];
+            $orderBySql = "ORDER BY {$dbCol} {$sortDir}, cb.reg_no ASC";
+        }
 
-    $dataSql = $sqlBase . "
+        $dataSql = $sqlBase . "
         SELECT 
             cb.sitecode,
             sr.name_site,
@@ -424,12 +431,12 @@ try {
         $orderBySql
     ";
 
-    $dataStmt = $db->prepare($dataSql);
-    foreach ($params as $k => $v) {
-        $dataStmt->bindValue($k, $v);
-    }
-    $dataStmt->execute();
-    $items = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+        $dataStmt = $db->prepare($dataSql);
+        foreach ($params as $k => $v) {
+            $dataStmt->bindValue($k, $v);
+        }
+        $dataStmt->execute();
+        $items = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     // 3. Initialize PhpSpreadsheet
@@ -649,7 +656,7 @@ try {
 
     if ($itemCount === 0) {
         $noDataMsg = !$hasCurrData
-            ? "Data DB periode {$currMonthLabel} belum diupload oleh Admin."
+            ? "Data DB periode {$currMonthLabel} no data."
             : "Tidak ada data pada filter ini.";
         $sheet->setCellValue("A{$startDataRow}", $noDataMsg);
         $sheet->mergeCells("A{$startDataRow}:K{$startDataRow}");

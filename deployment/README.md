@@ -1,7 +1,7 @@
 # Panduan Deployment Production AMORA (Asset Management)
 
 Panduan deployment arsitektur multi-VM:
-- **VM 103.123.100.11**: Apache Reverse Proxy (`wmsdev.my.id/amora`) + Redis Session Control Server
+- **VM 103.123.100.11**: Apache Reverse Proxy (`amora.wmsdev.my.id`) + Redis Session Control Server
 - **VM 103.123.100.12**: Docker Host (`amora-app` di Port 8082 pada `wms-network`)
 - **VM 103.123.100.14**: PostgreSQL Server (`dashboardasset_db`)
 - **VM 103.123.100.15**: Background Worker Node (Systemd Daemon)
@@ -71,36 +71,63 @@ sudo ufw allow from 103.123.100.15 to any port 6379 proto tcp
 sudo ufw status
 ```
 
-### B. Konfigurasi Apache Reverse Proxy Subpath `/amora`
-Edit file virtual host `/etc/apache2/sites-available/wmsdev.conf`:
-```bash
-sudo nano /etc/apache2/sites-available/wmsdev.conf
-```
+### B. Konfigurasi Apache Reverse Proxy Subdomain `amora.wmsdev.my.id`
 
-Tambahkan blok reverse proxy untuk `/amora` mengarah ke `http://103.123.100.12:8082`:
-```apache
-    # =========================================================================
-    # 2. Forward ke Container AMORA / Asset Management (Port 8082 VM-Docker)
-    # =========================================================================
-    RewriteEngine On
-    RewriteRule ^/amora$ /amora/ [R=301,L]
+1. **DNS Cloudflare**:
+   Pastikan DNS Record untuk `amora.wmsdev.my.id` di Cloudflare sudah diarahkan ke IP VM Reverse Proxy (`103.123.100.11`):
+   - Type: `A` | Name: `amora` | IPv4: `103.123.100.11` | Proxy status: `Proxied` (atau CNAME ke `wmsdev.my.id`).
 
-    ProxyPass /amora/ http://103.123.100.12:8082/ retry=0 timeout=300
-    ProxyPassReverse /amora/ http://103.123.100.12:8082/
-    ProxyPass /amora http://103.123.100.12:8082 retry=0 timeout=300
-    ProxyPassReverse /amora http://103.123.100.12:8082
-    ProxyPassReverse /amora https://wmsdev.my.id/amora
-```
+2. **Buat VirtualHost `amora.conf`**:
+   Salin atau buat file `/etc/apache2/sites-available/amora.conf`:
+   ```bash
+   sudo nano /etc/apache2/sites-available/amora.conf
+   ```
+   Isi dengan konfigurasi dari [deployment/amora.conf](file:///c:/laragon/www/assetmanagement/deployment/amora.conf):
+   ```apache
+   <VirtualHost *:80>
+       ServerName amora.wmsdev.my.id
 
-*(Lihat template lengkap di [deployment/wmsdev.conf](file:///c:/laragon/www/assetmanagement/deployment/wmsdev.conf))*.
+       ProxyPreserveHost Off
+       ProxyRequests Off
 
-Test sintaks dan reload Apache:
-```bash
-sudo a2enmod rewrite proxy proxy_http headers remoteip
-sudo apache2ctl configtest
-# Syntax OK
-sudo systemctl reload apache2
-```
+       RequestHeader set X-Forwarded-Proto "https"
+       RequestHeader set X-Forwarded-Port "443"
+
+       # Otomatis ubah setiap header redirect 'http://' menjadi 'https://' agar tidak loop
+       Header edit Location ^http:// https://
+
+       # Forward all traffic to Container AMORA / Asset Management (Port 8082 VM-Docker)
+       ProxyPass / http://103.123.100.12:8082/ retry=0 timeout=300
+       ProxyPassReverse / http://103.123.100.12:8082/
+       ProxyPassReverse / https://amora.wmsdev.my.id/
+
+       RemoteIPHeader X-Forwarded-For
+       RemoteIPInternalProxy 103.123.100.12
+
+       ErrorLog ${APACHE_LOG_DIR}/amora_error.log
+       CustomLog ${APACHE_LOG_DIR}/amora_access.log combined
+   </VirtualHost>
+   ```
+
+3. **Aktifkan VirtualHost `amora.conf`**:
+   ```bash
+   sudo a2enmod rewrite proxy proxy_http headers remoteip
+   sudo a2ensite amora.conf
+   ```
+
+4. **Update `wmsdev.conf` untuk Redirect Legacy Path `/amora`**:
+   Di file `/etc/apache2/sites-available/wmsdev.conf`, tambahkan redirect agar URL lama tetap berfungsi:
+   ```apache
+   # Redirect legacy path /amora ke subdomain
+   Redirect permanent /amora https://amora.wmsdev.my.id/
+   ```
+
+5. **Test sintaks dan reload Apache**:
+   ```bash
+   sudo apache2ctl configtest
+   # Output: Syntax OK
+   sudo systemctl reload apache2
+   ```
 
 ---
 
@@ -139,14 +166,15 @@ sudo journalctl -u amora-worker.service -f
 ---
 
 ## 4. Pengujian Akhir
-1. Buka browser: `https://wmsdev.my.id/amora/`
-2. Pastikan halaman terbuka dengan styling lengkap dan aset termuat.
-3. Login ke sistem.
-4. Cek session di Redis VM `103.123.100.11`:
+1. Buka browser: `https://amora.wmsdev.my.id/`
+2. Pastikan halaman terbuka dengan styling lengkap dan aset termuat normal.
+3. Uji backward compatibility: Buka `https://wmsdev.my.id/amora`, pastikan otomatis ter-redirect 301 ke `https://amora.wmsdev.my.id/`.
+4. Login ke sistem.
+5. Cek session di Redis VM `103.123.100.11`:
    ```bash
    redis-cli -a password_redis_rahasia keys "AMORA_SESSION:*"
    ```
-5. Cek worker heartbeat di Redis:
+6. Cek worker heartbeat di Redis:
    ```bash
    redis-cli -a password_redis_rahasia get "amora:worker:last_heartbeat"
    ```

@@ -14,3 +14,8 @@
 
 4. **Targetless Metrics (All Sites)**:
    - For overview cards that do not have targets, display percentage / quantity comparison against the previous period (`vs Prev`) with trend arrows (`▲` / `▼` with `+` / `-`). Do not evaluate target badges ("Tercapai" / "Tidak Tercapai").
+
+5. **Achievement Cards Trend Comparison**:
+   - For all achievement cards (Executive Summary, National, Depts, Subdepts, Site cards, and All Sites Overview), the trend arrow and percentage (`▲` / `▼` with `+` / `-`) must compare against the previous period (bulan lalu / periode sebelumnya).
+   - Do NOT add any extra label or span (e.g. do not show `"vs Prev"`) on achievement cards; display only the trend arrow with `+`/`-` `%`.
+

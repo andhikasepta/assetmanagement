@@ -26,65 +26,70 @@ header('Cache-Control: no-store');
 try {
     $db = getDbConnection();
 
-    $currYear  = isset($_GET['year']) && $_GET['year'] !== '' && $_GET['year'] !== 'all' ? (int)$_GET['year'] : 2026;
+    $currYear = isset($_GET['year']) && $_GET['year'] !== '' && $_GET['year'] !== 'all' ? (int) $_GET['year'] : 2026;
     if (isset($_GET['month']) && $_GET['month'] !== '' && $_GET['month'] !== 'all') {
-        $currMonth = (int)$_GET['month'];
+        $currMonth = (int) $_GET['month'];
     } else {
         $stmtMaxDb = $db->prepare("SELECT MAX(period_month) as max_m FROM rekap_db_master WHERE period_year = :y");
         $stmtMaxDb->execute([':y' => $currYear]);
-        $currMonth = (int)($stmtMaxDb->fetchColumn() ?: 9);
+        $currMonth = (int) ($stmtMaxDb->fetchColumn() ?: 9);
     }
 
-    $category       = trim($_GET['category'] ?? 'pmd');
-    $soType         = trim($_GET['so_type'] ?? 'monthly');
-    $isQuarterly    = ($soType === 'quarterly' || in_array($category, [
-        'quarterly_outlet', 'quarterly_subarep', 'quarterly_warehouse', 'quarterly_warehouse_hub', 'quarterly_tekno', 'quarterly_warehouse_tekno'
+    $category = trim($_GET['category'] ?? 'pmd');
+    $soType = trim($_GET['so_type'] ?? 'monthly');
+    $isQuarterly = ($soType === 'quarterly' || in_array($category, [
+        'quarterly_outlet',
+        'quarterly_subarep',
+        'quarterly_warehouse',
+        'quarterly_warehouse_hub',
+        'quarterly_tekno',
+        'quarterly_warehouse_tekno'
     ], true));
 
     // Previous month/quarter calculation
     if (isset($_GET['compare_month']) && $_GET['compare_month'] !== '') {
-        $prevMonth = (int)$_GET['compare_month'];
-        $prevYear  = isset($_GET['compare_year']) && $_GET['compare_year'] !== '' ? (int)$_GET['compare_year'] : $currYear;
+        $prevMonth = (int) $_GET['compare_month'];
+        $prevYear = isset($_GET['compare_year']) && $_GET['compare_year'] !== '' ? (int) $_GET['compare_year'] : $currYear;
     } else {
         if ($isQuarterly) {
             if ($currMonth <= 3) {
                 $prevMonth = 12;
-                $prevYear  = $currYear - 1;
+                $prevYear = $currYear - 1;
             } elseif ($currMonth <= 6) {
                 $prevMonth = 3;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             } elseif ($currMonth <= 9) {
                 $prevMonth = 6;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             } else {
                 $prevMonth = 9;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             }
         } else {
             if ($currMonth === 1) {
                 $prevMonth = 12;
-                $prevYear  = $currYear - 1;
+                $prevYear = $currYear - 1;
             } else {
                 $prevMonth = $currMonth - 1;
-                $prevYear  = $currYear;
+                $prevYear = $currYear;
             }
         }
     }
 
-    $deptFilter     = trim($_GET['dept'] ?? 'all');
-    $subDeptFilter  = trim($_GET['sub_dept'] ?? 'all');
+    $deptFilter = trim($_GET['dept'] ?? 'all');
+    $subDeptFilter = trim($_GET['sub_dept'] ?? 'all');
     $sitecodeFilter = trim($_GET['sitecode'] ?? 'all');
-    $statusFilter   = strtolower(trim($_GET['status'] ?? 'all'));
-    $search         = trim($_GET['search'] ?? '');
-    $viewMode       = strtolower(trim($_GET['view'] ?? 'flat')); // 'flat' (table view) or 'grouped'
-    $sortCol        = trim($_GET['sort_col'] ?? '');
-    $sortDir        = strtolower(trim($_GET['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
+    $statusFilter = strtolower(trim($_GET['status'] ?? 'all'));
+    $search = trim($_GET['search'] ?? '');
+    $viewMode = strtolower(trim($_GET['view'] ?? 'flat')); // 'flat' (table view) or 'grouped'
+    $sortCol = trim($_GET['sort_col'] ?? '');
+    $sortDir = strtolower(trim($_GET['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
 
-    $page       = max(1, (int)($_GET['page'] ?? 1));
+    $page = max(1, (int) ($_GET['page'] ?? 1));
     $limitParam = $_GET['limit'] ?? 10;
-    $isAll      = (strtolower($limitParam) === 'all' || (int)$limitParam === -1);
-    $limit      = $isAll ? 50000 : max(1, (int)$limitParam);
-    $offset     = $isAll ? 0 : ($page - 1) * $limit;
+    $isAll = (strtolower($limitParam) === 'all' || (int) $limitParam === -1);
+    $limit = $isAll ? 50000 : max(1, (int) $limitParam);
+    $offset = $isAll ? 0 : ($page - 1) * $limit;
 
     // 1. Resolve valid sites for the selected Category & SO Type from Site Master Data (site_regional)
 
@@ -161,9 +166,11 @@ try {
         $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
         if ($category === 'all') {
             if ($isQuarterly) {
-                if ($effGroup !== 'quarterly') continue;
+                if ($effGroup !== 'quarterly')
+                    continue;
             } else {
-                if ($effGroup !== 'monthly') continue;
+                if ($effGroup !== 'monthly')
+                    continue;
             }
         } elseif ($isQuarterly) {
             if ($isPmd) {
@@ -187,7 +194,8 @@ try {
         } else {
             $info = trim($s['info'] ?? '');
             if ($category === 'pmd' || $category === 'monthly_pmd') {
-                if (!$isPmd) continue;
+                if (!$isPmd)
+                    continue;
             } elseif ($category === 'warehouse_tekno' || $category === 'monthly_tekno' || $category === 'monthly_warehouse_tekno') {
                 if ($isPmd || !$isTekno || $effGroup !== 'monthly') {
                     continue;
@@ -212,7 +220,8 @@ try {
         $validSitecodes[] = $sc;
     }
 
-    $escapedSitecodes = array_map(function($sc) use ($db) { return $db->quote($sc); }, $validSitecodes);
+    $escapedSitecodes = array_map(function ($sc) use ($db) {
+        return $db->quote($sc); }, $validSitecodes);
     $inValidSitesSql = !empty($escapedSitecodes) ? implode(',', $escapedSitecodes) : "''";
 
     // Build filter options (DEPT, SUB DEPT, and SITES) strictly for this Category's Master Sites
@@ -247,7 +256,7 @@ try {
     foreach ($deptSubDeptMap as $d => $arr) {
         sort($deptSubDeptMap[$d]);
     }
-    usort($availableSitesList, function($a, $b) {
+    usort($availableSitesList, function ($a, $b) {
         return strcmp($a['sitecode'], $b['sitecode']);
     });
 
@@ -256,17 +265,20 @@ try {
     // Check if the current selected period has been uploaded to rekap_db_master
     $checkCurrStmt = $db->prepare("SELECT 1 FROM rekap_db_master WHERE period_month = :m AND period_year = :y LIMIT 1");
     $checkCurrStmt->execute([':m' => $currMonth, ':y' => $currYear]);
-    $hasCurrData = (bool)$checkCurrStmt->fetchColumn();
+    $hasCurrData = (bool) $checkCurrStmt->fetchColumn();
 
     if (!$hasCurrData) {
         $currMonthLabel = ($monthNames[$currMonth] ?? "Bulan $currMonth") . " " . $currYear;
         $prevMonthLabel = ($monthNames[$prevMonth] ?? "Bulan $prevMonth") . " " . $prevYear;
 
         // Compute total master sites in this Category for current filters
-        $filteredMasterSites = array_filter($categoryMasterSites, function($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
-            if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter) return false;
-            if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter) return false;
-            if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter) return false;
+        $filteredMasterSites = array_filter($categoryMasterSites, function ($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
+            if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter)
+                return false;
+            if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter)
+                return false;
+            if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter)
+                return false;
             return true;
         });
         $totalMasterSites = count($filteredMasterSites);
@@ -307,7 +319,7 @@ try {
             'page' => $page,
             'limit' => $limitParam,
             'total_pages' => 1,
-            'message' => "Data DB periode {$currMonthLabel} belum diupload oleh Admin.",
+            'message' => "Data DB periode {$currMonthLabel} no data.",
         ], JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -395,10 +407,13 @@ try {
     $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 
     // Compute total master sites in this Category for the current DEPT/SUB DEPT/SITECODE filter
-    $filteredMasterSites = array_filter($categoryMasterSites, function($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
-        if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter) return false;
-        if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter) return false;
-        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter) return false;
+    $filteredMasterSites = array_filter($categoryMasterSites, function ($s) use ($deptFilter, $subDeptFilter, $sitecodeFilter) {
+        if ($deptFilter !== 'all' && $deptFilter !== '' && $s['dept'] !== $deptFilter)
+            return false;
+        if ($subDeptFilter !== 'all' && $subDeptFilter !== '' && $s['sub_dept'] !== $subDeptFilter)
+            return false;
+        if ($sitecodeFilter !== 'all' && $sitecodeFilter !== '' && $s['sitecode'] !== $sitecodeFilter)
+            return false;
         return true;
     });
     $totalMasterSites = count($filteredMasterSites);
@@ -450,7 +465,7 @@ try {
         ";
         $countSitesStmt = $db->prepare($countSitesSql);
         $countSitesStmt->execute($params);
-        $filteredSiteCount = (int)$countSitesStmt->fetchColumn();
+        $filteredSiteCount = (int) $countSitesStmt->fetchColumn();
 
         // 2. Query paginated list of sites with aggregated status counts
         $sitesSql = $sqlBase . "
@@ -611,7 +626,7 @@ try {
     ";
     $countStmt = $db->prepare($countSql);
     $countStmt->execute($params);
-    $filteredTotal = (int)$countStmt->fetchColumn();
+    $filteredTotal = (int) $countStmt->fetchColumn();
 
     $allowedSortCols = [
         'dept' => 'sr.dept',

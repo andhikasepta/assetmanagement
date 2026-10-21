@@ -75,7 +75,7 @@ $monthNames = [
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <!-- Hamburger Button for Quick Access -->
             <button type="button" class="quick-access-btn" id="btn-quick-access-toggle"
-                onclick="App.toggleQuickAccess()" title="Quick Access" aria-label="Toggle Quick Access">
+                onclick="App.toggleQuickAccess()" aria-label="Toggle Quick Access">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -89,7 +89,7 @@ $monthNames = [
             </a>
         </div>
 
-        <!-- Navigation Menus: Summary, All Summary, Master Data (SPA) -->
+        <!-- Navigation Menus: Summary, All Summary, Weekly Summary, Master Data, Master Data Weekly, User Management (SPA) -->
         <nav class="navbar-menu" id="navbar-menu">
             <button type="button" class="nav-link <?= $isLoggedIn ? '' : 'active' ?>" data-page="summary"
                 id="tab-summary" onclick="App.navigateTo('summary')" style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
@@ -97,12 +97,27 @@ $monthNames = [
             </button>
             <button type="button" class="nav-link <?= $isLoggedIn ? 'active' : '' ?>" data-page="all-summary"
                 id="tab-all-summary" onclick="App.navigateTo('all-summary')"
-                style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_all_summary'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 All Summary
             </button>
+            <button type="button" class="nav-link" data-page="weekly-summary"
+                id="tab-weekly-summary" onclick="App.navigateTo('weekly-summary')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_weekly_summary'] ?? true) !== false) ? '' : 'display: none;' ?>">
+                Weekly Summary
+            </button>
             <button type="button" class="nav-link" data-page="master-data" id="tab-master-data"
-                onclick="App.navigateTo('master-data')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                onclick="App.navigateTo('master-data')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_master_data'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 Master Data
+            </button>
+            <button type="button" class="nav-link" data-page="master-data-weekly" id="tab-master-data-weekly"
+                onclick="App.navigateTo('master-data-weekly')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_master_data_weekly'] ?? true) !== false) ? '' : 'display: none;' ?>">
+                Master Data Weekly
+            </button>
+            <button type="button" class="nav-link" data-page="user-management" id="tab-user-management"
+                onclick="App.navigateTo('user-management')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                User Management
             </button>
         </nav>
 
@@ -112,7 +127,7 @@ $monthNames = [
             <div class="user-dropdown-container" id="user-dropdown-container"
                 style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
                 <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
-                    onclick="App.toggleUserDropdown(event)" title="Detail Akun Admin">
+                    onclick="App.toggleUserDropdown(event)">
                     <div class="user-avatar-circle" id="user-avatar-text">
                         A
                     </div>
@@ -125,8 +140,19 @@ $monthNames = [
                     </svg>
                 </button>
                 <div class="user-dropdown-menu" id="user-dropdown-menu">
+                    <button type="button" onclick="App.navigateTo('user-management'); App.toggleUserDropdown(event);" class="user-dropdown-item"
+                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1rem; color: #1e293b; font-size: 13px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span>User Management</span>
+                    </button>
+                    <div style="border-top: 1px solid #f1f5f9; margin: 4px 0;"></div>
                     <button type="button" onclick="App.logout()" class="user-dropdown-item text-danger"
-                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1rem;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -148,13 +174,12 @@ $monthNames = [
                 <h3 class="quick-access-title" style="margin: 0; white-space: nowrap;">Quick Access</h3>
                 <?php if (!$isLoggedIn): ?>
                     <button type="button" onclick="App.closeQuickAccess(); App.navigateTo('login');"
-                        class="btn-quick-access-login" id="drawer-header-login-btn" title="Masuk ke Halaman Login">
+                        class="btn-quick-access-login" id="drawer-header-login-btn">
                         <span>LOGIN</span>
                     </button>
                 <?php endif; ?>
             </div>
-            <button type="button" class="quick-access-close" onclick="App.closeQuickAccess()" title="Tutup"
-                aria-label="Close">
+            <button type="button" class="quick-access-close" onclick="App.closeQuickAccess()" aria-label="Close">
                 &times;
             </button>
         </div>
@@ -169,9 +194,8 @@ $monthNames = [
     <main class="main-wrapper">
         <section id="page-summary" class="page-section active">
             <!-- ── Unified Dashboard Controls: SO Type, Category & Periode ────── -->
-            <div class="card" id="card-summary-controls"
-                style="margin-bottom: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                <div class="card-header"
+            <div class="card sticky-controls-card" id="card-summary-controls">
+                <div class="card-header sticky-controls-header"
                     style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; padding: 0.75rem 1.25rem;">
                     <!-- Left: SO Type & Category Selectors -->
                     <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
@@ -539,7 +563,7 @@ $monthNames = [
 
                         <!-- Warehouse Tekno Monthly Cards (Shown when Category is Warehouse Tekno & SO Type is Monthly) -->
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-gudang" style="display: none;">
-                            <div class="kpi-title" title="GUDANG WAREHOUSE TEKNO">GUDANG WAREHOUSE TEKNO</div>
+                            <div class="kpi-title">GUDANG WAREHOUSE TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-gudang-achievement">0%</div>
                                 <div class="kpi-split-badges">
@@ -553,7 +577,7 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-khusus" style="display: none;">
-                            <div class="kpi-title" title="PENYIMPANAN PERANGKAT KHUSUS T TEKNO">PENYIMPANAN PERANGKAT
+                            <div class="kpi-title">PENYIMPANAN PERANGKAT
                                 KHUSUS T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-khusus-achievement">0%</div>
@@ -569,7 +593,7 @@ $monthNames = [
 
                         <!-- Warehouse Tekno Quarterly Cards (Shown when Category is Warehouse Tekno & SO Type is Quarterly) -->
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-buffer" style="display: none;">
-                            <div class="kpi-title" title="BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO">BUFFER PERANGKAT
+                            <div class="kpi-title">BUFFER PERANGKAT
                                 RUSAK WAREHOUSE T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-buffer-achievement">0%</div>
@@ -584,7 +608,7 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage2" style="display: none;">
-                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO">STORAGE END OF
+                            <div class="kpi-title">STORAGE END OF
                                 CYCLE LT.2 WAREHOUSE TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-storage2-achievement">0%</div>
@@ -599,7 +623,7 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-storage1" style="display: none;">
-                            <div class="kpi-title" title="STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO">STORAGE END OF
+                            <div class="kpi-title">STORAGE END OF
                                 CYCLE LT.1 WAREHOUSE TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-storage1-achievement">0%</div>
@@ -614,7 +638,7 @@ $monthNames = [
                         </div>
 
                         <div class="kpi-card kpi-card-split" id="kpi-card-tekno-persiapan" style="display: none;">
-                            <div class="kpi-title" title="PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO">PERSIAPAN PENGUJIAN
+                            <div class="kpi-title">PERSIAPAN PENGUJIAN
                                 WAREHOUSE T TEKNO</div>
                             <div class="kpi-card-main">
                                 <div class="kpi-split-value" id="kpi-tekno-persiapan-achievement">0%</div>
@@ -881,7 +905,7 @@ $monthNames = [
                                         Status Penyelesaian DB
                                     </h3>
                                     <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
-                                        Distribusi status penyelesaian data database
+                                        Distribusi status penyelesaian data DB dengan periode sebelumnya
                                     </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
@@ -962,7 +986,7 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                <span class="kpi-subdept-name">OUTLET OPTI
                                                     TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-solved-it-tbs"></span>
                                             </div>
@@ -972,8 +996,7 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name"
-                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                <span class="kpi-subdept-name">OUTLET OPTI - IT
                                                     CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend"
                                                     id="db-sub-trend-solved-it-arcadia"></span>
@@ -1057,7 +1080,7 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                <span class="kpi-subdept-name">OUTLET OPTI
                                                     TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-unsolved-it-tbs"></span>
                                             </div>
@@ -1067,8 +1090,7 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name"
-                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                <span class="kpi-subdept-name">OUTLET OPTI - IT
                                                     CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend"
                                                     id="db-sub-trend-unsolved-it-arcadia"></span>
@@ -1147,7 +1169,7 @@ $monthNames = [
                                         style="display: none; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name" title="OUTLET OPTI TBS">OUTLET OPTI
+                                                <span class="kpi-subdept-name">OUTLET OPTI
                                                     TBS</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-new-it-tbs"></span>
                                             </div>
@@ -1157,8 +1179,7 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-subdept-item">
                                             <div class="kpi-subdept-header">
-                                                <span class="kpi-subdept-name"
-                                                    title="OUTLET OPTI - IT CORPORATE - ARCADIA LT 4">OUTLET OPTI - IT
+                                                <span class="kpi-subdept-name">OUTLET OPTI - IT
                                                     CORPORATE - ARCADIA LT 4</span>
                                                 <span class="db-subdept-trend" id="db-sub-trend-new-it-arcadia"></span>
                                             </div>
@@ -1189,7 +1210,7 @@ $monthNames = [
                                 </h3>
                                 <div id="exec-catatan-subtitle"
                                     style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
-                                    Kesimpulan hasil evaluasi stock opname area
+                                    Kesimpulan hasil evaluasi stock opname
                                 </div>
                             </div>
                         </div>
@@ -1878,25 +1899,25 @@ $monthNames = [
                         </p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <select id="rdb-status-filter-dept" class="form-control"
+                        <select id="rdb-status-filter-dept" class="form-control unified-filter-select"
                             style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusDeptChange()">
                             <option value="all" selected>Semua Divisi</option>
                         </select>
 
-                        <select id="rdb-status-filter-subdept" class="form-control"
+                        <select id="rdb-status-filter-subdept" class="form-control unified-filter-select"
                             style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusSubDeptChange()">
                             <option value="all" selected>Semua Dept</option>
                         </select>
 
-                        <select id="rdb-status-filter-sitecode" class="form-control"
+                        <select id="rdb-status-filter-sitecode" class="form-control unified-filter-select"
                             style="width: auto; max-width: 200px; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusSitecodeChange()">
                             <option value="all" selected>Semua Site</option>
                         </select>
 
-                        <select id="rdb-status-filter-status" class="form-control"
+                        <select id="rdb-status-filter-status" class="form-control unified-filter-select"
                             style="width: auto; padding: 0.3rem 0.6rem; font-size: 12px; font-weight: 500;"
                             autocomplete="off" onchange="App.onRekapDbStatusFilterChange()">
                             <option value="all" selected>Semua Status</option>
@@ -1905,15 +1926,9 @@ $monthNames = [
                             <option value="new_db">New DB</option>
                         </select>
 
-                        <button class="btn btn-refresh btn-sm" onclick="App.loadRekapDbStatusData()"
-                            style="padding: 5px 12px;">
-                            Refresh
-                        </button>
-
-                        <button class="btn btn-success btn-sm" id="btn-rdb-status-export-excel"
+                        <button class="btn btn-success" id="btn-rdb-status-export-excel"
                             onclick="App.exportRekapDbStatusExcel()"
-                            title="Export data Rekapitulasi Status DB ke Excel (.xlsx)"
-                            style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600;">
+                            style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 0 1rem; border-radius: 8px; font-size: 12.5px; font-weight: 600; line-height: 1;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -2115,7 +2130,7 @@ $monthNames = [
                                 style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
                                 DIVISI
                             </label>
-                            <select id="rekap-dept-filter" class="form-control"
+                            <select id="rekap-dept-filter" class="form-control unified-filter-select"
                                 style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
                                 onchange="App.onRekapDeptFilterChange()">
                                 <option value="all" selected>Semua Divisi</option>
@@ -2128,7 +2143,7 @@ $monthNames = [
                                 style="font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap;">
                                 DEPT
                             </label>
-                            <select id="rekap-subdept-filter" class="form-control"
+                            <select id="rekap-subdept-filter" class="form-control unified-filter-select"
                                 style="width: auto; padding: 0.35rem 0.75rem; font-weight: 600;"
                                 onchange="App.onRekapSubDeptFilterChange()">
                                 <option value="all" selected>Semua Dept</option>
@@ -2136,12 +2151,9 @@ $monthNames = [
                                 <option value="DSO">DSO</option>
                             </select>
                         </div>
-                        <button class="btn btn-secondary" onclick="App.loadRekapitulasi()">
-                            Refresh
-                        </button>
                         <button class="btn btn-success" id="btn-rekap-export-excel"
-                            onclick="App.exportRekapitulasiExcel()" title="Export data Rekapitulasi ke Excel (.xlsx)"
-                            style="display: inline-flex; align-items: center; gap: 6px;">
+                            onclick="App.exportRekapitulasiExcel()"
+                            style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 0 1rem; border-radius: 8px; font-size: 12.5px; font-weight: 600; line-height: 1;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -2436,8 +2448,7 @@ $monthNames = [
 
             <!-- Floating Chat Room Action Button (WhatsApp Direct) -->
             <button type="button" class="floating-chat-room-btn" id="btn-chat-room-fab"
-                onclick="App.openChatRoomModal()" title="Buka Chat Room PIC Sites"
-                aria-label="Buka Chat Room PIC Sites">
+                onclick="App.openChatRoomModal()" aria-label="Buka Chat Room PIC Sites">
                 <svg viewBox="0 0 24 24">
                     <path
                         d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z" />
@@ -2451,8 +2462,17 @@ $monthNames = [
         <!-- All Summary Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_all_summary.php'; ?>
 
+        <!-- Weekly Summary Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_weekly_summary.php'; ?>
+
         <!-- Master Data Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_master_data.php'; ?>
+
+        <!-- Master Data Weekly Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_master_data_weekly.php'; ?>
+
+        <!-- User Management Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_user_management.php'; ?>
 
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- MODAL: Chat Room PIC Sites (WhatsApp Direct)                -->

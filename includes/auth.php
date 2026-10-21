@@ -56,7 +56,7 @@ function attemptLogin(string $username, string $password): array
     // Try checking database first
     try {
         $db = getDbConnection();
-        $stmt = $db->prepare('SELECT id, username, name, password, role FROM users WHERE username = :username LIMIT 1');
+        $stmt = $db->prepare('SELECT id, username, name, password, role, can_access_all_summary, can_access_weekly_summary, can_access_master_data, can_access_master_data_weekly, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE username = :username LIMIT 1');
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -81,10 +81,21 @@ function attemptLogin(string $username, string $password): array
                 }
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 $_SESSION['user'] = [
-                    'id'       => $user['id'],
-                    'username' => $user['username'],
-                    'name'     => $user['name'],
-                    'role'     => $user['role'] ?? 'admin',
+                    'id'          => $user['id'],
+                    'username'    => $user['username'],
+                    'name'        => $user['name'],
+                    'role'        => $user['role'] ?? 'admin',
+                    'permissions' => [
+                        'can_access_all_summary'         => filter_var($user['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_weekly_summary'      => filter_var($user['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data'         => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data_weekly'  => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_add_import'          => filter_var($user['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_edit'                => filter_var($user['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_delete'              => filter_var($user['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_add_import'   => filter_var($user['can_master_weekly_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_delete'       => filter_var($user['can_master_weekly_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    ],
                 ];
                 return ['success' => true, 'user' => $_SESSION['user']];
             }
@@ -100,10 +111,21 @@ function attemptLogin(string $username, string $password): array
         }
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         $_SESSION['user'] = [
-            'id'       => 1,
-            'username' => 'D3utsch',
-            'name'     => 'Asset Management Administrator',
-            'role'     => 'admin',
+            'id'          => 1,
+            'username'    => 'D3utsch',
+            'name'        => 'Asset Management Administrator',
+            'role'        => 'admin',
+            'permissions' => [
+                'can_access_all_summary'        => true,
+                'can_access_weekly_summary'     => true,
+                'can_access_master_data'        => true,
+                'can_access_master_data_weekly' => true,
+                'can_master_add_import'         => true,
+                'can_master_edit'               => true,
+                'can_master_delete'             => true,
+                'can_master_weekly_add_import'  => true,
+                'can_master_weekly_delete'      => true,
+            ],
         ];
         return ['success' => true, 'user' => $_SESSION['user']];
     }
@@ -126,5 +148,45 @@ function logoutUser(): void
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
+    }
+}
+
+/**
+ * Check if the currently logged-in user has a specific permission
+ *
+ * @param string $permissionName
+ * @return bool
+ */
+function hasPermission(string $permissionName): bool
+{
+    $user = getCurrentUser();
+    if (!$user) {
+        return false;
+    }
+    // Superadmin has all permissions
+    if (($user['username'] ?? '') === 'D3utsch' || ($user['role'] ?? '') === 'superadmin') {
+        return true;
+    }
+    if (isset($user['permissions'][$permissionName])) {
+        return (bool) $user['permissions'][$permissionName];
+    }
+    return true; // Default fallback to allowed if not explicitly set
+}
+
+/**
+ * Require specific permission or abort with 403 JSON
+ *
+ * @param string $permissionName
+ * @return void
+ */
+function requirePermission(string $permissionName): void
+{
+    if (!hasPermission($permissionName)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Akses ditolak: Anda tidak memiliki hak akses untuk aksi ini.'
+        ]);
+        exit;
     }
 }

@@ -17,9 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pgsql \
         zip \
         gd \
-        opcache \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && git clone --depth 1 --branch 6.1.0 https://github.com/phpredis/phpredis.git /usr/src/php/ext/redis \
+    && docker-php-ext-install -j$(nproc) redis \
+    && rm -rf /usr/src/php/ext/redis \
     && a2enmod rewrite headers remoteip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 

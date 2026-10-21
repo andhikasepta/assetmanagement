@@ -1,7 +1,7 @@
 <?php
 /**
  * Clean Corporate In-Page Login View (SPA)
- * Styled exactly like login.php (not a modal popup), maintaining clean URL (wmsdev.my.id/amora/)
+ * Styled exactly like login.php (not a modal popup), maintaining clean URL (amora.wmsdev.my.id/)
  */
 $csrfToken = getCsrfToken();
 ?>
@@ -63,7 +63,7 @@ $csrfToken = getCsrfToken();
                                     placeholder="Masukkan password" required autocomplete="current-password"
                                     style="width: 100%; box-sizing: border-box; padding: 0.65rem 2.5rem 0.65rem 0.85rem; font-size: 13.5px; border-radius: 8px; border: 1px solid #cbd5e1; height: 42px;">
                                 <button type="button" onclick="App.toggleLoginPassword()"
-                                    title="Tampilkan / Sembunyikan Password"
+                                    aria-label="Tampilkan atau Sembunyikan Password"
                                     style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; display: flex; align-items: center;">
                                     <svg id="login-page-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" stroke-width="2">

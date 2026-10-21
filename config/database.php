@@ -58,6 +58,31 @@ $dbConfig = [
  */
 function initRedisSession(): void
 {
+    $envSecure = getenv('SESSION_SECURE') ?: ($_ENV['SESSION_SECURE'] ?? null);
+    if ($envSecure !== null && $envSecure !== '') {
+        $isSecure = filter_var($envSecure, FILTER_VALIDATE_BOOLEAN);
+    } else {
+        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    }
+
+    // Purge legacy/obsolete default PHPSESSID cookie from client browser if present
+    if (isset($_COOKIE['PHPSESSID']) && !headers_sent()) {
+        if (PHP_VERSION_ID >= 70300) {
+            setcookie('PHPSESSID', '', [
+                'expires'  => time() - 3600,
+                'path'     => '/',
+                'domain'   => '',
+                'secure'   => $isSecure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        } else {
+            setcookie('PHPSESSID', '', time() - 3600, '/');
+        }
+        unset($_COOKIE['PHPSESSID']);
+    }
+
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
@@ -69,8 +94,6 @@ function initRedisSession(): void
     if ($ttl <= 0) {
         $ttl = 1200;
     }
-
-    $isSecure = filter_var(getenv('SESSION_SECURE') ?: ($_ENV['SESSION_SECURE'] ?? false), FILTER_VALIDATE_BOOLEAN);
 
     // Configure session cookie parameters
     if (PHP_VERSION_ID >= 70300) {

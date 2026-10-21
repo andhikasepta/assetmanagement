@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/security.php';
 
 sendSecurityHeaders();
@@ -16,6 +17,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
     validateCsrfToken();
     requireAuth();
+    if ($method === 'POST') {
+        requirePermission('can_master_add_import');
+    } elseif ($method === 'DELETE') {
+        requirePermission('can_master_delete');
+    }
 }
 
 try {
@@ -648,6 +654,33 @@ try {
             }
         }
 
+        if (isset($achievements['sub_depts']) && is_array($achievements['sub_depts'])) {
+            foreach ($achievements['sub_depts'] as $sKey => &$sVal) {
+                $currPct = ($sVal['pct'] !== null) ? (float) $sVal['pct'] : null;
+                $prevPct = ($hasPrevious && isset($prevAchievements['sub_depts'][$sKey]['pct']) && $prevAchievements['sub_depts'][$sKey]['pct'] !== null)
+                    ? (float) $prevAchievements['sub_depts'][$sKey]['pct']
+                    : null;
+                $sVal['prev_pct'] = $prevPct;
+                $sVal['diff_pct'] = ($hasPrevious && $isCurrRecUploaded && $currPct !== null && $prevPct !== null)
+                    ? round($currPct - $prevPct, 2)
+                    : null;
+            }
+            unset($sVal);
+        }
+
+        if (isset($achievements['sites']) && is_array($achievements['sites'])) {
+            foreach ($achievements['sites'] as $sc => &$sInfo) {
+                $currPct = ($sInfo['pct'] !== null) ? (float) $sInfo['pct'] : null;
+                $prevSite = ($hasPrevious && isset($prevAchievements['sites'][$sc])) ? $prevAchievements['sites'][$sc] : null;
+                $prevPct = ($prevSite && $prevSite['pct'] !== null) ? (float) $prevSite['pct'] : null;
+                $sInfo['prev_pct'] = $prevPct;
+                $sInfo['diff_pct'] = ($hasPrevious && $isCurrRecUploaded && $currPct !== null && $prevPct !== null)
+                    ? round($currPct - $prevPct, 2)
+                    : null;
+            }
+            unset($sInfo);
+        }
+
         if (isset($achievements['db_analysis'])) {
             $dbA = &$achievements['db_analysis'];
             $dbA['has_previous'] = $hasPrevious;
@@ -954,6 +987,12 @@ try {
                             $dbA[$dk]['unsolved_sites'] = $cDept['unsolved_sites'];
                             $dbA[$dk]['new_db_sites'] = $cDept['new_db_sites'];
 
+                            $cTotalStatus = $cDept['solved'] + $cDept['unsolved'] + $cDept['new_db'];
+                            $pTotalStatus = $pDept ? ($pDept['solved'] + $pDept['unsolved'] + $pDept['new_db']) : null;
+                            $dbA[$dk]['total_status'] = $cTotalStatus;
+                            $dbA[$dk]['prev_total_status'] = $pTotalStatus;
+                            $dbA[$dk]['diff_total_status'] = ($pTotalStatus !== null) ? ($cTotalStatus - $pTotalStatus) : null;
+
                             if ($pDept) {
                                 $dbA[$dk]['prev_solved'] = $pDept['solved'];
                                 $dbA[$dk]['prev_unsolved'] = $pDept['unsolved'];
@@ -981,6 +1020,13 @@ try {
                         $dbA['outlet_national']['solved_sites'] = $cOut['solved_sites'];
                         $dbA['outlet_national']['unsolved_sites'] = $cOut['unsolved_sites'];
                         $dbA['outlet_national']['new_db_sites'] = $cOut['new_db_sites'];
+
+                        $cTotalOut = $cOut['solved'] + $cOut['unsolved'] + $cOut['new_db'];
+                        $pTotalOut = $pOut ? ($pOut['solved'] + $pOut['unsolved'] + $pOut['new_db']) : null;
+                        $dbA['outlet_national']['total_status'] = $cTotalOut;
+                        $dbA['outlet_national']['prev_total_status'] = $pTotalOut;
+                        $dbA['outlet_national']['diff_total_status'] = ($pTotalOut !== null) ? ($cTotalOut - $pTotalOut) : null;
+
                         if ($pOut) {
                             $dbA['outlet_national']['prev_solved'] = $pOut['solved'];
                             $dbA['outlet_national']['prev_unsolved'] = $pOut['unsolved'];
@@ -1007,6 +1053,13 @@ try {
                         $dbA['national']['solved_sites'] = $cScope['solved_sites'];
                         $dbA['national']['unsolved_sites'] = $cScope['unsolved_sites'];
                         $dbA['national']['new_db_sites'] = $cScope['new_db_sites'];
+
+                        $cTotalScope = $cScope['solved'] + $cScope['unsolved'] + $cScope['new_db'];
+                        $pTotalScope = $pScope ? ($pScope['solved'] + $pScope['unsolved'] + $pScope['new_db']) : null;
+                        $dbA['national']['total_status'] = $cTotalScope;
+                        $dbA['national']['prev_total_status'] = $pTotalScope;
+                        $dbA['national']['diff_total_status'] = ($pTotalScope !== null) ? ($cTotalScope - $pTotalScope) : null;
+
                         if ($pScope) {
                             $dbA['national']['prev_solved'] = $pScope['solved'];
                             $dbA['national']['prev_unsolved'] = $pScope['unsolved'];
@@ -1031,6 +1084,13 @@ try {
                             $sEntry['solved'] = $cSite['solved'];
                             $sEntry['unsolved'] = $cSite['unsolved'];
                             $sEntry['new_db'] = $cSite['new_db'];
+
+                            $cTotalSite = $cSite['solved'] + $cSite['unsolved'] + $cSite['new_db'];
+                            $pTotalSite = $pSite ? ($pSite['solved'] + $pSite['unsolved'] + $pSite['new_db']) : null;
+                            $sEntry['total_status'] = $cTotalSite;
+                            $sEntry['prev_total_status'] = $pTotalSite;
+                            $sEntry['diff_total_status'] = ($pTotalSite !== null) ? ($cTotalSite - $pTotalSite) : null;
+
                             if ($pSite) {
                                 $sEntry['prev_solved'] = $pSite['solved'];
                                 $sEntry['prev_unsolved'] = $pSite['unsolved'];
@@ -1056,6 +1116,13 @@ try {
                         $dbA['pmd']['solved_sites'] = $cPmd['solved_sites'];
                         $dbA['pmd']['unsolved_sites'] = $cPmd['unsolved_sites'];
                         $dbA['pmd']['new_db_sites'] = $cPmd['new_db_sites'];
+
+                        $cTotalPmd = ($dbA['pmd']['solved'] ?? 0) + ($dbA['pmd']['unsolved'] ?? 0) + ($dbA['pmd']['new_db'] ?? 0);
+                        $pTotalPmd = $pPmd ? ($pPmd['solved'] + $pPmd['unsolved'] + $pPmd['new_db']) : null;
+                        $dbA['pmd']['total_status'] = $cTotalPmd;
+                        $dbA['pmd']['prev_total_status'] = $pTotalPmd;
+                        $dbA['pmd']['diff_total_status'] = ($pTotalPmd !== null) ? ($cTotalPmd - $pTotalPmd) : null;
+
                         if ($pPmd) {
                             $dbA['pmd']['prev_solved'] = $pPmd['solved'];
                             $dbA['pmd']['prev_unsolved'] = $pPmd['unsolved'];
@@ -1087,6 +1154,12 @@ try {
                             $sVal['unsolved_sites'] = $cSub['unsolved_sites'];
                             $sVal['new_db_sites'] = $cSub['new_db_sites'];
 
+                            $cTotalSub = $cSub['solved'] + $cSub['unsolved'] + $cSub['new_db'];
+                            $pTotalSub = $pSub ? ($pSub['solved'] + $pSub['unsolved'] + $pSub['new_db']) : null;
+                            $sVal['total_status'] = $cTotalSub;
+                            $sVal['prev_total_status'] = $pTotalSub;
+                            $sVal['diff_total_status'] = ($pTotalSub !== null) ? ($cTotalSub - $pTotalSub) : null;
+
                             if ($pSub) {
                                 $sVal['prev_solved'] = $pSub['solved'];
                                 $sVal['prev_unsolved'] = $pSub['unsolved'];
@@ -1117,6 +1190,12 @@ try {
                             $dbA[$dsub]['solved_sites'] = $cSub['solved_sites'];
                             $dbA[$dsub]['unsolved_sites'] = $cSub['unsolved_sites'];
                             $dbA[$dsub]['new_db_sites'] = $cSub['new_db_sites'];
+
+                            $cTotalSub = $cSub['solved'] + $cSub['unsolved'] + $cSub['new_db'];
+                            $pTotalSub = $pSub ? ($pSub['solved'] + $pSub['unsolved'] + $pSub['new_db']) : null;
+                            $dbA[$dsub]['total_status'] = $cTotalSub;
+                            $dbA[$dsub]['prev_total_status'] = $pTotalSub;
+                            $dbA[$dsub]['diff_total_status'] = ($pTotalSub !== null) ? ($cTotalSub - $pTotalSub) : null;
                             if ($pSub) {
                                 $dbA[$dsub]['prev_solved'] = $pSub['solved'];
                                 $dbA[$dsub]['prev_unsolved'] = $pSub['unsolved'];
@@ -1615,7 +1694,9 @@ try {
 
     if ($method === 'DELETE') {
         // CSRF check
-        session_start();
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            session_start();
+        }
         $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
         if (empty($csrfHeader) || !hash_equals($_SESSION['csrf_token'] ?? '', $csrfHeader)) {
             http_response_code(403);

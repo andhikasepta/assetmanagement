@@ -38,7 +38,7 @@ $category = trim($payload['category'] ?? $_GET['category'] ?? 'pmd');
 $catLabel = trim($payload['category_label'] ?? $_GET['category_label'] ?? '');
 if (empty($catLabel)) {
     if ($category === 'all' || $category === 'all_monthly' || $category === 'all_quarterly') {
-        $catLabel = 'All Summary';
+        $catLabel = 'All Sites';
     } elseif (stripos($category, 'pmd') !== false) {
         $catLabel = 'PMD';
     } elseif (stripos($category, 'warehouse') !== false) {
@@ -482,6 +482,8 @@ for ($i = 0; $i < $rowCount; $i++) {
     // Month cells
     $col = 6;
     $rowMonths = $r['months'] ?? [];
+    $rowDept = strtoupper(trim($r['dept'] ?? ''));
+    $rowIsPmd = ($rowDept === 'PMD') || $isPmd;
     foreach (array_keys($monthCols) as $m) {
         $cLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
         $coord = "{$cLetter}{$currentRow}";
@@ -492,7 +494,7 @@ for ($i = 0; $i < $rowCount; $i++) {
             $sheet->setCellValue($coord, $valFloat / 100);
             $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('0%');
 
-            $colors = getCellColorStyles($valFloat, $isPmd);
+            $colors = getCellColorStyles($valFloat, $rowIsPmd);
             $sheet->getStyle($coord)->applyFromArray([
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -643,7 +645,7 @@ $sheet->freezePane('F3');
 // Clean filename: rekap_[category]_[dmYHi].xlsx
 $catSlug = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $catLabel ?: $category));
 if (in_array($category, ['all', 'all_monthly', 'all_quarterly'], true) || $catSlug === 'allsummary' || $catSlug === 'allsites') {
-    $catSlug = 'all';
+    $catSlug = 'allsites';
 } elseif ($catSlug === 'outlet' || $catSlug === 'monthlyoutlet') {
     $catSlug = 'outletregional';
 }

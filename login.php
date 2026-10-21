@@ -50,7 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result['success']) {
             if ($isJson) {
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['success' => true, 'message' => 'Login berhasil.']);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Login berhasil.',
+                    'user' => $result['user'] ?? null
+                ]);
                 exit;
             }
             $_SESSION['initial_page'] = 'all-summary';
@@ -287,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <!-- Hamburger Button for Quick Access -->
             <button type="button" class="quick-access-btn" id="btn-quick-access-toggle" onclick="toggleQuickAccess()"
-                title="Quick Access" aria-label="Toggle Quick Access">
+                aria-label="Toggle Quick Access">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -308,7 +312,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div style="display: flex; align-items: center; gap: 0.6rem;">
                 <h3 class="quick-access-title">Quick Access</h3>
             </div>
-            <button type="button" class="quick-access-close" onclick="toggleQuickAccess()" title="Tutup"
+            <button type="button" class="quick-access-close" onclick="toggleQuickAccess()"
                 aria-label="Close">
                 &times;
             </button>
@@ -363,7 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     placeholder="Masukkan password" required
                                     style="padding: 0.6rem 2.4rem 0.6rem 0.8rem; font-size: 13.5px;">
                                 <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility()"
-                                    title="Lihat/Sembunyikan Password">
+                                    aria-label="Lihat atau Sembunyikan Password">
                                     <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" stroke-width="2">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -386,6 +390,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php require_once __DIR__ . '/layout/footer.php'; ?>
 
     <script>
+        (function disableAllHoverTooltips() {
+            function removeTitles(root) {
+                if (!root) return;
+                if (root.nodeType === 1 && root.hasAttribute('title')) {
+                    root.removeAttribute('title');
+                }
+                if (root.querySelectorAll) {
+                    root.querySelectorAll('[title]').forEach(function(el) {
+                        el.removeAttribute('title');
+                    });
+                }
+            }
+            document.addEventListener('mouseover', function(e) {
+                let el = e.target;
+                while (el && el !== document && el.nodeType === 1) {
+                    if (el.hasAttribute('title')) el.removeAttribute('title');
+                    el = el.parentElement;
+                }
+            }, true);
+            document.addEventListener('pointerover', function(e) {
+                let el = e.target;
+                while (el && el !== document && el.nodeType === 1) {
+                    if (el.hasAttribute('title')) el.removeAttribute('title');
+                    el = el.parentElement;
+                }
+            }, true);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    removeTitles(document.body || document.documentElement);
+                });
+            } else {
+                removeTitles(document.body || document.documentElement);
+            }
+        })();
+
         function toggleQuickAccess() {
             const drawer = document.getElementById('quick-access-drawer');
             const backdrop = document.getElementById('quick-access-backdrop');

@@ -3,6 +3,84 @@
  * Admin View: Shows consolidated data for ALL sites (no category breakdown)
  * Supports Monthly and Quarterly SO types.
  */
+(function disableAllHoverTooltips() {
+    try {
+        if (typeof HTMLElement !== 'undefined' && HTMLElement.prototype) {
+            Object.defineProperty(HTMLElement.prototype, 'title', {
+                get: function() { return ''; },
+                set: function() { this.removeAttribute('title'); },
+                configurable: true
+            });
+        }
+        if (typeof SVGElement !== 'undefined' && SVGElement.prototype) {
+            Object.defineProperty(SVGElement.prototype, 'title', {
+                get: function() { return ''; },
+                set: function() { this.removeAttribute('title'); },
+                configurable: true
+            });
+        }
+    } catch (e) {}
+
+    function removeTitles(root) {
+        if (!root) return;
+        if (root.nodeType === 1 && root.hasAttribute('title')) {
+            root.removeAttribute('title');
+        }
+        if (root.querySelectorAll) {
+            root.querySelectorAll('[title]').forEach(function(el) {
+                el.removeAttribute('title');
+            });
+        }
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        let el = e.target;
+        while (el && el !== document && el.nodeType === 1) {
+            if (el.hasAttribute('title')) el.removeAttribute('title');
+            el = el.parentElement;
+        }
+    }, true);
+
+    document.addEventListener('pointerover', function(e) {
+        let el = e.target;
+        while (el && el !== document && el.nodeType === 1) {
+            if (el.hasAttribute('title')) el.removeAttribute('title');
+            el = el.parentElement;
+        }
+    }, true);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            removeTitles(document.body || document.documentElement);
+        });
+    } else {
+        removeTitles(document.body || document.documentElement);
+    }
+
+    if (window.MutationObserver) {
+        var observer = new MutationObserver(function(mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var m = mutations[i];
+                if (m.type === 'attributes' && m.attributeName === 'title') {
+                    if (m.target && m.target.hasAttribute && m.target.hasAttribute('title')) {
+                        m.target.removeAttribute('title');
+                    }
+                } else if (m.addedNodes && m.addedNodes.length > 0) {
+                    for (var j = 0; j < m.addedNodes.length; j++) {
+                        removeTitles(m.addedNodes[j]);
+                    }
+                }
+            }
+        });
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['title']
+        });
+    }
+})();
+
 const AllSummaryApp = (function () {
     let summarySOType = 'monthly';
     const summaryCategory = 'all';
@@ -110,8 +188,13 @@ const AllSummaryApp = (function () {
 
             const trendEl = document.getElementById('kpi-all-trend');
             if (trendEl) {
-                const diffPct = (nat.diff_pct !== undefined && nat.diff_pct !== null) ? Number(nat.diff_pct) : null;
-                const prevPct = (nat.prev_pct !== undefined && nat.prev_pct !== null) ? Number(nat.prev_pct) : null;
+                let diffPct = null;
+                if (nat.diff_pct !== undefined && nat.diff_pct !== null) {
+                    diffPct = Math.round(Number(nat.diff_pct));
+                } else if (nat.prev_pct !== undefined && nat.prev_pct !== null && nat.pct !== null && nat.pct !== undefined) {
+                    diffPct = Math.round(Number(nat.pct)) - Math.round(Number(nat.prev_pct));
+                }
+
                 if (diffPct !== null) {
                     const isUp = diffPct > 0;
                     const isDown = diffPct < 0;
@@ -121,14 +204,14 @@ const AllSummaryApp = (function () {
                         ? `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:middle;"><polygon points="12,4 21,20 3,20"/></svg>`
                         : (isDown ? `<svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block; vertical-align:middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
                     trendEl.innerHTML = `
-                        <span class="kpi-target-indicator ${trendClass}" title="Periode Sebelumnya: ${prevPct}% (Selisih: ${sign}${diffPct}%)">
+                        <span class="kpi-target-indicator ${trendClass}">
                             ${svg}
-                            <span>${sign}${diffPct}% vs Prev</span>
+                            <span>${sign}${diffPct}%</span>
                         </span>
                     `;
                 } else {
                     trendEl.innerHTML = `
-                        <span class="kpi-target-indicator target-neutral" title="Tidak ada data perbandingan periode sebelumnya">
+                        <span class="kpi-target-indicator target-neutral">
                             <span>-</span>
                         </span>
                     `;
@@ -146,7 +229,8 @@ const AllSummaryApp = (function () {
             const dbNat = dbA.national || dbA.outlet_national || {};
             const grandTotal = (dbNat.qty !== undefined) ? dbNat.qty : (dbA.grand_total || 0);
 
-            ['all-db-analysis-grand-total', 'db-analysis-grand-total', 'all-db-val-total', 'all-db-status-grand-total', 'db-status-grand-total'].forEach(id => {
+            // Result DB Analysis Grand Total
+            ['all-db-analysis-grand-total', 'db-analysis-grand-total', 'all-db-val-total'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = Number(grandTotal).toLocaleString('id-ID');
             });
@@ -157,7 +241,7 @@ const AllSummaryApp = (function () {
 
             const renderDbTrend = () => {
                 if (!hasPrev || diffQty === null) {
-                    return `<span class="db-trend-indicator db-trend-neutral" title="Tidak ada data perbandingan periode sebelumnya"><span>-</span></span>`;
+                    return `<span class="db-trend-indicator db-trend-neutral"><span>-</span></span>`;
                 }
                 const sign = diffQty > 0 ? '+' : '';
                 const isPos = diffQty > 0;
@@ -168,7 +252,7 @@ const AllSummaryApp = (function () {
                     : (isNeg ? `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,20 3,4 21,4"/></svg>` : '');
                 const formatted = `${sign}${Number(diffQty).toLocaleString('id-ID')}`;
                 return `
-                    <span class="db-trend-indicator ${trendClass}" title="${formatted} vs Periode Sebelumnya (Prev: ${Number(prevQty || 0).toLocaleString('id-ID')})">
+                    <span class="db-trend-indicator ${trendClass}">
                         ${svg}
                         <span>${formatted} vs Prev</span>
                     </span>
@@ -176,7 +260,7 @@ const AllSummaryApp = (function () {
             };
 
             const trendHtml = renderDbTrend();
-            ['all-db-grand-trend', 'db-grand-trend', 'all-db-card-trend', 'all-db-status-grand-trend', 'db-status-grand-trend'].forEach(id => {
+            ['all-db-grand-trend', 'db-grand-trend', 'all-db-card-trend'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = trendHtml;
             });
@@ -185,6 +269,58 @@ const AllSummaryApp = (function () {
             const solved = dbNat.solved !== undefined ? dbNat.solved : (dbA.outlet_national?.solved || 0);
             const unsolved = dbNat.unsolved !== undefined ? dbNat.unsolved : (dbA.outlet_national?.unsolved || 0);
             const newDb = dbNat.new_db !== undefined ? dbNat.new_db : (dbA.outlet_national?.new_db || 0);
+
+            // Status Penyelesaian DB: Total DB is counted Solved DB, Unsolved DB and New DB
+            const totalStatusDb = (dbNat.total_status !== undefined && dbNat.total_status !== null)
+                ? Number(dbNat.total_status)
+                : (Number(solved || 0) + Number(unsolved || 0) + Number(newDb || 0));
+
+            ['all-db-status-grand-total', 'db-status-grand-total'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = Number(totalStatusDb).toLocaleString('id-ID');
+            });
+
+            // Status Total Trend (Solved + Unsolved + New DB vs previous period)
+            let prevStatusTotal = null;
+            if (dbNat.prev_total_status !== undefined && dbNat.prev_total_status !== null) {
+                prevStatusTotal = Number(dbNat.prev_total_status);
+            } else if (dbNat.prev_solved !== undefined && dbNat.prev_solved !== null &&
+                       dbNat.prev_unsolved !== undefined && dbNat.prev_unsolved !== null &&
+                       dbNat.prev_new_db !== undefined && dbNat.prev_new_db !== null) {
+                prevStatusTotal = Number(dbNat.prev_solved) + Number(dbNat.prev_unsolved) + Number(dbNat.prev_new_db);
+            }
+            let diffStatusTotal = null;
+            if (dbNat.diff_total_status !== undefined && dbNat.diff_total_status !== null) {
+                diffStatusTotal = Number(dbNat.diff_total_status);
+            } else if (prevStatusTotal !== null) {
+                diffStatusTotal = totalStatusDb - prevStatusTotal;
+            }
+
+            const renderStatusTotalTrend = () => {
+                if (diffStatusTotal === null || !hasPrev) {
+                    return `<span class="db-trend-indicator db-trend-neutral"><span>-</span></span>`;
+                }
+                const sign = diffStatusTotal > 0 ? '+' : '';
+                const isPos = diffStatusTotal > 0;
+                const isNeg = diffStatusTotal < 0;
+                const trendClass = isNeg ? 'db-trend-good-down' : (isPos ? 'db-trend-bad-up' : 'db-trend-neutral');
+                const svg = isPos
+                    ? `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,4 21,20 3,20"/></svg>`
+                    : (isNeg ? `<svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,20 3,4 21,4"/></svg>` : '');
+                const formatted = `${sign}${Number(diffStatusTotal).toLocaleString('id-ID')}`;
+                return `
+                    <span class="db-trend-indicator ${trendClass}">
+                        ${svg}
+                        <span>${formatted} vs Prev</span>
+                    </span>
+                `;
+            };
+
+            const statusTrendHtml = renderStatusTotalTrend();
+            ['all-db-status-grand-trend', 'db-status-grand-trend'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = statusTrendHtml;
+            });
 
             ['all-db-status-val-solved', 'db-status-val-solved'].forEach(id => {
                 const el = document.getElementById(id);
@@ -590,7 +726,7 @@ const AllSummaryApp = (function () {
         const activeAll = (curStatus === 'all') ? ' active' : '';
 
         let statsHtml = `
-            <div class="so-pie-stat-row${activeTercapai}" onclick="AllSummaryApp.toggleHasilStatusFilter('tercapai')" title="Klik untuk filter status Tercapai">
+            <div class="so-pie-stat-row${activeTercapai}" onclick="AllSummaryApp.toggleHasilStatusFilter('tercapai')">
                 <span class="so-pie-stat-label">
                     <span class="so-pie-stat-dot" style="background-color: #16a34a;"></span>
                     Tercapai
@@ -599,7 +735,7 @@ const AllSummaryApp = (function () {
                     ${tercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
                 </span>
             </div>
-            <div class="so-pie-stat-row${activeTidak}" onclick="AllSummaryApp.toggleHasilStatusFilter('tidak_tercapai')" title="Klik untuk filter status Tidak Tercapai">
+            <div class="so-pie-stat-row${activeTidak}" onclick="AllSummaryApp.toggleHasilStatusFilter('tidak_tercapai')">
                 <span class="so-pie-stat-label">
                     <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
                     Tidak Tercapai
@@ -612,7 +748,7 @@ const AllSummaryApp = (function () {
 
         if (noData > 0) {
             statsHtml += `
-                <div class="so-pie-stat-row${activeNoData}" onclick="AllSummaryApp.toggleHasilStatusFilter('no_data')" title="Klik untuk filter Belum Ada Data">
+                <div class="so-pie-stat-row${activeNoData}" onclick="AllSummaryApp.toggleHasilStatusFilter('no_data')">
                     <span class="so-pie-stat-label">
                         <span class="so-pie-stat-dot" style="background-color: #94a3b8;"></span>
                         Belum Ada Data
@@ -625,7 +761,7 @@ const AllSummaryApp = (function () {
         }
 
         statsHtml += `
-            <div class="so-pie-stat-row${activeAll}" onclick="AllSummaryApp.toggleHasilStatusFilter('all')" title="Klik untuk tampilkan Semua Status" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
+            <div class="so-pie-stat-row${activeAll}" onclick="AllSummaryApp.toggleHasilStatusFilter('all')" style="margin-top: 4px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
                 <span class="so-pie-stat-label" style="font-weight: 600; color: #1e293b;">
                     Total Sites
                 </span>
@@ -1064,9 +1200,124 @@ const AllSummaryApp = (function () {
         renderRekapTable();
     }
 
-    function exportRekapExcel() {
-        const year = document.getElementById('all-summary-filter-year')?.value || '2026';
-        window.location.href = `api/export_rekapitulasi.php?category=all&so_type=${summarySOType}&year=${year}`;
+    function showToast(type, title, message) {
+        if (typeof window.showToast === 'function') {
+            window.showToast(type, title, message);
+            return;
+        }
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <h4>${escapeHtml(title)}</h4>
+                <p>${escapeHtml(message)}</p>
+            </div>
+        `;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 200);
+        }, 4000);
+    }
+
+    async function exportRekapExcel() {
+        if (!filteredRekapRows || filteredRekapRows.length === 0) {
+            showToast('warning', 'Data Kosong', 'Tidak ada data rekapitulasi untuk diexport.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-all-rekap-export-excel') || document.getElementById('btn-rekap-export-excel');
+        const origContent = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+                <span>Mengekspor...</span>
+            `;
+        }
+
+        try {
+            const yearEl = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
+            const year = parseInt(yearEl?.value) || 2026;
+            const searchEl = document.getElementById('all-rekap-search') || document.getElementById('rekap-search');
+            const searchQuery = searchEl ? searchEl.value.trim() : '';
+
+            const payload = {
+                year: year,
+                category: 'all',
+                category_label: 'All Sites',
+                so_type: summarySOType || 'monthly',
+                search_query: searchQuery,
+                rows: filteredRekapRows
+            };
+
+            const res = await fetch('api/export_rekapitulasi.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.message || `Export gagal dengan status HTTP ${res.status}`);
+            }
+
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+
+            let downloadFilename = '';
+            const disposition = res.headers.get('content-disposition');
+            if (disposition && disposition.indexOf('filename=') !== -1) {
+                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                if (matches != null && matches[1]) {
+                    downloadFilename = matches[1].replace(/['"]/g, '').trim();
+                }
+            }
+            if (!downloadFilename) {
+                const now = new Date();
+                const d = String(now.getDate()).padStart(2, '0');
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const y = String(now.getFullYear());
+                const H = String(now.getHours()).padStart(2, '0');
+                const i = String(now.getMinutes()).padStart(2, '0');
+                downloadFilename = `rekap_allsites_${d}${m}${y}${H}${i}.xlsx`;
+            }
+
+            a.download = downloadFilename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+
+            showToast('success', 'Export Berhasil', 'File Excel Rekapitulasi berhasil diunduh.');
+        } catch (err) {
+            console.error('Error exporting Rekapitulasi Excel:', err);
+            showToast('error', 'Export Gagal', err.message || 'Terjadi kesalahan saat mengekspor Excel.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origContent;
+            }
+        }
     }
 
     // ── 7. Site Movements (History & Log) ──
@@ -1151,7 +1402,7 @@ const AllSummaryApp = (function () {
 
             const renderDiffBadge = (diff, invertColors = false) => {
                 if (diff === null || diff === undefined || diff === 0) {
-                    return `<span class="kpi-target-indicator target-neutral" title="Tidak ada perubahan"><span>-</span></span>`;
+                    return `<span class="kpi-target-indicator target-neutral"><span>-</span></span>`;
                 }
                 const isGood = invertColors ? (diff < 0) : (diff > 0);
                 const cls = isGood ? 'target-up' : 'target-down';
@@ -1160,7 +1411,7 @@ const AllSummaryApp = (function () {
                     ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"></polygon></svg>`
                     : `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"></polygon></svg>`;
                 return `
-                    <span class="kpi-target-indicator ${cls}" title="${formatted} vs bulan sebelumnya">
+                    <span class="kpi-target-indicator ${cls}">
                         ${arrowSvg}
                         <span>${formatted}</span>
                     </span>

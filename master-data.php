@@ -98,7 +98,7 @@ $monthNames = [
         <div class="navbar-actions">
             <div class="user-dropdown-container" id="user-dropdown-container">
                 <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
-                    onclick="App.toggleUserDropdown(event)" title="Detail Akun Admin">
+                    onclick="App.toggleUserDropdown(event)">
                     <div class="user-avatar-circle">
                         <?= strtoupper(substr($currentUser['name'] ?? 'A', 0, 1)) ?>
                     </div>
@@ -139,8 +139,7 @@ $monthNames = [
                         <button class="btn btn-refresh" onclick="App.loadMasterData()">
                             Refresh
                         </button>
-                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()"
-                            title="Hapus data berdasarkan bulan dan tahun">
+                        <button class="btn btn-danger" onclick="App.openBulkDeleteModal()">
                             Hapus Data
                         </button>
                         <button class="btn btn-primary" onclick="App.openImportModal()">
@@ -335,11 +334,10 @@ $monthNames = [
                         <p class="card-subtitle">All Site master data</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <button class="btn btn-refresh" onclick="App.loadSiteRegional()" title="Muat ulang tabel">
+                        <button class="btn btn-refresh" onclick="App.loadSiteRegional()">
                             Refresh
                         </button>
                         <button class="btn btn-success" id="btn-sync-all-sites" onclick="App.syncAllSiteProfiles()"
-                            title="Sinkronkan Group Type seluruh site dengan data profil Stock Opname terbaru"
                             style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -348,7 +346,7 @@ $monthNames = [
                             <span>Sync All</span>
                         </button>
                         <button class="btn btn-danger" id="sr-bulk-delete-btn" style="display: none;"
-                            onclick="App.bulkDeleteSiteRegional()" title="Hapus data terpilih">
+                            onclick="App.bulkDeleteSiteRegional()">
                             Hapus Terpilih (<span id="sr-selected-count">0</span>)
                         </button>
                         <button class="btn btn-primary" onclick="App.openSiteRegionalImportModal()">
@@ -452,7 +450,7 @@ $monthNames = [
                                 <tr>
                                     <!-- Under ACTION -->
                                     <th class="text-center align-middle col-action-select" style="padding: 4px;">
-                                        <input type="checkbox" id="sr-select-all" title="Select all on current page"
+                                        <input type="checkbox" id="sr-select-all"
                                             onchange="App.toggleSelectAllSR(this.checked)"
                                             style="cursor: pointer; width: 15px; height: 15px;">
                                     </th>
@@ -461,18 +459,15 @@ $monthNames = [
                                         DEL
                                     </th>
                                     <th class="text-center align-middle col-action-active"
-                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
-                                        title="Active status">
+                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
                                         ACT
                                     </th>
                                     <th class="text-center align-middle col-action-counted"
-                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
-                                        title="Dihitung dalam Ringkasan / Count in summary">
+                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
                                         COUNT
                                     </th>
                                     <th class="text-center align-middle col-action-sync"
-                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;"
-                                        title="Sinkronisasi Group Type Profil">
+                                        style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
                                         SYNC
                                     </th>
                                 </tr>
@@ -508,8 +503,7 @@ $monthNames = [
                         <button class="btn btn-refresh" onclick="App.loadRekapDbData()">
                             Refresh
                         </button>
-                        <button class="btn btn-danger" onclick="App.openRekapDbBulkDeleteModal()"
-                            title="Hapus data Rekap DB berdasarkan bulan dan tahun">
+                        <button class="btn btn-danger" onclick="App.openRekapDbBulkDeleteModal()">
                             Hapus Data
                         </button>
                         <button class="btn btn-primary" onclick="App.openRekapDbImportModal()">
@@ -626,7 +620,7 @@ $monthNames = [
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
 
-                        <button class="btn btn-secondary btn-sm" onclick="App.loadMasterCatatan()" title="Segarkan data"
+                        <button class="btn btn-secondary btn-sm" onclick="App.loadMasterCatatan()"
                             style="font-size: 11.5px; padding: 3px 8px;">
                             Refresh
                         </button>
@@ -737,11 +731,10 @@ $monthNames = [
                         <p class="card-subtitle">Master data PIC Sites</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <button class="btn btn-refresh" onclick="App.loadPicSites()" title="Muat ulang data">
+                        <button class="btn btn-refresh" onclick="App.loadPicSites()">
                             Refresh
                         </button>
                         <button class="btn btn-outline-success btn-sm" onclick="App.openPicSitesImportModal()"
-                            title="Impor dari Excel"
                             style="font-size: 12px; font-weight: 600; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -752,7 +745,6 @@ $monthNames = [
                             <span>Import Excel</span>
                         </button>
                         <button class="btn btn-outline-primary btn-sm" onclick="App.exportPicSitesExcel()"
-                            title="Export ke Excel"
                             style="font-size: 12px; font-weight: 600; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -876,7 +868,7 @@ $monthNames = [
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                             <button class="btn btn-refresh btn-sm" id="kpi-rating-refresh-btn"
-                                onclick="App.loadScorecardKpi()" title="Muat ulang data KPI"
+                                onclick="App.loadScorecardKpi()"
                                 style="font-size: 11.5px; padding: 3px 8px;">
                                 Refresh
                             </button>
@@ -929,7 +921,7 @@ $monthNames = [
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                             <button class="btn btn-refresh btn-sm" id="kpi-exec-refresh-btn"
-                                onclick="App.loadScorecardKpi()" title="Muat ulang data KPI"
+                                onclick="App.loadScorecardKpi()"
                                 style="font-size: 11.5px; padding: 3px 8px;">
                                 Refresh
                             </button>
@@ -1388,7 +1380,7 @@ $monthNames = [
 
                 <!-- Floating Action Button (+ circle) on bottom right following scrolling -->
                 <button type="button" class="fab-add-note-row" id="btn-add-note-row-fab"
-                    onclick="App.addExecutiveNoteRow()" title="Tambah Data Catatan (+)"
+                    onclick="App.addExecutiveNoteRow()"
                     aria-label="Tambah Data Catatan">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
                         stroke-linecap="round" stroke-linejoin="round">

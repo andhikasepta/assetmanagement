@@ -1,60 +1,90 @@
-# Version Control
+# ── Version Control ─────────────────────────────────────────
 .git/
+.git/**
 .gitignore
 .gitattributes
 
-# Environment & Sensitive Files
+# ── Environment & Secrets ──────────────────────────────────
 .env
 .env.*
 !.env.example
 
-# Dependency Directories (Installed cleanly inside container via Dockerfile cache)
+# ── Dependencies (Built inside container via Composer) ───────
 vendor/
 node_modules/
+composer.phar
 
-# Logs & Temporary Files
+# ── Logs & Runtime Cache ────────────────────────────────────
 *.log
+**/*.log
 logs/
+**/logs/
+cache/
+**/cache/
+tmp/
+**/tmp/
+temp/
+**/temp/
 *.tmp
 *.temp
-tmp/
-temp/
-cache/
 
-# Uploads & User Generated Content
+# ── Uploads & User Generated Content ─────────────────────────
 uploads/*
 !uploads/.gitkeep
 !uploads/.htaccess
 
-# Testing, Scratch, & Debug Scripts
-scratch/
+# ── Scratch, Tests, Debug & Inspect Scripts ─────────────────
+scratch/*
+!scratch/.gitkeep
 tests/
+**/tests/
+test_*.php
 inspect_*.php
+check_*.php
+benchmark_*.php
 *.out
-*.txt
 
-# Backups & Database Dumps
+# ── Backups, Archives & Database Dumps ───────────────────────
 *.sql
 *.dump
 *.sqlite
 *.bak
+*.old
 *.swp
+*~
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+*.csv
+*.xlsx
+*.xls
 
-# Docker & Deployment Files (not needed inside web root)
+# ── AI, IDE & OS Metadata ───────────────────────────────────
+.agents/
+.agents/**
+.gemini/
+.gemini/**
+.idea/
+.vscode/
+.fleet/
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+ehthumbs.db
+desktop.ini
+*.sublime-*
+
+# ── Deployment & Docker Configs (not needed in web root) ─────
 Dockerfile
 docker-compose*.yml
 .dockerignore
 deployment/
 
-# IDE & OS Metadata
-.idea/
-.vscode/
-.fleet/
-.DS_Store
-Thumbs.db
-desktop.ini
-*.sublime-*
-
-# Documentation & Misc
-README.md
+# ── Documentation & Text Files ──────────────────────────────
 *.md
+**/*.md
+*.txt

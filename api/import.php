@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Validate CSRF token & ensure user is logged in
 validateCsrfToken();
 requireAuth();
+requirePermission('can_master_add_import');
 
 // Check ZipArchive before attempting to parse xlsx
 if (!class_exists('ZipArchive')) {

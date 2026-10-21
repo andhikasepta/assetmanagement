@@ -79,7 +79,7 @@ $csrfToken = getCsrfToken();
         <div class="navbar-actions">
             <div class="user-dropdown-container" id="user-dropdown-container">
                 <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
-                    onclick="AllSummaryApp.toggleUserDropdown(event)" title="Detail Akun Admin">
+                    onclick="AllSummaryApp.toggleUserDropdown(event)">
                     <div class="user-avatar-circle">
                         <?= strtoupper(substr($currentUser['name'] ?? 'A', 0, 1)) ?>
                     </div>
@@ -111,9 +111,8 @@ $csrfToken = getCsrfToken();
         <section id="page-all-summary" class="page-section active">
 
             <!-- ── Unified Dashboard Controls: SO Type & Periode (No Category Switch) ────── -->
-            <div class="card" id="card-all-summary-controls"
-                style="margin-bottom: 1.25rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                <div class="card-header"
+            <div class="card sticky-controls-card" id="card-all-summary-controls">
+                <div class="card-header sticky-controls-header"
                     style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; padding: 0.75rem 1.25rem;">
                     <!-- Left: SO Type Toggle Only -->
                     <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
@@ -562,9 +561,16 @@ $csrfToken = getCsrfToken();
                         <input type="search" id="rekap-search" class="table-search-input unified-search-input" placeholder="Search..."
                             oninput="AllSummaryApp.applyRekapFilter()"
                             style="max-width: 240px;">
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            onclick="AllSummaryApp.exportRekapExcel()">
-                            Export Excel
+                        <button class="btn btn-success" id="btn-all-rekap-export-excel"
+                            onclick="AllSummaryApp.exportRekapExcel()"
+                            style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 0 1rem; border-radius: 8px; font-size: 12.5px; font-weight: 600; line-height: 1;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Export Excel</span>
                         </button>
                     </div>
                 </div>

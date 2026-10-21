@@ -1,0 +1,52 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Composer / Dependencies
+/vendor/
+composer.phar
+
+# Uploads & Temp files
+/uploads/*
+!/uploads/.gitkeep
+!/uploads/.htaccess
+/scratch/*
+!/scratch/.gitkeep
+/logs/
+*.log
+*.tmp
+*.temp
+/tmp/
+/temp/
+/cache/
+
+# Debug & Scratch
+inspect_*.php
+check_*.php
+test_*.php
+benchmark_*.php
+*.out
+
+# Backups & Dumps
+*.sql
+*.dump
+*.sqlite
+*.bak
+*.old
+*.swp
+*~
+*.csv
+*.xlsx
+*.xls
+
+# OS & IDE
+.idea/
+.vscode/
+.fleet/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.sublime-*
+.agents/
+.gemini/
