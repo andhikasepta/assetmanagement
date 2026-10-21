@@ -255,7 +255,8 @@ const App = (() => {
             const canWk = perms.can_access_weekly_summary !== false;
             const canMst = perms.can_access_master_data !== false;
             const canMstWk = perms.can_access_master_data_weekly !== false;
-            initialPage = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : 'user-management')));
+            const canUserMgmt = perms.can_access_user_management !== false;
+            initialPage = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))));
         }
 
         // Restore active SO Type & Category from sessionStorage
@@ -335,6 +336,10 @@ const App = (() => {
         if (tabMasterDataWeekly) {
             tabMasterDataWeekly.style.display = perms.can_access_master_data_weekly !== false ? '' : 'none';
         }
+        const tabUserManagement = document.getElementById('tab-user-management');
+        if (tabUserManagement) {
+            tabUserManagement.style.display = perms.can_access_user_management !== false ? '' : 'none';
+        }
 
         // Master Data (Monthly) Buttons: Add / Import
         document.querySelectorAll('[data-uac="master-add-import"]').forEach(el => {
@@ -380,7 +385,8 @@ const App = (() => {
             const canWk = perms.can_access_weekly_summary !== false;
             const canMst = perms.can_access_master_data !== false;
             const canMstWk = perms.can_access_master_data_weekly !== false;
-            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : 'user-management')));
+            const canUserMgmt = perms.can_access_user_management !== false;
+            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))));
         }
 
         // Protected pages require authenticated session
@@ -413,6 +419,11 @@ const App = (() => {
                 else if (perms.can_access_all_summary !== false) page = 'all-summary';
                 else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
                 else page = 'user-management';
+            } else if (page === 'user-management' && perms.can_access_user_management === false) {
+                if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
             }
         }
 
@@ -465,7 +476,8 @@ const App = (() => {
                 AllSummaryApp.init();
             }
         } else if (page === 'weekly-summary') {
-            loadWeeklySummary();
+            const savedWeeklyCat = sessionStorage.getItem('weekly_category') || 'pmd';
+            switchWeeklyCategory(savedWeeklyCat);
         } else if (page === 'master-data') {
             loadMasterData();
             loadSiteRegional();
@@ -699,18 +711,14 @@ const App = (() => {
 
                 // Update Navbar UI
                 const tabSummary = document.getElementById('tab-summary');
-                const userDropdown = document.getElementById('user-dropdown-container');
                 const btnNavLogin = document.getElementById('btn-navbar-login');
-                const userDisplayName = document.getElementById('user-display-name');
-                const userAvatarText = document.getElementById('user-avatar-text');
+                const btnNavLogout = document.getElementById('btn-navbar-logout');
                 const tabUserManagement = document.getElementById('tab-user-management');
 
                 if (tabSummary) tabSummary.style.display = 'none';
-                if (tabUserManagement) tabUserManagement.style.display = 'inline-flex';
-                if (userDropdown) userDropdown.style.display = 'inline-block';
+                if (tabUserManagement) tabUserManagement.style.display = ((window.AUTH_USER.permissions || {}).can_access_user_management !== false) ? '' : 'none';
                 if (btnNavLogin) btnNavLogin.style.display = 'none';
-                if (userDisplayName) userDisplayName.textContent = (window.AUTH_USER.name || 'ASSET MANAGEMENT ADMINISTRATOR').toUpperCase();
-                if (userAvatarText) userAvatarText.textContent = (window.AUTH_USER.name || 'A').charAt(0).toUpperCase();
+                if (btnNavLogout) btnNavLogout.style.display = 'inline-flex';
 
                 // Apply UAC permissions for tabs & buttons
                 applyUacPermissions();
@@ -762,8 +770,8 @@ const App = (() => {
         const tabMasterData = document.getElementById('tab-master-data');
         const tabMasterDataWeekly = document.getElementById('tab-master-data-weekly');
         const tabUserManagement = document.getElementById('tab-user-management');
-        const userDropdown = document.getElementById('user-dropdown-container');
         const btnNavLogin = document.getElementById('btn-navbar-login');
+        const btnNavLogout = document.getElementById('btn-navbar-logout');
 
         if (tabSummary) tabSummary.style.display = 'inline-flex';
         if (tabAllSummary) tabAllSummary.style.display = 'none';
@@ -771,7 +779,7 @@ const App = (() => {
         if (tabMasterData) tabMasterData.style.display = 'none';
         if (tabMasterDataWeekly) tabMasterDataWeekly.style.display = 'none';
         if (tabUserManagement) tabUserManagement.style.display = 'none';
-        if (userDropdown) userDropdown.style.display = 'none';
+        if (btnNavLogout) btnNavLogout.style.display = 'none';
         if (btnNavLogin) btnNavLogin.style.display = 'inline-flex';
 
         // Update Quick Access Drawer Header Login button
@@ -779,6 +787,16 @@ const App = (() => {
         if (drawerHeaderLogin) drawerHeaderLogin.style.display = 'inline-flex';
 
         showToast('info', 'Logout', 'Anda telah berhasil logout.');
+        try {
+            sessionStorage.removeItem('active_page');
+            sessionStorage.removeItem('weekly_category');
+            sessionStorage.removeItem('all_summary_so_type');
+            sessionStorage.removeItem('all_summary_filter_month');
+            sessionStorage.removeItem('all_summary_filter_year');
+            sessionStorage.removeItem('weekly_filter_month');
+            sessionStorage.removeItem('weekly_filter_week');
+            sessionStorage.removeItem('weekly_filter_year');
+        } catch (e) { }
         navigateTo('summary');
         keepCleanUrl();
     }
@@ -11416,6 +11434,12 @@ const App = (() => {
                 uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Master Weekly</span>`);
             }
 
+            if (u.can_access_user_management !== false) {
+                uacBadges.push(`<span class="badge" style="background: #fdf4ff; color: #a21caf; border: 1px solid #f0abfc; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">User Mgmt</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">User Mgmt</span>`);
+            }
+
             if (u.can_master_add_import !== false) {
                 uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master: Add</span>`);
             }
@@ -11496,6 +11520,8 @@ const App = (() => {
         document.getElementById('user-uac-weekly-summary').checked = true;
         document.getElementById('user-uac-master-data').checked = true;
         document.getElementById('user-uac-master-data-weekly').checked = true;
+        const uacUserMgmtAdd = document.getElementById('user-uac-user-management');
+        if (uacUserMgmtAdd) uacUserMgmtAdd.checked = true;
         document.getElementById('user-uac-master-add-import').checked = true;
         document.getElementById('user-uac-master-edit').checked = true;
         document.getElementById('user-uac-master-delete').checked = true;
@@ -11526,6 +11552,8 @@ const App = (() => {
         document.getElementById('user-uac-weekly-summary').checked = user.can_access_weekly_summary !== false;
         document.getElementById('user-uac-master-data').checked = user.can_access_master_data !== false;
         document.getElementById('user-uac-master-data-weekly').checked = user.can_access_master_data_weekly !== false;
+        const uacUserMgmtEdit = document.getElementById('user-uac-user-management');
+        if (uacUserMgmtEdit) uacUserMgmtEdit.checked = user.can_access_user_management !== false;
         document.getElementById('user-uac-master-add-import').checked = user.can_master_add_import !== false;
         document.getElementById('user-uac-master-edit').checked = user.can_master_edit !== false;
         document.getElementById('user-uac-master-delete').checked = user.can_master_delete !== false;
@@ -11552,7 +11580,7 @@ const App = (() => {
         const password = document.getElementById('user-form-password').value;
 
         if (!name || !username) {
-            showToast('error', 'Validasi Gagal', 'Nama lengkap dan Username wajib diisi.');
+            showToast('error', 'Validasi Gagal', 'Nama User dan Username wajib diisi.');
             return;
         }
 
@@ -11570,6 +11598,7 @@ const App = (() => {
             can_access_weekly_summary: document.getElementById('user-uac-weekly-summary').checked,
             can_access_master_data: document.getElementById('user-uac-master-data').checked,
             can_access_master_data_weekly: document.getElementById('user-uac-master-data-weekly').checked,
+            can_access_user_management: document.getElementById('user-uac-user-management') ? document.getElementById('user-uac-user-management').checked : true,
             can_master_add_import: document.getElementById('user-uac-master-add-import').checked,
             can_master_edit: document.getElementById('user-uac-master-edit').checked,
             can_master_delete: document.getElementById('user-uac-master-delete').checked,
@@ -12280,9 +12309,18 @@ const App = (() => {
     let weeklyReportSortDirection = 'asc';
     let weeklyScorecardRatingPieChart = null;
     let weeklyScorecardExecPieChart = null;
+    let weeklyReportPageSize = 10;
+    let currentWeeklyReportPage = 1;
+    let filteredWeeklyReportRows = [];
+    let weeklySummaryInitialized = false;
 
     function switchWeeklyCategory(cat) {
         currentWeeklyCategory = cat === 'outlet' ? 'outlet' : 'pmd';
+        currentWeeklyReportPage = 1;
+
+        try {
+            sessionStorage.setItem('weekly_category', currentWeeklyCategory);
+        } catch (e) { }
 
         // Update slider button states
         const btnPmd = document.getElementById('btn-weekly-cat-pmd');
@@ -12296,19 +12334,24 @@ const App = (() => {
             if (currentWeeklyCategory === 'pmd') {
                 statusEl.innerHTML = `(<strong style="color: #9333ea;">PMD</strong> Target 98%)`;
             } else {
-                statusEl.innerHTML = `(<strong style="color: #2563eb;">Outlet Regional</strong> Target 97%)`;
+                statusEl.innerHTML = `(<strong style="color: #2563eb;">Outlet Regional</strong> Target 85%)`;
             }
         }
 
         // Update card titles
         const execTitle = document.getElementById('weekly-executive-title');
         if (execTitle) {
-            execTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Executive Summary (Weekly PMD)' : 'Executive Summary (Weekly Outlet Regional)';
+            execTitle.textContent = 'Executive Summary';
         }
 
         const reportTitle = document.getElementById('weekly-hasil-so-title');
         if (reportTitle) {
             reportTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Report SO PMD (Weekly)' : 'Report SO Outlet Regional (Weekly)';
+        }
+
+        const pieTitle = document.getElementById('weekly-pie-title');
+        if (pieTitle) {
+            pieTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Status Pencapaian PMD' : 'Status Pencapaian Outlet Regional';
         }
 
         // Toggle card groups in achievements
@@ -12335,9 +12378,43 @@ const App = (() => {
     }
 
     async function loadWeeklySummary() {
-        const m = document.getElementById('weekly-filter-month')?.value || 9;
-        const w = document.getElementById('weekly-filter-week')?.value || 1;
-        const y = document.getElementById('weekly-filter-year')?.value || 2026;
+        const monthEl = document.getElementById('weekly-filter-month');
+        const weekEl = document.getElementById('weekly-filter-week');
+        const yearEl = document.getElementById('weekly-filter-year');
+
+        if (!weeklySummaryInitialized) {
+            const savedM = sessionStorage.getItem('weekly_filter_month');
+            const savedW = sessionStorage.getItem('weekly_filter_week');
+            const savedY = sessionStorage.getItem('weekly_filter_year');
+
+            if (monthEl && savedM !== null && savedM !== undefined && Array.from(monthEl.options).some(o => o.value === String(savedM))) {
+                monthEl.value = String(savedM);
+            }
+            if (weekEl && savedW !== null && savedW !== undefined && Array.from(weekEl.options).some(o => o.value === String(savedW))) {
+                weekEl.value = String(savedW);
+            }
+            if (yearEl && savedY) {
+                const sY = String(savedY);
+                if (!Array.from(yearEl.options).some(o => o.value === sY)) {
+                    const opt = document.createElement('option');
+                    opt.value = sY;
+                    opt.textContent = sY;
+                    yearEl.appendChild(opt);
+                }
+                yearEl.value = sY;
+            }
+            weeklySummaryInitialized = true;
+        }
+
+        const m = monthEl?.value || 9;
+        const w = weekEl?.value || 1;
+        const y = yearEl?.value || 2026;
+
+        try {
+            sessionStorage.setItem('weekly_filter_month', m);
+            sessionStorage.setItem('weekly_filter_week', w);
+            sessionStorage.setItem('weekly_filter_year', y);
+        } catch (e) { }
 
         const monthNames = {
             1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
@@ -12388,124 +12465,170 @@ const App = (() => {
     function renderWeeklyAchievements(achievements) {
         if (!achievements) return;
 
-        const targetPct = achievements.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+        const isPmd = (currentWeeklyCategory === 'pmd');
 
-        // Helper for trend arrow
-        // Rule: Achievement Cards Trend Comparison: display only the trend arrow with +/- % (no "vs Prev" label).
-        const renderTrend = (diff) => {
-            if (diff === null || diff === undefined) return '';
-            const num = parseFloat(diff);
-            if (isNaN(num)) return '';
-            if (num > 0) {
-                return `<span class="trend-up" style="color: #16a34a; font-weight: 700; font-size: 11px;">▲ +${num.toFixed(1)}%</span>`;
-            } else if (num < 0) {
-                return `<span class="trend-down" style="color: #dc2626; font-weight: 700; font-size: 11px;">▼ ${num.toFixed(1)}%</span>`;
-            } else {
-                return `<span class="trend-flat" style="color: #64748b; font-weight: 600; font-size: 11px;">0.0%</span>`;
+        // Shared helper matching monthly summary page updateAchCard
+        const updateWeeklyAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmdCard = false, customTarget = null) => {
+            const rawPct = item && item.pct !== null && item.pct !== undefined ? parseFloat(item.pct) : 0;
+            const pct = Math.round(rawPct);
+            const count = item?.sites_counted !== undefined ? item.sites_counted : (item?.count || 0);
+            const total = item?.total_sites !== undefined ? item.total_sites : (item?.total || 0);
+            let threshold = isPmdCard ? 98 : 85;
+            if (customTarget !== null) {
+                threshold = customTarget;
+            }
+            const color = (total === 0 || count === 0) ? '#94a3b8' : getPctColor(pct, threshold === 98);
+
+            const valEl = document.getElementById(valId);
+            if (valEl) {
+                valEl.textContent = `${pct}%`;
+                valEl.style.color = color;
+            }
+
+            const subEl = document.getElementById(subId);
+            if (subEl) {
+                subEl.textContent = `${defaultLabel} (${count}/${total} Sites)`;
+            }
+
+            const statusEl = document.getElementById(statusId);
+            if (statusEl) {
+                if (total === 0 || count === 0) {
+                    statusEl.innerHTML = '<span class="so-status-badge status-none">Belum Ada Data</span>';
+                } else if (pct >= threshold) {
+                    statusEl.innerHTML = '<span class="so-status-badge status-green">Tercapai</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="so-status-badge status-red">Tidak Tercapai</span>';
+                }
+            }
+
+            const trendEl = document.getElementById(trendId);
+            if (trendEl) {
+                if (total === 0 || count === 0) {
+                    trendEl.innerHTML = '';
+                } else {
+                    let diff = null;
+                    if (item && item.diff_pct !== undefined && item.diff_pct !== null) {
+                        diff = Math.round(Number(item.diff_pct));
+                    } else if (item && item.prev_pct !== undefined && item.prev_pct !== null && item.pct !== null && item.pct !== undefined) {
+                        diff = Math.round(Number(item.pct)) - Math.round(Number(item.prev_pct));
+                    }
+
+                    if (diff === null) {
+                        trendEl.innerHTML = '<span class="kpi-target-indicator target-neutral"><span>-</span></span>';
+                    } else {
+                        const isUp = diff > 0;
+                        const isDown = diff < 0;
+                        const sign = isUp ? '+' : '';
+                        const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
+                        const formattedDiff = `${sign}${diff}%`;
+
+                        // Solid triangle style: up (green) if > 0, down (red) if < 0
+                        const triangleSvg = isUp
+                            ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                            : (isDown ? `<svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
+
+                        trendEl.innerHTML = `
+                            <span class="kpi-target-indicator ${trendClass}">
+                                ${triangleSvg}
+                                <span>${formattedDiff}</span>
+                            </span>
+                        `;
+                    }
+                }
             }
         };
 
-        const renderStatusBadge = (counted, pct) => {
-            if (!counted || counted <= 0) {
-                return `<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">-</span>`;
+        // Shared helper matching monthly summary page updateSubDeptCard
+        const updateWeeklySubDeptCard = (subKey) => {
+            const sKey = subKey.toLowerCase();
+            const upperKey = subKey.toUpperCase();
+            const subDeptsData = achievements.sub_depts || {};
+            const sData = subDeptsData[upperKey] || subDeptsData[sKey] || {};
+            const rawPct = sData.pct !== undefined && sData.pct !== null ? parseFloat(sData.pct) : 0;
+            const pct = Math.round(rawPct);
+            const count = sData.sites_counted !== undefined ? sData.sites_counted : (sData.count || 0);
+            const total = sData.total_sites !== undefined ? sData.total_sites : (sData.total || 0);
+            const threshold = isPmd ? 98 : 85;
+            const color = (total === 0 || count === 0) ? '#94a3b8' : getPctColor(pct, threshold === 98);
+
+            const valEl = document.getElementById(`weekly-kpi-subdept-val-${sKey}`);
+            if (valEl) {
+                valEl.textContent = `${pct}%`;
+                valEl.style.color = color;
             }
-            if (pct >= targetPct) {
-                return `<span class="badge badge-success" style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tercapai</span>`;
+
+            const metaEl = document.getElementById(`weekly-kpi-subdept-meta-${sKey}`);
+            if (metaEl) {
+                metaEl.textContent = `${count}/${total} Sites`;
             }
-            return `<span class="badge badge-danger" style="background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tidak Tercapai</span>`;
+
+            const trendEl = document.getElementById(`weekly-kpi-subdept-trend-${sKey}`);
+            if (trendEl) {
+                if (total === 0 || count === 0) {
+                    trendEl.innerHTML = '';
+                } else {
+                    let diff = null;
+                    if (sData && sData.diff_pct !== undefined && sData.diff_pct !== null) {
+                        diff = Math.round(Number(sData.diff_pct));
+                    } else if (sData && sData.prev_pct !== undefined && sData.prev_pct !== null && sData.pct !== null && sData.pct !== undefined) {
+                        diff = Math.round(Number(sData.pct)) - Math.round(Number(sData.prev_pct));
+                    }
+
+                    if (diff === null) {
+                        trendEl.innerHTML = '<span class="kpi-target-indicator target-neutral"><span>-</span></span>';
+                    } else {
+                        const isUp = diff > 0;
+                        const isDown = diff < 0;
+                        const sign = isUp ? '+' : '';
+                        const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
+                        const formattedDiff = `${sign}${diff}%`;
+                        const triangleSvg = isUp
+                            ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
+                            : (isDown ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
+
+                        trendEl.innerHTML = `
+                            <span class="kpi-target-indicator ${trendClass}">
+                                ${triangleSvg}
+                                <span>${formattedDiff}</span>
+                            </span>
+                        `;
+                    }
+                }
+            }
+
+            const statusEl = document.getElementById(`weekly-kpi-subdept-status-${sKey}`);
+            if (statusEl) {
+                if (total === 0 || count === 0) {
+                    statusEl.innerHTML = '<span class="so-status-badge status-none">Belum Ada Data</span>';
+                } else if (pct >= threshold) {
+                    statusEl.innerHTML = '<span class="so-status-badge status-green">Tercapai</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="so-status-badge status-red">Tidak Tercapai</span>';
+                }
+            }
         };
 
-        if (currentWeeklyCategory === 'pmd') {
-            // Main PMD
+        if (isPmd) {
             const main = achievements.main || {};
-            const pmdVal = document.getElementById('weekly-kpi-pmd-achievement');
-            const pmdStatus = document.getElementById('weekly-kpi-pmd-status');
-            const pmdTrend = document.getElementById('weekly-kpi-pmd-trend');
-            const pmdSubtext = document.getElementById('weekly-kpi-pmd-subtext');
-
-            if (pmdVal) pmdVal.textContent = formatPercent(main.pct);
-            if (pmdStatus) pmdStatus.innerHTML = renderStatusBadge(main.sites_counted, main.pct);
-            if (pmdTrend) pmdTrend.innerHTML = renderTrend(main.diff_pct);
-            if (pmdSubtext) pmdSubtext.textContent = `Avg PMD Divisi (${main.sites_counted || 0} Sites)`;
-
-            // DNO
             const dno = achievements.sub_depts ? (achievements.sub_depts['DNO'] || {}) : {};
-            const dnoVal = document.getElementById('weekly-kpi-dno-achievement');
-            const dnoStatus = document.getElementById('weekly-kpi-dno-status');
-            const dnoTrend = document.getElementById('weekly-kpi-dno-trend');
-            const dnoSubtext = document.getElementById('weekly-kpi-dno-subtext');
-
-            if (dnoVal) dnoVal.textContent = formatPercent(dno.pct);
-            if (dnoStatus) dnoStatus.innerHTML = renderStatusBadge(dno.sites_counted, dno.pct);
-            if (dnoTrend) dnoTrend.innerHTML = renderTrend(dno.diff_pct);
-            if (dnoSubtext) dnoSubtext.textContent = `Avg DEPT DNO (${dno.sites_counted || 0} Sites)`;
-
-            // DSO
             const dso = achievements.sub_depts ? (achievements.sub_depts['DSO'] || {}) : {};
-            const dsoVal = document.getElementById('weekly-kpi-dso-achievement');
-            const dsoStatus = document.getElementById('weekly-kpi-dso-status');
-            const dsoTrend = document.getElementById('weekly-kpi-dso-trend');
-            const dsoSubtext = document.getElementById('weekly-kpi-dso-subtext');
 
-            if (dsoVal) dsoVal.textContent = formatPercent(dso.pct);
-            if (dsoStatus) dsoStatus.innerHTML = renderStatusBadge(dso.sites_counted, dso.pct);
-            if (dsoTrend) dsoTrend.innerHTML = renderTrend(dso.diff_pct);
-            if (dsoSubtext) dsoSubtext.textContent = `Avg DEPT DSO (${dso.sites_counted || 0} Sites)`;
-
+            updateWeeklyAchCard('weekly-kpi-pmd-achievement', 'weekly-kpi-pmd-subtext', 'weekly-kpi-pmd-trend', 'weekly-kpi-pmd-status', main, 'Avg PMD Divisi', true);
+            updateWeeklyAchCard('weekly-kpi-dno-achievement', 'weekly-kpi-dno-subtext', 'weekly-kpi-dno-trend', 'weekly-kpi-dno-status', dno, 'Avg DEPT DNO', true);
+            updateWeeklyAchCard('weekly-kpi-dso-achievement', 'weekly-kpi-dso-subtext', 'weekly-kpi-dso-trend', 'weekly-kpi-dso-status', dso, 'Avg DEPT DSO', true);
         } else {
-            // Outlet Regional Main
             const main = achievements.main || {};
-            const outletVal = document.getElementById('weekly-kpi-outlet-achievement');
-            const outletStatus = document.getElementById('weekly-kpi-outlet-status');
-            const outletTrend = document.getElementById('weekly-kpi-outlet-trend');
-            const outletSubtext = document.getElementById('weekly-kpi-outlet-subtext');
-
-            if (outletVal) outletVal.textContent = formatPercent(main.pct);
-            if (outletStatus) outletStatus.innerHTML = renderStatusBadge(main.sites_counted, main.pct);
-            if (outletTrend) outletTrend.innerHTML = renderTrend(main.diff_pct);
-            if (outletSubtext) outletSubtext.textContent = `Avg Outlet Regional (${main.sites_counted || 0} Sites)`;
-
-            // Depts & Subdepts
             const depts = achievements.depts || {};
-            const subdepts = achievements.sub_depts || {};
+            const cro = depts['CRO'] || {};
+            const ero = depts['ERO'] || {};
+            const wro = depts['WRO'] || {};
 
-            const deptKeys = ['wro', 'cro', 'ero'];
-            const subdeptMap = {
-                wro: ['cso', 'nso', 'sso'],
-                cro: ['cco', 'wco', 'eco'],
-                ero: ['eeo', 'neo', 'seo']
-            };
+            updateWeeklyAchCard('weekly-kpi-outlet-achievement', 'weekly-kpi-outlet-subtext', 'weekly-kpi-outlet-trend', 'weekly-kpi-outlet-status', main, 'Avg Outlet Regional', false, 85);
+            updateWeeklyAchCard('weekly-kpi-cro-achievement', 'weekly-kpi-cro-subtext', 'weekly-kpi-cro-trend', 'weekly-kpi-cro-status', cro, 'Avg DEPT CRO', false, 85);
+            updateWeeklyAchCard('weekly-kpi-ero-achievement', 'weekly-kpi-ero-subtext', 'weekly-kpi-ero-trend', 'weekly-kpi-ero-status', ero, 'Avg DEPT ERO', false, 85);
+            updateWeeklyAchCard('weekly-kpi-wro-achievement', 'weekly-kpi-wro-subtext', 'weekly-kpi-wro-trend', 'weekly-kpi-wro-status', wro, 'Avg DEPT WRO', false, 85);
 
-            deptKeys.forEach(dk => {
-                const upperDk = dk.toUpperCase();
-                const dData = depts[upperDk] || {};
-
-                const valEl = document.getElementById(`weekly-kpi-${dk}-achievement`);
-                const statusEl = document.getElementById(`weekly-kpi-${dk}-status`);
-                const trendEl = document.getElementById(`weekly-kpi-${dk}-trend`);
-                const subtextEl = document.getElementById(`weekly-kpi-${dk}-subtext`);
-
-                if (valEl) valEl.textContent = formatPercent(dData.pct);
-                if (statusEl) statusEl.innerHTML = renderStatusBadge(dData.sites_counted, dData.pct);
-                if (trendEl) trendEl.innerHTML = renderTrend(dData.diff_pct);
-                if (subtextEl) subtextEl.textContent = `Avg DEPT ${upperDk} (${dData.sites_counted || 0} Sites)`;
-
-                // Subdepts
-                (subdeptMap[dk] || []).forEach(sk => {
-                    const upperSk = sk.toUpperCase();
-                    const sData = subdepts[upperSk] || {};
-
-                    const sVal = document.getElementById(`weekly-kpi-subdept-val-${sk}`);
-                    const sTrend = document.getElementById(`weekly-kpi-subdept-trend-${sk}`);
-                    const sMeta = document.getElementById(`weekly-kpi-subdept-meta-${sk}`);
-                    const sStatus = document.getElementById(`weekly-kpi-subdept-status-${sk}`);
-
-                    if (sVal) sVal.textContent = formatPercent(sData.pct);
-                    if (sTrend) sTrend.innerHTML = renderTrend(sData.diff_pct);
-                    if (sMeta) sMeta.textContent = `${sData.sites_counted || 0} Sites`;
-                    if (sStatus) sStatus.innerHTML = renderStatusBadge(sData.sites_counted, sData.pct);
-                });
-            });
+            ['cso', 'nso', 'sso', 'cjdo', 'eko', 'wjo', 'wko', 'bno', 'ejo', 'mpo', 'smo'].forEach(updateWeeklySubDeptCard);
         }
     }
 
@@ -12798,24 +12921,95 @@ const App = (() => {
 
     // Report SO Weekly Data Table
     function populateWeeklyDeptFilter(reportData) {
-        const select = document.getElementById('weekly-report-so-dept-filter');
-        if (!select) return;
+        const deptSelect = document.getElementById('weekly-report-so-dept-filter');
+        const deptLabel = document.getElementById('label-weekly-dept-filter');
+        const subdeptContainer = document.getElementById('weekly-subdept-filter-container');
+        const subdeptSelect = document.getElementById('weekly-report-so-subdept-filter');
 
-        const currentVal = select.value;
-        const depts = new Set();
-        reportData.forEach(r => {
-            if (r.dept) depts.add(r.dept.trim());
-        });
+        if (!deptSelect) return;
 
-        const sortedDepts = Array.from(depts).sort();
-        let optionsHtml = '<option value="all" selected>Semua Dept</option>';
-        sortedDepts.forEach(d => {
-            optionsHtml += `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`;
-        });
-        select.innerHTML = optionsHtml;
-        if (depts.has(currentVal)) {
-            select.value = currentVal;
+        if (currentWeeklyCategory === 'pmd') {
+            if (deptLabel) deptLabel.textContent = 'DEPT';
+            if (subdeptContainer) subdeptContainer.style.display = 'none';
+            if (subdeptSelect) subdeptSelect.value = 'all';
+
+            deptSelect.innerHTML = `
+                <option value="all" selected>Semua Dept</option>
+                <option value="DNO">DNO</option>
+                <option value="DSO">DSO</option>
+            `;
+        } else {
+            // Outlet Regional
+            if (deptLabel) deptLabel.textContent = 'DEPT';
+            if (subdeptContainer) subdeptContainer.style.display = 'flex';
+
+            deptSelect.innerHTML = `
+                <option value="all" selected>Semua DEPT</option>
+                <option value="CRO">CRO</option>
+                <option value="ERO">ERO</option>
+                <option value="WRO">WRO</option>
+            `;
+
+            updateWeeklySubdeptOptions('all');
         }
+    }
+
+    function updateWeeklySubdeptOptions(selectedDept) {
+        const subdeptSelect = document.getElementById('weekly-report-so-subdept-filter');
+        if (!subdeptSelect) return;
+
+        const previousVal = subdeptSelect.value;
+        let html = '<option value="all">Semua Sub Dept</option>';
+
+        if (selectedDept === 'all') {
+            const depts = ['CRO', 'ERO', 'WRO'];
+            depts.forEach(d => {
+                const subs = DEPT_SUBDEPTS_MAP[d] || [];
+                html += `<optgroup label="${d}">`;
+                subs.forEach(s => {
+                    html += `<option value="${s}">${s}</option>`;
+                });
+                html += `</optgroup>`;
+            });
+        } else if (DEPT_SUBDEPTS_MAP[selectedDept]) {
+            const subs = DEPT_SUBDEPTS_MAP[selectedDept] || [];
+            subs.forEach(s => {
+                html += `<option value="${s}">${s}</option>`;
+            });
+        }
+        subdeptSelect.innerHTML = html;
+        if (previousVal && subdeptSelect.querySelector(`option[value="${previousVal}"]`)) {
+            subdeptSelect.value = previousVal;
+        } else {
+            subdeptSelect.value = 'all';
+        }
+    }
+
+    function onWeeklyDeptFilterChange() {
+        const deptSelect = document.getElementById('weekly-report-so-dept-filter');
+        if (!deptSelect) return;
+
+        if (currentWeeklyCategory !== 'pmd') {
+            updateWeeklySubdeptOptions(deptSelect.value);
+        }
+        currentWeeklyReportPage = 1;
+        applyWeeklyReportSoFilter();
+    }
+
+    function changeWeeklyReportPageSize(size) {
+        weeklyReportPageSize = (size === 'all') ? 'all' : (parseInt(size, 10) || 10);
+        currentWeeklyReportPage = 1;
+        renderWeeklyReportTable();
+    }
+
+    function goToWeeklyReportPage(page) {
+        const total = filteredWeeklyReportRows.length;
+        const pageSize = (weeklyReportPageSize === 'all') ? total : parseInt(weeklyReportPageSize, 10);
+        const totalPages = (pageSize > 0) ? Math.ceil(total / pageSize) : 1;
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentWeeklyReportPage = page;
+        renderWeeklyReportTable();
     }
 
     function toggleWeeklyReportSort(col) {
@@ -12837,41 +13031,257 @@ const App = (() => {
         applyWeeklyReportSoFilter();
     }
 
+    // ── Weekly Report SO: Pie Chart & Filter Logic ──────────────────
+
+    let weeklyReportPieChart = null;
+
+    function toggleWeeklyReportStatusFilter(targetStatus) {
+        const sel = document.getElementById('weekly-report-so-status-filter');
+        if (!sel) return;
+        const current = sel.value || 'all';
+        const nextVal = (current === targetStatus) ? 'all' : targetStatus;
+        sel.value = nextVal;
+        currentWeeklyReportPage = 1;
+        applyWeeklyReportSoFilter();
+    }
+
+    function renderWeeklyReportPieChart(tercapai, tidakTercapai, noData, total) {
+        const canvas = document.getElementById('chart-weekly-report-pie');
+        const statsContainer = document.getElementById('weekly-report-pie-stats');
+        if (!canvas) return;
+
+        if (weeklyReportPieChart) {
+            weeklyReportPieChart.destroy();
+            weeklyReportPieChart = null;
+        }
+
+        if (total === 0) {
+            if (typeof Chart !== 'undefined') {
+                const ctx = canvas.getContext('2d');
+                weeklyReportPieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Belum Ada Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e2e8f0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        },
+                        cutout: '68%'
+                    }
+                });
+            }
+            if (statsContainer) {
+                statsContainer.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.75rem 0.5rem;">Tidak ada data site</div>';
+            }
+            return;
+        }
+
+        const labels = ['Tercapai', 'Tidak Tercapai', 'Belum Ada Data'];
+        const data = [tercapai, tidakTercapai, noData];
+        const colors = ['#16a34a', '#dc2626', '#94a3b8'];
+
+        if (typeof Chart !== 'undefined') {
+            const ctx = canvas.getContext('2d');
+            weeklyReportPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'],
+                    onClick: (evt, elements) => {
+                        if (elements && elements.length > 0) {
+                            const idx = elements[0].index;
+                            let target = 'all';
+                            if (idx === 0) target = 'tercapai';
+                            else if (idx === 1) target = 'tidak_tercapai';
+                            else if (idx === 2) target = 'no_data';
+                            toggleWeeklyReportStatusFilter(target);
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        event.native.target.style.cursor = (chartElement && chartElement.length > 0) ? 'pointer' : 'default';
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            onClick: (e, legendItem) => {
+                                const text = legendItem.text;
+                                let target = 'all';
+                                if (text === 'Tercapai') target = 'tercapai';
+                                else if (text === 'Tidak Tercapai') target = 'tidak_tercapai';
+                                else if (text === 'Belum Ada Data') target = 'no_data';
+                                toggleWeeklyReportStatusFilter(target);
+                            },
+                            onHover: (e, legendItem, legend) => {
+                                legend.chart.canvas.style.cursor = 'pointer';
+                            },
+                            labels: {
+                                boxWidth: 12,
+                                padding: 12,
+                                font: {
+                                    family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                                    size: 11,
+                                    weight: '600'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.raw || 0;
+                                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                    return ` ${context.label}: ${val} sites (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '62%'
+                }
+            });
+        }
+
+        if (statsContainer) {
+            const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
+            const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
+            const pctNoData = total > 0 ? Math.round((noData / total) * 100) : 0;
+            const thresholdLabel = (currentWeeklyCategory === 'pmd') ? '98%' : '97%';
+            const statusSel = document.getElementById('weekly-report-so-status-filter');
+            const curStatus = statusSel ? statusSel.value : 'all';
+            const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
+            const activeTidak = (curStatus === 'tidak_tercapai') ? ' active' : '';
+            const activeNoData = (curStatus === 'no_data') ? ' active' : '';
+            const activeAll = (curStatus === 'all') ? ' active' : '';
+
+            let statsHtml = `
+                <div class="so-pie-stat-row${activeTercapai}" onclick="App.toggleWeeklyReportStatusFilter('tercapai')" style="cursor: pointer; padding: 4px 6px; border-radius: 6px;">
+                    <span class="so-pie-stat-label">
+                        <span class="so-pie-stat-dot" style="background-color: #16a34a;"></span>
+                        Tercapai (≥${thresholdLabel})
+                    </span>
+                    <span class="so-pie-stat-val" style="color: #16a34a;">
+                        ${tercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTercapai}%)</span>
+                    </span>
+                </div>
+                <div class="so-pie-stat-row${activeTidak}" onclick="App.toggleWeeklyReportStatusFilter('tidak_tercapai')" style="cursor: pointer; padding: 4px 6px; border-radius: 6px;">
+                    <span class="so-pie-stat-label">
+                        <span class="so-pie-stat-dot" style="background-color: #dc2626;"></span>
+                        Tidak Tercapai (<${thresholdLabel})
+                    </span>
+                    <span class="so-pie-stat-val" style="color: #dc2626;">
+                        ${tidakTercapai} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctTidak}%)</span>
+                    </span>
+                </div>
+                <div class="so-pie-stat-row${activeNoData}" onclick="App.toggleWeeklyReportStatusFilter('no_data')" style="cursor: pointer; padding: 4px 6px; border-radius: 6px;">
+                    <span class="so-pie-stat-label">
+                        <span class="so-pie-stat-dot" style="background-color: #94a3b8;"></span>
+                        Belum Ada Data
+                    </span>
+                    <span class="so-pie-stat-val" style="color: #64748b;">
+                        ${noData} sites <span style="font-weight: 500; font-size: 11px; color: #64748b;">(${pctNoData}%)</span>
+                    </span>
+                </div>
+                <div class="so-pie-stat-row${activeAll}" onclick="App.toggleWeeklyReportStatusFilter('all')" style="cursor: pointer; margin-top: 4px; padding: 6px 6px 3px; border-top: 1px dashed #e2e8f0; border-radius: 6px;">
+                    <span class="so-pie-stat-label" style="font-weight: 600; color: #1e293b;">
+                        Total Sites
+                    </span>
+                    <span class="so-pie-stat-val" style="font-weight: 700; color: #0f172a;">${total} sites</span>
+                </div>
+            `;
+
+            statsContainer.innerHTML = statsHtml;
+        }
+    }
+
     function applyWeeklyReportSoFilter() {
-        const tbody = document.getElementById('weekly-report-so-tbody');
-        if (!tbody || !weeklySummaryData) return;
+        if (!weeklySummaryData) return;
 
         const reportData = weeklySummaryData.report_so || [];
         const deptFilter = document.getElementById('weekly-report-so-dept-filter')?.value || 'all';
+        const subdeptFilter = document.getElementById('weekly-report-so-subdept-filter')?.value || 'all';
         const statusFilter = document.getElementById('weekly-report-so-status-filter')?.value || 'all';
         const searchInput = document.getElementById('weekly-report-so-search');
         const query = (searchInput?.value || '').toLowerCase().trim();
 
         const targetPct = weeklySummaryData.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
 
-        let filtered = reportData.slice();
+        // Base rows filtered by Dept/Subdept & Search query (used for pie chart calculations)
+        let baseRows = reportData.slice();
 
-        if (deptFilter !== 'all') {
-            filtered = filtered.filter(r => (r.dept || '').toUpperCase() === deptFilter.toUpperCase());
-        }
-
-        if (statusFilter !== 'all') {
-            if (statusFilter === 'tercapai') {
-                filtered = filtered.filter(r => r.pct >= targetPct);
-            } else {
-                filtered = filtered.filter(r => r.pct < targetPct);
+        if (currentWeeklyCategory === 'pmd') {
+            if (deptFilter !== 'all') {
+                baseRows = baseRows.filter(r => (r.sub_dept || '').toUpperCase() === deptFilter.toUpperCase());
+            }
+        } else {
+            // Outlet Regional
+            if (deptFilter !== 'all') {
+                baseRows = baseRows.filter(r => (r.dept || '').toUpperCase() === deptFilter.toUpperCase());
+            }
+            if (subdeptFilter !== 'all') {
+                baseRows = baseRows.filter(r => (r.sub_dept || '').toUpperCase() === subdeptFilter.toUpperCase());
             }
         }
 
         if (query) {
-            filtered = filtered.filter(r => {
+            baseRows = baseRows.filter(r => {
                 const sc = (r.sitecode || '').toLowerCase();
                 const ns = (r.name_site || '').toLowerCase();
                 const dp = (r.dept || '').toLowerCase();
-                return sc.includes(query) || ns.includes(query) || dp.includes(query);
+                const sd = (r.sub_dept || '').toLowerCase();
+                return sc.includes(query) || ns.includes(query) || dp.includes(query) || sd.includes(query);
             });
         }
 
+        // Count for Pie Chart: Tercapai vs Tidak Tercapai vs Belum Ada Data
+        let countTercapai = 0;
+        let countTidakTercapai = 0;
+        let countNoData = 0;
+        baseRows.forEach(r => {
+            if (r.has_data && r.pct !== null && r.pct !== undefined) {
+                if (r.pct >= targetPct) {
+                    countTercapai++;
+                } else {
+                    countTidakTercapai++;
+                }
+            } else {
+                countNoData++;
+            }
+        });
+
+        // Render Pie Chart
+        renderWeeklyReportPieChart(countTercapai, countTidakTercapai, countNoData, baseRows.length);
+
+        // Filter by Status for Table Display
+        let filtered = baseRows.slice();
+        if (statusFilter !== 'all') {
+            if (statusFilter === 'tercapai') {
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && r.pct >= targetPct);
+            } else if (statusFilter === 'tidak_tercapai') {
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && r.pct < targetPct);
+            } else if (statusFilter === 'no_data') {
+                filtered = filtered.filter(r => !r.has_data || r.pct === null || r.pct === undefined);
+            }
+        }
+
+        // Sorting
         if (weeklyReportSortColumn) {
             const isNumeric = ['match_qty', 'physic_qty', 'db_qty', 'target_qty', 'pct'].includes(weeklyReportSortColumn);
             filtered.sort((a, b) => {
@@ -12879,8 +13289,8 @@ const App = (() => {
                 let valB = b[weeklyReportSortColumn];
 
                 if (isNumeric) {
-                    valA = parseFloat(valA) || 0;
-                    valB = parseFloat(valB) || 0;
+                    valA = (valA !== null && valA !== undefined) ? parseFloat(valA) : -999999;
+                    valB = (valB !== null && valB !== undefined) ? parseFloat(valB) : -999999;
                     return weeklyReportSortDirection === 'asc' ? valA - valB : valB - valA;
                 } else {
                     valA = (valA || '').toString();
@@ -12890,7 +13300,42 @@ const App = (() => {
             });
         }
 
-        if (filtered.length === 0) {
+        filteredWeeklyReportRows = filtered;
+        renderWeeklyReportTable();
+    }
+
+    function renderWeeklyReportTable() {
+        const tbody = document.getElementById('weekly-report-so-tbody');
+        const tfoot = document.getElementById('weekly-report-so-tfoot');
+        const info = document.getElementById('weekly-report-so-table-info');
+        const controls = document.getElementById('weekly-report-so-pagination-controls');
+
+        if (!tbody) return;
+
+        const total = filteredWeeklyReportRows.length;
+        const targetPct = weeklySummaryData?.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+        const statusFilter = document.getElementById('weekly-report-so-status-filter')?.value || 'all';
+
+        const pageSize = (weeklyReportPageSize === 'all') ? total : parseInt(weeklyReportPageSize, 10);
+        const totalPages = (pageSize > 0) ? Math.ceil(total / pageSize) : 1;
+
+        if (currentWeeklyReportPage < 1) currentWeeklyReportPage = 1;
+        if (currentWeeklyReportPage > totalPages) currentWeeklyReportPage = totalPages;
+
+        const startIndex = total > 0 ? (currentWeeklyReportPage - 1) * pageSize : 0;
+        const endIndex = (weeklyReportPageSize === 'all') ? total : Math.min(startIndex + pageSize, total);
+        const pageRows = (total > 0) ? ((weeklyReportPageSize === 'all') ? filteredWeeklyReportRows : filteredWeeklyReportRows.slice(startIndex, endIndex)) : [];
+
+        // Update pagination info
+        if (info) {
+            const startDisplay = total > 0 ? (startIndex + 1) : 0;
+            info.textContent = `Menampilkan ${startDisplay.toLocaleString('id-ID')} sampai ${endIndex.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
+        }
+
+        // Render pagination controls
+        renderWeeklyPaginationControls(controls, currentWeeklyReportPage, totalPages, 'App.goToWeeklyReportPage');
+
+        if (total === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
@@ -12898,15 +13343,31 @@ const App = (() => {
                     </td>
                 </tr>
             `;
+            if (tfoot) tfoot.innerHTML = '';
             return;
         }
 
         let html = '';
-        filtered.forEach(r => {
-            const isTercapai = r.pct >= targetPct;
-            const statusBadge = isTercapai
-                ? `<span class="badge badge-success" style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tercapai</span>`
-                : `<span class="badge badge-danger" style="background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tidak Tercapai</span>`;
+        pageRows.forEach(r => {
+            const hasData = r.has_data && r.pct !== null && r.pct !== undefined;
+            const isTercapai = hasData && (r.pct >= targetPct);
+
+            let statusBadge = '';
+            if (hasData) {
+                statusBadge = isTercapai
+                    ? `<span class="badge badge-success" style="background: #dcfce7; color: #166534; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tercapai</span>`
+                    : `<span class="badge badge-danger" style="background: #fee2e2; color: #991b1b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Tidak Tercapai</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Belum Ada Data</span>`;
+            }
+
+            const deptDisplay = currentWeeklyCategory === 'pmd'
+                ? escapeHtml(r.sub_dept || r.dept || '-')
+                : `${escapeHtml(r.dept || '-')}${r.sub_dept ? ' / ' + escapeHtml(r.sub_dept) : ''}`;
+
+            const pctDisplay = hasData
+                ? `<span style="font-weight: 700; color: ${isTercapai ? '#16a34a' : '#dc2626'};">${formatPercent(r.pct)}</span>`
+                : `<span style="color: #94a3b8; font-weight: 500;">-</span>`;
 
             html += `
                 <tr>
@@ -12917,21 +13378,99 @@ const App = (() => {
                         ${escapeHtml(r.name_site || '-')}
                     </td>
                     <td class="text-center" style="font-size: 12px; font-weight: 600; color: #475569;">
-                        ${escapeHtml(r.dept || '-')}
+                        ${deptDisplay}
                     </td>
-                    <td class="text-right">${formatNumber(r.match_qty)}</td>
-                    <td class="text-right">${formatNumber(r.physic_qty)}</td>
-                    <td class="text-right">${formatNumber(r.db_qty)}</td>
-                    <td class="text-right" style="font-weight: 600;">${formatNumber(r.target_qty)}</td>
-                    <td class="text-right" style="font-weight: 700; color: ${isTercapai ? '#16a34a' : '#dc2626'};">
-                        ${formatPercent(r.pct)}
-                    </td>
+                    <td class="text-right">${hasData ? formatNumber(r.match_qty) : '-'}</td>
+                    <td class="text-right">${hasData ? formatNumber(r.physic_qty) : '-'}</td>
+                    <td class="text-right">${hasData ? formatNumber(r.db_qty) : '-'}</td>
+                    <td class="text-right" style="font-weight: 600;">${hasData ? formatNumber(r.target_qty) : '-'}</td>
+                    <td class="text-right">${pctDisplay}</td>
                     <td class="text-center">${statusBadge}</td>
                 </tr>
             `;
         });
 
         tbody.innerHTML = html;
+
+        // Render Grand Total row across all filtered rows
+        if (tfoot) {
+            let sumMatch = 0, sumPhysic = 0, sumDb = 0, sumTarget = 0, sumPct = 0, countWithData = 0;
+            filteredWeeklyReportRows.forEach(r => {
+                if (r.has_data && r.pct !== null && r.pct !== undefined) {
+                    sumMatch += (parseFloat(r.match_qty) || 0);
+                    sumPhysic += (parseFloat(r.physic_qty) || 0);
+                    sumDb += (parseFloat(r.db_qty) || 0);
+                    sumTarget += (parseFloat(r.target_qty) || 0);
+                    sumPct += (parseFloat(r.pct) || 0);
+                    countWithData++;
+                }
+            });
+
+            const avgPct = countWithData > 0 ? (sumPct / countWithData) : 0;
+            const isOverallTercapai = avgPct >= targetPct;
+            let filterNote = '';
+            if (statusFilter === 'tercapai') filterNote = ' - Tercapai';
+            else if (statusFilter === 'tidak_tercapai') filterNote = ' - Tidak Tercapai';
+            else if (statusFilter === 'no_data') filterNote = ' - Belum Ada Data';
+
+            tfoot.innerHTML = `
+                <tr class="table-summary-row" style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                    <td colspan="3" style="color: #0f172a; padding: 0.75rem 1rem; text-align: left;">
+                        Grand Total (${total} Sites${filterNote})
+                    </td>
+                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumMatch)}</td>
+                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumPhysic)}</td>
+                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumDb)}</td>
+                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumTarget)}</td>
+                    <td class="text-right" style="font-weight: 700; color: ${countWithData > 0 ? (isOverallTercapai ? '#16a34a' : '#dc2626') : '#64748b'}; padding: 0.75rem 0.5rem;">
+                        ${countWithData > 0 ? formatPercent(avgPct) : '-'}
+                    </td>
+                    <td class="text-center" style="padding: 0.75rem 0.5rem;">
+                        ${countWithData > 0 ? `
+                        <span class="badge ${isOverallTercapai ? 'badge-success' : 'badge-danger'}"
+                            style="background: ${isOverallTercapai ? '#dcfce7' : '#fee2e2'}; color: ${isOverallTercapai ? '#166534' : '#991b1b'}; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+                            ${isOverallTercapai ? 'Tercapai' : 'Tidak Tercapai'}
+                        </span>
+                        ` : `<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">-</span>`}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function renderWeeklyPaginationControls(container, currentPage, totalPages, clickHandler) {
+        if (!container) return;
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        html += `<button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="${clickHandler}(${currentPage - 1})">&laquo; Prev</button>`;
+
+        const maxButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="${clickHandler}(1)">1</button>`;
+            if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            html += `<button class="pagination-btn ${p === currentPage ? 'active' : ''}" onclick="${clickHandler}(${p})">${p}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+            html += `<button class="pagination-btn" onclick="${clickHandler}(${totalPages})">${totalPages}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="${clickHandler}(${currentPage + 1})">Next &raquo;</button>`;
+        container.innerHTML = html;
     }
 
     // ── Public Interface ───────────────────────────────────────
@@ -13169,7 +13708,13 @@ const App = (() => {
         onWeeklyScorecardExecutionFilterChange,
         toggleWeeklyScorecardExecutionFilter,
         applyWeeklyReportSoFilter,
+        renderWeeklyReportTable,
+        changeWeeklyReportPageSize,
+        goToWeeklyReportPage,
+        onWeeklyDeptFilterChange,
         toggleWeeklyReportSort,
+        toggleWeeklyReportStatusFilter,
+        renderWeeklyReportPieChart,
     };
 })();
 

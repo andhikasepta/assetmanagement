@@ -50,7 +50,7 @@ try {
             }
 
             // Target percentage based on category
-            $targetPct = ($category === 'pmd') ? 98.0 : 97.0;
+            $targetPct = ($category === 'pmd') ? 98.0 : 85.0;
 
             // Helper to get achievements for a given period
             $calcPeriodStats = function (int $m, int $w, int $y, string $cat) use ($db, $targetPct) {
@@ -68,24 +68,14 @@ try {
                 $recs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 $recByCode = [];
+                $recList = [];
                 foreach ($recs as $r) {
-                    $pct = (float) $r['total_physic_pct'];
-                    $parts = explode('-', $r['profile']);
+                    $recList[] = $r;
+                    $parts = explode('-', $r['profile'] ?? '');
                     foreach ($parts as $p) {
                         $token = strtoupper(trim($p));
                         if ($token !== '') {
-                            if (!isset($recByCode[$token])) {
-                                $recByCode[$token] = [
-                                    'pct_sum' => $pct,
-                                    'count'   => 1,
-                                    'pct'     => $pct,
-                                    'record'  => $r,
-                                ];
-                            } else {
-                                $recByCode[$token]['pct_sum'] += $pct;
-                                $recByCode[$token]['count']++;
-                                $recByCode[$token]['pct'] = $recByCode[$token]['pct_sum'] / $recByCode[$token]['count'];
-                            }
+                            $recByCode[$token][] = $r;
                         }
                     }
                 }
@@ -96,6 +86,7 @@ try {
                            COALESCE(is_active, TRUE) as is_active, 
                            COALESCE(is_counted, TRUE) as is_counted 
                     FROM site_regional
+                    ORDER BY dept ASC, sub_dept ASC, sitecode ASC
                 ");
                 $allSites = $sitesStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -159,10 +150,64 @@ try {
                     if (isset($deptStats[$dept])) $deptStats[$dept]['total']++;
                     if (isset($subDeptStats[$subDept])) $subDeptStats[$subDept]['total']++;
 
-                    if (isset($recByCode[$sc])) {
-                        $pct = $recByCode[$sc]['pct'];
-                        $recRow = $recByCode[$sc]['record'];
+                    $matchedRecs = [];
+                    if ($sc !== '') {
+                        if (isset($recByCode[$sc])) {
+                            $matchedRecs = $recByCode[$sc];
+                        } else {
+                            foreach ($recList as $item) {
+                                $prof = $item['profile'] ?? '';
+                                if (
+                                    stripos($prof, " - {$sc} - ") !== false ||
+                                    stripos($prof, "- {$sc} -") !== false ||
+                                    stripos($prof, " {$sc} ") !== false ||
+                                    stripos($prof, $sc) !== false
+                                ) {
+                                    $matchedRecs[] = $item;
+                                }
+                            }
+                            if (!empty($matchedRecs)) {
+                                $recByCode[$sc] = $matchedRecs;
+                            }
+                        }
+                    }
 
+                    $hasData = !empty($matchedRecs);
+                    $matchQty = 0;
+                    $physicQty = 0;
+                    $dbQty = 0;
+                    $actualQty = 0;
+                    $targetQty = 0;
+                    $pct = null;
+
+                    if ($hasData) {
+                        if (count($matchedRecs) === 1) {
+                            $recRow = $matchedRecs[0];
+                            $matchQty = (int) ($recRow['match_physic_qty'] ?? 0);
+                            $physicQty = (int) ($recRow['physic_physic_qty'] ?? 0);
+                            $dbQty = (int) ($recRow['db_physic_qty'] ?? 0);
+                            $actualQty = (int) ($recRow['total_physic_actual'] ?? 0);
+                            $targetQty = (int) ($recRow['total_physic_target'] ?? 0);
+                            $pct = ($recRow['total_physic_pct'] !== null && $recRow['total_physic_pct'] !== '') ? (float) $recRow['total_physic_pct'] : null;
+                        } else {
+                            foreach ($matchedRecs as $recRow) {
+                                $matchQty += (int) ($recRow['match_physic_qty'] ?? 0);
+                                $physicQty += (int) ($recRow['physic_physic_qty'] ?? 0);
+                                $dbQty += (int) ($recRow['db_physic_qty'] ?? 0);
+                                $actualQty += (int) ($recRow['total_physic_actual'] ?? 0);
+                                $targetQty += (int) ($recRow['total_physic_target'] ?? 0);
+                            }
+                            if ($targetQty > 0) {
+                                $pct = round(($actualQty / $targetQty) * 100.0, 2);
+                            } elseif ($actualQty > 0) {
+                                $pct = 100.0;
+                            } else {
+                                $pct = 0.0;
+                            }
+                        }
+                    }
+
+                    if ($hasData && $pct !== null) {
                         $catSum += $pct;
                         $catCount++;
 
@@ -174,40 +219,29 @@ try {
                             $subDeptStats[$subDept]['sum'] += $pct;
                             $subDeptStats[$subDept]['count']++;
                         }
-
-                        $matchedSites[$sc] = [
-                            'sitecode'   => $sc,
-                            'name_site'  => $s['name_site'],
-                            'dept'       => $dept,
-                            'sub_dept'   => $subDept,
-                            'regional'   => $s['regional'] ?? '',
-                            'pct'        => round($pct, 2),
-                            'match_qty'  => (int) ($recRow['match_physic_qty'] ?? 0),
-                            'physic_qty' => (int) ($recRow['physic_physic_qty'] ?? 0),
-                            'db_qty'     => (int) ($recRow['db_physic_qty'] ?? 0),
-                            'actual_qty' => (int) ($recRow['total_physic_actual'] ?? 0),
-                            'target_qty' => (int) ($recRow['total_physic_target'] ?? 0),
-                            'status'     => ($pct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai',
-                            'executed'   => ((int) ($recRow['total_physic_actual'] ?? 0) > 0),
-                        ];
+                        $status = ($pct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai';
+                        $executed = ($actualQty > 0);
                     } else {
-                        // Unmatched site
-                        $matchedSites[$sc] = [
-                            'sitecode'   => $sc,
-                            'name_site'  => $s['name_site'],
-                            'dept'       => $dept,
-                            'sub_dept'   => $subDept,
-                            'regional'   => $s['regional'] ?? '',
-                            'pct'        => 0.0,
-                            'match_qty'  => 0,
-                            'physic_qty' => 0,
-                            'db_qty'     => 0,
-                            'actual_qty' => 0,
-                            'target_qty' => 0,
-                            'status'     => 'Tidak Tercapai',
-                            'executed'   => false,
-                        ];
+                        $status = 'Belum Ada Data';
+                        $executed = false;
                     }
+
+                    $matchedSites[$sc] = [
+                        'sitecode'   => $sc,
+                        'name_site'  => $s['name_site'] ?? '',
+                        'dept'       => $dept,
+                        'sub_dept'   => $subDept,
+                        'regional'   => $s['regional'] ?? '',
+                        'pct'        => ($pct !== null ? round($pct, 2) : null),
+                        'match_qty'  => $matchQty,
+                        'physic_qty' => $physicQty,
+                        'db_qty'     => $dbQty,
+                        'actual_qty' => $actualQty,
+                        'target_qty' => $targetQty,
+                        'status'     => $status,
+                        'has_data'   => $hasData,
+                        'executed'   => $executed,
+                    ];
                 }
 
                 $mainPct = ($catCount > 0) ? round($catSum / $catCount, 2) : 0.0;
@@ -218,7 +252,7 @@ try {
                         'pct'           => $pct,
                         'sites_counted' => $count,
                         'total_sites'   => $total,
-                        'status'        => ($pct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai',
+                        'status'        => ($total === 0 || $count === 0) ? 'Belum Ada Data' : (($pct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
                     ];
                 };
 
@@ -237,7 +271,7 @@ try {
                         'pct'           => $mainPct,
                         'sites_counted' => $catCount,
                         'total_sites'   => $catTotalSites,
-                        'status'        => ($mainPct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai',
+                        'status'        => ($catTotalSites === 0 || $catCount === 0) ? 'Belum Ada Data' : (($mainPct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
                     ],
                     'depts'            => $deptsFormatted,
                     'sub_depts'        => $subDeptsFormatted,

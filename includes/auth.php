@@ -20,7 +20,13 @@ if (empty($_SESSION['csrf_token'])) {
  */
 function getCurrentUser(): ?array
 {
-    return $_SESSION['user'] ?? null;
+    if (!empty($_SESSION['user'])) {
+        if (!isset($_SESSION['user']['permissions']['can_access_user_management'])) {
+            $_SESSION['user']['permissions']['can_access_user_management'] = true;
+        }
+        return $_SESSION['user'];
+    }
+    return null;
 }
 
 /**
@@ -56,7 +62,7 @@ function attemptLogin(string $username, string $password): array
     // Try checking database first
     try {
         $db = getDbConnection();
-        $stmt = $db->prepare('SELECT id, username, name, password, role, can_access_all_summary, can_access_weekly_summary, can_access_master_data, can_access_master_data_weekly, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE username = :username LIMIT 1');
+        $stmt = $db->prepare('SELECT id, username, name, password, role, can_access_all_summary, can_access_weekly_summary, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE username = :username LIMIT 1');
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -90,6 +96,7 @@ function attemptLogin(string $username, string $password): array
                         'can_access_weekly_summary'      => filter_var($user['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data'         => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data_weekly'  => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_user_management'     => filter_var($user['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_master_add_import'          => filter_var($user['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_master_edit'                => filter_var($user['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_master_delete'              => filter_var($user['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
@@ -120,6 +127,7 @@ function attemptLogin(string $username, string $password): array
                 'can_access_weekly_summary'     => true,
                 'can_access_master_data'        => true,
                 'can_access_master_data_weekly' => true,
+                'can_access_user_management'    => true,
                 'can_master_add_import'         => true,
                 'can_master_edit'               => true,
                 'can_master_delete'             => true,

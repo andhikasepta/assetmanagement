@@ -14,6 +14,12 @@ header('Content-Type: application/json; charset=utf-8');
 // Must be logged in
 requireAuth();
 
+if (!empty($_SESSION['user']['permissions']) && ($_SESSION['user']['permissions']['can_access_user_management'] ?? true) === false) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Anda tidak memiliki hak akses untuk User Management.']);
+    exit;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
@@ -32,6 +38,7 @@ try {
                 COALESCE(can_access_weekly_summary, TRUE) as can_access_weekly_summary,
                 COALESCE(can_access_master_data, TRUE) as can_access_master_data,
                 COALESCE(can_access_master_data_weekly, TRUE) as can_access_master_data_weekly,
+                COALESCE(can_access_user_management, TRUE) as can_access_user_management,
                 COALESCE(can_master_add_import, TRUE) as can_master_add_import,
                 COALESCE(can_master_edit, TRUE) as can_master_edit,
                 COALESCE(can_master_delete, TRUE) as can_master_delete,
@@ -51,6 +58,7 @@ try {
             $u['can_access_weekly_summary'] = filter_var($u['can_access_weekly_summary'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data'] = filter_var($u['can_access_master_data'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data_weekly'] = filter_var($u['can_access_master_data_weekly'], FILTER_VALIDATE_BOOLEAN);
+            $u['can_access_user_management'] = filter_var($u['can_access_user_management'], FILTER_VALIDATE_BOOLEAN);
             $u['can_master_add_import'] = filter_var($u['can_master_add_import'], FILTER_VALIDATE_BOOLEAN);
             $u['can_master_edit'] = filter_var($u['can_master_edit'], FILTER_VALIDATE_BOOLEAN);
             $u['can_master_delete'] = filter_var($u['can_master_delete'], FILTER_VALIDATE_BOOLEAN);
@@ -102,6 +110,7 @@ try {
         $canAccessWeeklySummary = !empty($input['can_access_weekly_summary']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
+        $canAccessUserManagement = !empty($input['can_access_user_management']);
         $canMasterAddImport = !empty($input['can_master_add_import']);
         $canMasterEdit = !empty($input['can_master_edit']);
         $canMasterDelete = !empty($input['can_master_delete']);
@@ -120,6 +129,7 @@ try {
                 can_access_weekly_summary, 
                 can_access_master_data, 
                 can_access_master_data_weekly, 
+                can_access_user_management, 
                 can_master_add_import, 
                 can_master_edit, 
                 can_master_delete,
@@ -134,6 +144,7 @@ try {
                 :can_weekly, 
                 :can_md, 
                 :can_md_wk, 
+                :can_usr_mgmt, 
                 :can_add, 
                 :can_edit, 
                 :can_del,
@@ -143,19 +154,20 @@ try {
         ');
 
         $stmt->execute([
-            ':username'   => $username,
-            ':name'       => $name,
-            ':password'   => $hashedPassword,
-            ':role'       => 'admin',
-            ':can_all'    => $canAccessAllSummary ? 't' : 'f',
-            ':can_weekly' => $canAccessWeeklySummary ? 't' : 'f',
-            ':can_md'     => $canAccessMasterData ? 't' : 'f',
-            ':can_md_wk'  => $canAccessMasterDataWeekly ? 't' : 'f',
-            ':can_add'    => $canMasterAddImport ? 't' : 'f',
-            ':can_edit'   => $canMasterEdit ? 't' : 'f',
-            ':can_del'    => $canMasterDelete ? 't' : 'f',
-            ':can_wk_add' => $canMasterWeeklyAddImport ? 't' : 'f',
-            ':can_wk_del' => $canMasterWeeklyDelete ? 't' : 'f',
+            ':username'     => $username,
+            ':name'         => $name,
+            ':password'     => $hashedPassword,
+            ':role'         => 'admin',
+            ':can_all'      => $canAccessAllSummary ? 't' : 'f',
+            ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+            ':can_md'       => $canAccessMasterData ? 't' : 'f',
+            ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
+            ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
+            ':can_add'      => $canMasterAddImport ? 't' : 'f',
+            ':can_edit'     => $canMasterEdit ? 't' : 'f',
+            ':can_del'      => $canMasterDelete ? 't' : 'f',
+            ':can_wk_add'   => $canMasterWeeklyAddImport ? 't' : 'f',
+            ':can_wk_del'   => $canMasterWeeklyDelete ? 't' : 'f',
         ]);
 
         $newId = (int) $stmt->fetchColumn();
@@ -202,6 +214,7 @@ try {
         $canAccessWeeklySummary = !empty($input['can_access_weekly_summary']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
+        $canAccessUserManagement = !empty($input['can_access_user_management']);
         $canMasterAddImport = !empty($input['can_master_add_import']);
         $canMasterEdit = !empty($input['can_master_edit']);
         $canMasterDelete = !empty($input['can_master_delete']);
@@ -218,6 +231,7 @@ try {
             $canAccessWeeklySummary = true;
             $canAccessMasterData = true;
             $canAccessMasterDataWeekly = true;
+            $canAccessUserManagement = true;
             $canMasterAddImport = true;
             $canMasterEdit = true;
             $canMasterDelete = true;
@@ -236,6 +250,7 @@ try {
                     can_access_weekly_summary = :can_weekly,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
+                    can_access_user_management = :can_usr_mgmt,
                     can_master_add_import = :can_add,
                     can_master_edit = :can_edit,
                     can_master_delete = :can_del,
@@ -245,19 +260,20 @@ try {
                 WHERE id = :id
             ');
             $stmt->execute([
-                ':name'       => $name,
-                ':username'   => $username,
-                ':password'   => $hashedPassword,
-                ':can_all'    => $canAccessAllSummary ? 't' : 'f',
-                ':can_weekly' => $canAccessWeeklySummary ? 't' : 'f',
-                ':can_md'     => $canAccessMasterData ? 't' : 'f',
-                ':can_md_wk'  => $canAccessMasterDataWeekly ? 't' : 'f',
-                ':can_add'    => $canMasterAddImport ? 't' : 'f',
-                ':can_edit'   => $canMasterEdit ? 't' : 'f',
-                ':can_del'    => $canMasterDelete ? 't' : 'f',
-                ':can_wk_add' => $canMasterWeeklyAddImport ? 't' : 'f',
-                ':can_wk_del' => $canMasterWeeklyDelete ? 't' : 'f',
-                ':id'         => $id,
+                ':name'         => $name,
+                ':username'     => $username,
+                ':password'     => $hashedPassword,
+                ':can_all'      => $canAccessAllSummary ? 't' : 'f',
+                ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+                ':can_md'       => $canAccessMasterData ? 't' : 'f',
+                ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
+                ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
+                ':can_add'      => $canMasterAddImport ? 't' : 'f',
+                ':can_edit'     => $canMasterEdit ? 't' : 'f',
+                ':can_del'      => $canMasterDelete ? 't' : 'f',
+                ':can_wk_add'   => $canMasterWeeklyAddImport ? 't' : 'f',
+                ':can_wk_del'   => $canMasterWeeklyDelete ? 't' : 'f',
+                ':id'           => $id,
             ]);
         } else {
             $stmt = $db->prepare('
@@ -268,6 +284,7 @@ try {
                     can_access_weekly_summary = :can_weekly,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
+                    can_access_user_management = :can_usr_mgmt,
                     can_master_add_import = :can_add,
                     can_master_edit = :can_edit,
                     can_master_delete = :can_del,
@@ -277,18 +294,19 @@ try {
                 WHERE id = :id
             ');
             $stmt->execute([
-                ':name'       => $name,
-                ':username'   => $username,
-                ':can_all'    => $canAccessAllSummary ? 't' : 'f',
-                ':can_weekly' => $canAccessWeeklySummary ? 't' : 'f',
-                ':can_md'     => $canAccessMasterData ? 't' : 'f',
-                ':can_md_wk'  => $canAccessMasterDataWeekly ? 't' : 'f',
-                ':can_add'    => $canMasterAddImport ? 't' : 'f',
-                ':can_edit'   => $canMasterEdit ? 't' : 'f',
-                ':can_del'    => $canMasterDelete ? 't' : 'f',
-                ':can_wk_add' => $canMasterWeeklyAddImport ? 't' : 'f',
-                ':can_wk_del' => $canMasterWeeklyDelete ? 't' : 'f',
-                ':id'         => $id,
+                ':name'         => $name,
+                ':username'     => $username,
+                ':can_all'      => $canAccessAllSummary ? 't' : 'f',
+                ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+                ':can_md'       => $canAccessMasterData ? 't' : 'f',
+                ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
+                ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
+                ':can_add'      => $canMasterAddImport ? 't' : 'f',
+                ':can_edit'     => $canMasterEdit ? 't' : 'f',
+                ':can_del'      => $canMasterDelete ? 't' : 'f',
+                ':can_wk_add'   => $canMasterWeeklyAddImport ? 't' : 'f',
+                ':can_wk_del'   => $canMasterWeeklyDelete ? 't' : 'f',
+                ':id'           => $id,
             ]);
         }
 
@@ -302,6 +320,7 @@ try {
                 'can_access_weekly_summary'     => $canAccessWeeklySummary,
                 'can_access_master_data'        => $canAccessMasterData,
                 'can_access_master_data_weekly' => $canAccessMasterDataWeekly,
+                'can_access_user_management'    => $canAccessUserManagement,
                 'can_master_add_import'         => $canMasterAddImport,
                 'can_master_edit'               => $canMasterEdit,
                 'can_master_delete'             => $canMasterDelete,

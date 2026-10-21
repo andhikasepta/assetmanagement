@@ -116,53 +116,39 @@ $monthNames = [
                 Master Data Weekly
             </button>
             <button type="button" class="nav-link" data-page="user-management" id="tab-user-management"
-                onclick="App.navigateTo('user-management')" style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                onclick="App.navigateTo('user-management')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_user_management'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 User Management
             </button>
         </nav>
 
-        <!-- Navbar Actions: User Profile Dropdown & Public Login Button -->
+        <!-- Navbar Actions: Public Login Button & Direct Logout Button -->
         <div class="navbar-actions">
-            <!-- User Dropdown (Admin Session) -->
-            <div class="user-dropdown-container" id="user-dropdown-container"
-                style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
-                <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
-                    onclick="App.toggleUserDropdown(event)">
-                    <div class="user-avatar-circle" id="user-avatar-text">
-                        A
-                    </div>
-                    <span class="user-name-text" id="user-display-name">
-                        ASSET MANAGEMENT ADMINISTRATOR
-                    </span>
-                    <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.2">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </button>
-                <div class="user-dropdown-menu" id="user-dropdown-menu">
-                    <button type="button" onclick="App.navigateTo('user-management'); App.toggleUserDropdown(event);" class="user-dropdown-item"
-                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1rem; color: #1e293b; font-size: 13px;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                        <span>User Management</span>
-                    </button>
-                    <div style="border-top: 1px solid #f1f5f9; margin: 4px 0;"></div>
-                    <button type="button" onclick="App.logout()" class="user-dropdown-item text-danger"
-                        style="background: none; border: none; width: 100%; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1rem;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        <span>Logout</span>
-                    </button>
-                </div>
-            </div>
+            <!-- User Session: Logout Button (Direct, no dropdown) -->
+            <button type="button" class="nav-logout-btn" id="btn-navbar-logout"
+                onclick="App.logout()" title="Logout"
+                style="<?= $isLoggedIn ? 'display: inline-flex;' : 'display: none;' ?>">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Logout</span>
+            </button>
+
+            <!-- Public Session: Login Button -->
+            <button type="button" class="nav-login-btn" id="btn-navbar-login"
+                onclick="App.openLoginModal(sessionStorage.getItem('active_page') || 'summary')"
+                style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                    <polyline points="10 17 15 12 10 7"></polyline>
+                    <line x1="15" y1="12" x2="3" y2="12"></line>
+                </svg>
+                <span>Login</span>
+            </button>
         </div>
     </header>
 
@@ -2588,7 +2574,7 @@ $monthNames = [
     <!-- Global Auth Configuration -->
     <script>
         window.AUTH_USER = <?= json_encode($currentUser, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-        window.INITIAL_PAGE = <?= json_encode($_SESSION['initial_page'] ?? ($isLoggedIn ? 'all-summary' : 'summary')) ?>;
+        window.INITIAL_PAGE = <?= json_encode($_SESSION['initial_page'] ?? null) ?>;
         <?php unset($_SESSION['initial_page']); ?>
     </script>
 

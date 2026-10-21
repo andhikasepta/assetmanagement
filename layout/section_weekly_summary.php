@@ -95,7 +95,7 @@
         <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
             <div>
                 <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                    <h2 class="card-title" id="weekly-executive-title" style="margin: 0;">Executive Summary (Weekly)</h2>
+                    <h2 class="card-title" id="weekly-executive-title" style="margin: 0;">Executive Summary</h2>
                     <span id="weekly-executive-period-badge" class="badge"
                         style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
                         September - Week 1 2026
@@ -104,7 +104,7 @@
             </div>
         </div>
         <div class="card-body" style="padding: 1.25rem;">
-            <!-- Achievements Grid -->
+            <!-- ── Achievement Cards (PMD: PMD, DNO, DSO; Outlet Regional: National, WRO, CRO, ERO) ── -->
             <div class="kpi-grid" id="weekly-achievement-cards" style="margin-bottom: 0;">
                 
                 <!-- PMD Cards (Default Active) -->
@@ -152,7 +152,7 @@
 
                 <!-- Outlet Regional Cards (Shown when Outlet Regional is selected) -->
                 <div class="kpi-card kpi-card-split" id="weekly-kpi-card-outlet-national" style="display: none;">
-                    <div class="kpi-title">Summary Outlet Regional Achievement</div>
+                    <div class="kpi-title" id="weekly-kpi-outlet-title">Summary Outlet Regional Achievement</div>
                     <div class="kpi-card-main">
                         <div class="kpi-split-value" id="weekly-kpi-outlet-achievement">0%</div>
                         <div class="kpi-split-badges">
@@ -165,7 +165,7 @@
                     </div>
                 </div>
 
-                <!-- WRO Group -->
+                <!-- WRO Group: WRO Card + Subdept Cards (CSO, NSO, SSO) -->
                 <div class="kpi-card-group" id="weekly-kpi-group-wro" style="display: none;">
                     <div class="kpi-card kpi-card-split" id="weekly-kpi-card-wro">
                         <div class="kpi-title">WRO Achievement</div>
@@ -181,7 +181,7 @@
                         </div>
                     </div>
                     <div class="kpi-subdept-container">
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-cso">
                             <div class="kpi-subdept-header">
                                 <span class="kpi-subdept-name">CSO</span>
                                 <span id="weekly-kpi-subdept-trend-cso"></span>
@@ -190,7 +190,7 @@
                             <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-cso">0 Sites</div>
                             <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-cso"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-nso">
                             <div class="kpi-subdept-header">
                                 <span class="kpi-subdept-name">NSO</span>
                                 <span id="weekly-kpi-subdept-trend-nso"></span>
@@ -199,7 +199,7 @@
                             <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-nso">0 Sites</div>
                             <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-nso"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-sso">
                             <div class="kpi-subdept-header">
                                 <span class="kpi-subdept-name">SSO</span>
                                 <span id="weekly-kpi-subdept-trend-sso"></span>
@@ -211,7 +211,7 @@
                     </div>
                 </div>
 
-                <!-- CRO Group -->
+                <!-- CRO Group: CRO Card + Subdept Cards (CJDO, EKO, WJO, WKO) -->
                 <div class="kpi-card-group" id="weekly-kpi-group-cro" style="display: none;">
                     <div class="kpi-card kpi-card-split" id="weekly-kpi-card-cro">
                         <div class="kpi-title">CRO Achievement</div>
@@ -227,37 +227,46 @@
                         </div>
                     </div>
                     <div class="kpi-subdept-container">
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-cjdo">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">CCO</span>
-                                <span id="weekly-kpi-subdept-trend-cco"></span>
+                                <span class="kpi-subdept-name">CJDO</span>
+                                <span id="weekly-kpi-subdept-trend-cjdo"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-cco">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-cco">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-cco"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-cjdo">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-cjdo">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-cjdo"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-eko">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">WCO</span>
-                                <span id="weekly-kpi-subdept-trend-wco"></span>
+                                <span class="kpi-subdept-name">EKO</span>
+                                <span id="weekly-kpi-subdept-trend-eko"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-wco">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-wco">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-wco"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-eko">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-eko">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-eko"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-wjo">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">ECO</span>
-                                <span id="weekly-kpi-subdept-trend-eco"></span>
+                                <span class="kpi-subdept-name">WJO</span>
+                                <span id="weekly-kpi-subdept-trend-wjo"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-eco">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-eco">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-eco"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-wjo">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-wjo">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-wjo"></div>
+                        </div>
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-wko">
+                            <div class="kpi-subdept-header">
+                                <span class="kpi-subdept-name">WKO</span>
+                                <span id="weekly-kpi-subdept-trend-wko"></span>
+                            </div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-wko">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-wko">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-wko"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ERO Group -->
+                <!-- ERO Group: ERO Card + Subdept Cards (BNO, EJO, MPO, SMO) -->
                 <div class="kpi-card-group" id="weekly-kpi-group-ero" style="display: none;">
                     <div class="kpi-card kpi-card-split" id="weekly-kpi-card-ero">
                         <div class="kpi-title">ERO Achievement</div>
@@ -273,32 +282,41 @@
                         </div>
                     </div>
                     <div class="kpi-subdept-container">
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-bno">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">EEO</span>
-                                <span id="weekly-kpi-subdept-trend-eeo"></span>
+                                <span class="kpi-subdept-name">BNO</span>
+                                <span id="weekly-kpi-subdept-trend-bno"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-eeo">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-eeo">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-eeo"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-bno">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-bno">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-bno"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-ejo">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">NEO</span>
-                                <span id="weekly-kpi-subdept-trend-neo"></span>
+                                <span class="kpi-subdept-name">EJO</span>
+                                <span id="weekly-kpi-subdept-trend-ejo"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-neo">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-neo">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-neo"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-ejo">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-ejo">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-ejo"></div>
                         </div>
-                        <div class="kpi-subdept-item">
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-mpo">
                             <div class="kpi-subdept-header">
-                                <span class="kpi-subdept-name">SEO</span>
-                                <span id="weekly-kpi-subdept-trend-seo"></span>
+                                <span class="kpi-subdept-name">MPO</span>
+                                <span id="weekly-kpi-subdept-trend-mpo"></span>
                             </div>
-                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-seo">0%</div>
-                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-seo">0 Sites</div>
-                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-seo"></div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-mpo">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-mpo">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-mpo"></div>
+                        </div>
+                        <div class="kpi-subdept-item" id="weekly-kpi-subdept-item-smo">
+                            <div class="kpi-subdept-header">
+                                <span class="kpi-subdept-name">SMO</span>
+                                <span id="weekly-kpi-subdept-trend-smo"></span>
+                            </div>
+                            <div class="kpi-subdept-val" id="weekly-kpi-subdept-val-smo">0%</div>
+                            <div class="kpi-subdept-meta" id="weekly-kpi-subdept-meta-smo">0 Sites</div>
+                            <div class="kpi-subdept-status" id="weekly-kpi-subdept-status-smo"></div>
                         </div>
                     </div>
                 </div>
@@ -503,13 +521,37 @@
             
             <!-- Filters Toolbar -->
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <!-- Tampilkan Filter (Page Size) -->
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label for="weekly-report-so-page-size"
+                        style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                    <select id="weekly-report-so-page-size" class="form-control unified-filter-select"
+                        onchange="App.changeWeeklyReportPageSize(this.value)" style="width: auto;">
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="all">Semua</option>
+                    </select>
+                </div>
+
                 <!-- Dept Filter -->
-                <div style="display: flex; align-items: center; gap: 0.45rem;">
-                    <label for="weekly-report-so-dept-filter"
+                <div style="display: flex; align-items: center; gap: 0.45rem;" id="weekly-dept-filter-container">
+                    <label for="weekly-report-so-dept-filter" id="label-weekly-dept-filter"
                         style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
                     <select id="weekly-report-so-dept-filter" class="form-control unified-filter-select"
-                        style="width: auto;" onchange="App.applyWeeklyReportSoFilter()">
+                        style="width: auto;" onchange="App.onWeeklyDeptFilterChange()">
                         <option value="all" selected>Semua Dept</option>
+                    </select>
+                </div>
+
+                <!-- Subdept Filter (Visible when Outlet Regional) -->
+                <div style="display: none; align-items: center; gap: 0.45rem;" id="weekly-subdept-filter-container">
+                    <label for="weekly-report-so-subdept-filter"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                    <select id="weekly-report-so-subdept-filter" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.applyWeeklyReportSoFilter()">
+                        <option value="all" selected>Semua Sub Dept</option>
                     </select>
                 </div>
 
@@ -522,86 +564,120 @@
                         <option value="all" selected>Semua Status</option>
                         <option value="tercapai">Tercapai</option>
                         <option value="tidak_tercapai">Tidak Tercapai</option>
+                        <option value="no_data">Belum Ada Data</option>
                     </select>
                 </div>
 
                 <!-- Search Input: Rule placeholder="Search..." with .table-search-input.unified-search-input -->
                 <div style="display: flex; align-items: center;">
-                    <input type="text" id="weekly-report-so-search" class="table-search-input unified-search-input"
-                        placeholder="Search..." autocomplete="off" oninput="App.applyWeeklyReportSoFilter()">
+                    <input type="search" id="weekly-report-so-search" class="table-search-input unified-search-input"
+                        placeholder="Search..." autocomplete="off" oninput="App.applyWeeklyReportSoFilter()" style="max-width: 200px;">
                 </div>
             </div>
         </div>
 
         <div class="card-body" style="padding: 1rem 1.25rem;">
-            <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 8px;">
-                <table class="table so-subdept-table" id="weekly-report-so-table"
-                    style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0;">
-                    <thead>
-                        <tr style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
-                            <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('sitecode')"
-                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569;">
-                                Site Code <span class="sort-indicator" data-weekly-col="sitecode">⇅</span>
-                            </th>
-                            <th rowspan="2" class="sortable text-left" onclick="App.toggleWeeklyReportSort('name_site')"
-                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569;">
-                                Name Site <span class="sort-indicator" data-weekly-col="name_site">⇅</span>
-                            </th>
-                            <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('dept')"
-                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569;">
-                                Dept <span class="sort-indicator" data-weekly-col="dept">⇅</span>
-                            </th>
-                            <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b;">
-                                Result Match
-                            </th>
-                            <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b;">
-                                Result Physic
-                            </th>
-                            <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b;">
-                                Result DB
-                            </th>
-                            <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b;">
-                                Total Physical
-                            </th>
-                            <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b;">
-                                Pencapaian
-                            </th>
-                            <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('status')"
-                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 150px;">
-                                Status <span class="sort-indicator" data-weekly-col="status">⇅</span>
-                            </th>
-                        </tr>
-                        <tr style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
-                            <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('match_qty')"
-                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none;">
-                                Physical (QTY) <span class="sort-indicator" data-weekly-col="match_qty">⇅</span>
-                            </th>
-                            <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('physic_qty')"
-                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none;">
-                                Physical (QTY) <span class="sort-indicator" data-weekly-col="physic_qty">⇅</span>
-                            </th>
-                            <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('db_qty')"
-                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none;">
-                                Physical (QTY) <span class="sort-indicator" data-weekly-col="db_qty">⇅</span>
-                            </th>
-                            <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('target_qty')"
-                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none;">
-                                Target (QTY) <span class="sort-indicator" data-weekly-col="target_qty">⇅</span>
-                            </th>
-                            <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('pct')"
-                                style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none;">
-                                % <span class="sort-indicator" data-weekly-col="pct">⇅</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="weekly-report-so-tbody">
-                        <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
-                                Memuat data Report SO Weekly...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="so-subdept-layout">
+                <!-- Left: Table Wrapper -->
+                <div class="so-subdept-table-wrapper">
+                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <table class="table so-subdept-table" id="weekly-report-so-table"
+                            style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
+                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('sitecode')"
+                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Site Code <span class="sort-indicator" data-weekly-col="sitecode">⇅</span>
+                                    </th>
+                                    <th rowspan="2" class="sortable text-left" onclick="App.toggleWeeklyReportSort('name_site')"
+                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Name Site <span class="sort-indicator" data-weekly-col="name_site">⇅</span>
+                                    </th>
+                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('dept')"
+                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Dept <span class="sort-indicator" data-weekly-col="dept">⇅</span>
+                                    </th>
+                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Result Match
+                                    </th>
+                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Result Physic
+                                    </th>
+                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Result DB
+                                    </th>
+                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Total Physical
+                                    </th>
+                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Pencapaian
+                                    </th>
+                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('status')"
+                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 150px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Status <span class="sort-indicator" data-weekly-col="status">⇅</span>
+                                    </th>
+                                </tr>
+                                <tr style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('match_qty')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        Physical (QTY) <span class="sort-indicator" data-weekly-col="match_qty">⇅</span>
+                                    </th>
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('physic_qty')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        Physical (QTY) <span class="sort-indicator" data-weekly-col="physic_qty">⇅</span>
+                                    </th>
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('db_qty')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        Physical (QTY) <span class="sort-indicator" data-weekly-col="db_qty">⇅</span>
+                                    </th>
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('target_qty')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        Target (QTY) <span class="sort-indicator" data-weekly-col="target_qty">⇅</span>
+                                    </th>
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('pct')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        % <span class="sort-indicator" data-weekly-col="pct">⇅</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="weekly-report-so-tbody">
+                                <tr>
+                                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
+                                        Memuat data Report SO Weekly...
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot id="weekly-report-so-tfoot"
+                                style="position: sticky; bottom: 0; z-index: 5; background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.05);">
+                            </tfoot>
+                        </table>
+                    </div>
+                    <!-- Table Pagination Footer -->
+                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <div id="weekly-report-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                        <div class="pagination-controls" id="weekly-report-so-pagination-controls"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Pie / Donut Chart for Tercapai vs Tidak Tercapai (Weekly) -->
+                <div class="so-subdept-chart-wrapper">
+                    <div class="so-pie-card">
+                        <div class="so-pie-header">
+                            <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;" id="weekly-pie-title">
+                                Status Pencapaian (Weekly)</h3>
+                            <p style="font-size: 11px; color: #64748b; margin: 0;" id="weekly-pie-subtitle">
+                                Tercapai vs Tidak Tercapai</p>
+                        </div>
+                        <div class="so-pie-canvas-box">
+                            <canvas id="chart-weekly-report-pie"></canvas>
+                        </div>
+                        <div class="so-pie-stats" id="weekly-report-pie-stats">
+                            <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.5rem;">
+                                Memuat grafik...
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -9,9 +9,6 @@
         <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
             <div>
                 <h2 class="card-title" style="margin: 0;">User Management</h2>
-                <p class="card-subtitle" style="margin-top: 2px;">
-                    Kelola akun admin dan User Access Control (UAC)
-                </p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                 <button class="btn btn-refresh" onclick="App.loadUsers()">
@@ -50,7 +47,7 @@
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                             <th style="width: 50px; text-align: center; vertical-align: middle;">NO</th>
-                            <th style="min-width: 180px; text-align: left; vertical-align: middle;">NAMA LENGKAP</th>
+                            <th style="min-width: 180px; text-align: left; vertical-align: middle;">NAMA USER</th>
                             <th style="min-width: 140px; text-align: left; vertical-align: middle;">USERNAME</th>
                             <th style="min-width: 320px; text-align: left; vertical-align: middle;">HAK AKSES (UAC)</th>
                             <th style="width: 150px; text-align: center; vertical-align: middle;">TERAKHIR DIPERBARUI
@@ -87,11 +84,11 @@
             <input type="hidden" id="user-form-id" value="">
             <div class="modal-body" style="padding: 1.25rem;">
 
-                <!-- Nama Lengkap -->
+                <!-- Nama User -->
                 <div class="form-group" style="margin-bottom: 1rem;">
                     <label class="form-label" for="user-form-name"
                         style="font-size: 12px; font-weight: 600; color: #334155;">
-                        Nama Lengkap <span style="color: #ef4444;">*</span>
+                        Nama User <span style="color: #ef4444;">*</span>
                     </label>
                     <input type="text" id="user-form-name" class="form-control" required
                         placeholder="Masukkan nama user..." style="width: 100%; font-size: 13px;">
@@ -117,7 +114,7 @@
                         placeholder="Masukkan password..." style="width: 100%; font-size: 13px;">
                     <span id="user-form-password-hint"
                         style="display: none; font-size: 11px; color: #64748b; margin-top: 4px;">
-                        * Kosongkan jika tidak ingin mengubah password yang sudah ada.
+                        * Kosongkan jika tidak ingin mengubah password.
                     </span>
                 </div>
 
@@ -135,7 +132,7 @@
                         style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 0.85rem;">
                         <span
                             style="display: block; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
-                            Akses Menu Halaman
+                            Akses Menu
                         </span>
 
                         <label
@@ -148,7 +145,8 @@
                             </div>
                         </label>
 
-                        <label style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
+                        <label
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="user-uac-weekly-summary" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
@@ -157,19 +155,32 @@
                             </div>
                         </label>
 
-                        <label style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
+                        <label
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="user-uac-master-data" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
-                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Master Data (Monthly)</span>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Master Data
+                                    (SO Profile Monthly)</span>
+                            </div>
+                        </label>
+
+                        <label
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="user-uac-master-data-weekly" checked
+                                style="width: 16px; height: 16px; cursor: pointer;">
+                            <div>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Master Data Weekly
+                                    (SO Profile)</span>
                             </div>
                         </label>
 
                         <label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer;">
-                            <input type="checkbox" id="user-uac-master-data-weekly" checked
+                            <input type="checkbox" id="user-uac-user-management" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
-                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Master Data Weekly (SO Profile)</span>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">User
+                                    Management</span>
                             </div>
                         </label>
                     </div>
@@ -179,7 +190,7 @@
                         style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 0.85rem;">
                         <span
                             style="display: block; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
-                            Kewenangan Master Data
+                            Hak Akses Master Data
                         </span>
 
                         <label
@@ -217,7 +228,7 @@
                         style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
                         <span
                             style="display: block; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
-                            Kewenangan Master Data Weekly
+                            Hak Master Data Weekly
                         </span>
 
                         <label
@@ -225,7 +236,8 @@
                             <input type="checkbox" id="user-uac-master-weekly-add-import" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
-                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Add / Import SO Profile Weekly</span>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Add / Import SO
+                                    Profile Weekly</span>
                             </div>
                         </label>
 
@@ -233,7 +245,8 @@
                             <input type="checkbox" id="user-uac-master-weekly-delete" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
-                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Delete SO Profile Weekly</span>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Delete SO Profile
+                                    Weekly</span>
                             </div>
                         </label>
                     </div>

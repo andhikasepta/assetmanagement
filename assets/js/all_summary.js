@@ -109,13 +109,31 @@ const AllSummaryApp = (function () {
         const pageEl = document.getElementById('page-all-summary') || document.getElementById('card-executive-summary');
         if (!pageEl) return;
 
-        // Set default month to 9 (September) on initial load if unset
+        // Restore SO Type from sessionStorage
+        const savedSOType = sessionStorage.getItem('all_summary_so_type');
+        if (savedSOType === 'quarterly' || savedSOType === 'monthly') {
+            summarySOType = savedSOType;
+            const btnMonthly = document.getElementById('all-btn-so-type-monthly');
+            const btnQuarterly = document.getElementById('all-btn-so-type-quarterly');
+            if (btnMonthly) btnMonthly.classList.toggle('active', summarySOType === 'monthly');
+            if (btnQuarterly) btnQuarterly.classList.toggle('active', summarySOType === 'quarterly');
+        }
+
         const monthSel = document.getElementById('all-summary-filter-month') || document.getElementById('summary-filter-month');
-        if (monthSel && !isInitialized && monthSel.value === '') {
+        const yearSel = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
+
+        const savedMonth = sessionStorage.getItem('all_summary_filter_month');
+        const savedYear = sessionStorage.getItem('all_summary_filter_year');
+
+        if (savedMonth !== null && savedMonth !== undefined && monthSel) {
+            monthSel.value = savedMonth;
+        } else if (monthSel && !isInitialized && monthSel.value === '') {
             monthSel.value = '9';
         }
-        const yearSel = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
-        if (yearSel && !yearSel.value) {
+
+        if (savedYear && yearSel) {
+            yearSel.value = savedYear;
+        } else if (yearSel && !yearSel.value) {
             yearSel.value = '2026';
         }
         isInitialized = true;
@@ -127,6 +145,10 @@ const AllSummaryApp = (function () {
     function switchSOType(type) {
         if (type !== 'monthly' && type !== 'quarterly') type = 'monthly';
         summarySOType = type;
+
+        try {
+            sessionStorage.setItem('all_summary_so_type', summarySOType);
+        } catch (e) { }
 
         const btnMonthly = document.getElementById('all-btn-so-type-monthly');
         const btnQuarterly = document.getElementById('all-btn-so-type-quarterly');
@@ -142,6 +164,11 @@ const AllSummaryApp = (function () {
         const month = monthEl ? monthEl.value : '';
         const yearEl = document.getElementById('all-summary-filter-year') || document.getElementById('summary-filter-year');
         const year = yearEl ? yearEl.value : '2026';
+
+        try {
+            if (month !== undefined && month !== null) sessionStorage.setItem('all_summary_filter_month', month);
+            if (year) sessionStorage.setItem('all_summary_filter_year', year);
+        } catch (e) { }
 
         // Update period badge
         const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
