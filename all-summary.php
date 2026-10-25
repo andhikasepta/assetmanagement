@@ -70,6 +70,9 @@ $csrfToken = getCsrfToken();
             <button class="nav-link active" data-page="all-summary" id="tab-all-summary">
                 All Summary
             </button>
+            <a href="reports.php" class="nav-link" id="tab-reports">
+                Reports
+            </a>
             <a href="master-data.php" class="nav-link" data-page="master-data" id="tab-master-data">
                 Master Data
             </a>
@@ -389,7 +392,8 @@ $csrfToken = getCsrfToken();
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <input type="search" id="hasil-so-search" class="table-search-input unified-search-input"
-                            placeholder="Search..." oninput="AllSummaryApp.applyHasilFilter()" style="max-width: 250px;">
+                            placeholder="Search..." oninput="AllSummaryApp.applyHasilFilter()"
+                            style="max-width: 250px;">
                         <select id="hasil-so-filter-status" class="form-control unified-filter-select"
                             onchange="AllSummaryApp.applyHasilFilter()" style="width: auto;">
                             <option value="all">Semua Status</option>
@@ -398,7 +402,8 @@ $csrfToken = getCsrfToken();
                             <option value="no_data">Belum Ada Data</option>
                         </select>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <label for="hasil-so-page-size" style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                            <label for="hasil-so-page-size"
+                                style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
                             <select id="hasil-so-page-size" class="form-control unified-filter-select"
                                 onchange="AllSummaryApp.changeHasilPageSize(this.value)" style="width: auto;">
                                 <option value="10" selected>10</option>
@@ -422,14 +427,11 @@ $csrfToken = getCsrfToken();
                                         <tr
                                             style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
                                             <th rowspan="2"
-                                                style="width: 45px; text-align: center; vertical-align: middle; padding: 0.6rem 0.5rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                NO</th>
-                                            <th rowspan="2"
                                                 style="width: 110px; text-align: center; vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 SITE CODE</th>
                                             <th rowspan="2"
                                                 style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                NAMA SITE</th>
+                                                NAME SITE</th>
                                             <th rowspan="2"
                                                 style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 DEPT / SUB DEPT</th>
@@ -473,7 +475,7 @@ $csrfToken = getCsrfToken();
                                     </thead>
                                     <tbody id="hasil-so-table-body">
                                         <tr>
-                                            <td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                                            <td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">
                                                 Memuat data Report SO...
                                             </td>
                                         </tr>
@@ -481,7 +483,8 @@ $csrfToken = getCsrfToken();
                                 </table>
                             </div>
                             <!-- Table Pagination Footer -->
-                            <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            <div class="table-pagination-footer"
+                                style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                                 <div id="hasil-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
                                 <div class="pagination-controls" id="hasil-so-pagination-controls"></div>
                             </div>
@@ -524,9 +527,8 @@ $csrfToken = getCsrfToken();
                         <table class="reconciliation-table" style="margin: 0; font-size: 12px; width: 100%;">
                             <thead>
                                 <tr>
-                                    <th style="width: 45px; text-align: center;">NO</th>
                                     <th style="width: 120px; text-align: center;">SITE CODE</th>
-                                    <th>NAMA SITE</th>
+                                    <th style="text-align: left;">NAME SITE</th>
                                     <th>DEPT / SUB DEPT</th>
                                     <th style="width: 130px;">REG NO</th>
                                     <th>DESKRIPSI</th>
@@ -535,7 +537,7 @@ $csrfToken = getCsrfToken();
                             </thead>
                             <tbody id="rekap-db-status-tbody">
                                 <tr>
-                                    <td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                                    <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">
                                         Memuat data status DB...
                                     </td>
                                 </tr>
@@ -543,7 +545,8 @@ $csrfToken = getCsrfToken();
                         </table>
                     </div>
                     <!-- Table Pagination Footer -->
-                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <div class="table-pagination-footer"
+                        style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <div id="all-rdb-status-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
                         <div class="pagination-controls" id="all-rdb-status-pagination-controls"></div>
                     </div>
@@ -555,11 +558,11 @@ $csrfToken = getCsrfToken();
                 <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
                         <h2 class="card-title">Rekapitulasi Stock Opname (All Data)</h2>
-                        <p class="card-subtitle">Rekapitulasi persentase fisik seluruh site per bulan</p>
+                        <p class="card-subtitle">Rekapitulasi persentase seluruh site per bulan</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <input type="search" id="rekap-search" class="table-search-input unified-search-input" placeholder="Search..."
-                            oninput="AllSummaryApp.applyRekapFilter()"
+                        <input type="search" id="rekap-search" class="table-search-input unified-search-input"
+                            placeholder="Search..." oninput="AllSummaryApp.applyRekapFilter()"
                             style="max-width: 240px;">
                         <button class="btn btn-success" id="btn-all-rekap-export-excel"
                             onclick="AllSummaryApp.exportRekapExcel()"
@@ -580,9 +583,8 @@ $csrfToken = getCsrfToken();
                         <table class="reconciliation-table" style="margin: 0; font-size: 11.5px; width: 100%;">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px; text-align: center;">NO</th>
                                     <th style="width: 110px; text-align: center;">SITE CODE</th>
-                                    <th>NAMA SITE</th>
+                                    <th style="text-align: left;">NAME SITE</th>
                                     <th>DEPT</th>
                                     <th style="text-align: center;">JAN</th>
                                     <th style="text-align: center;">FEB</th>
@@ -608,7 +610,8 @@ $csrfToken = getCsrfToken();
                         </table>
                     </div>
                     <!-- Table Pagination Footer -->
-                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <div class="table-pagination-footer"
+                        style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <div id="rekap-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
                         <div class="pagination-controls" id="rekap-pagination-controls"></div>
                     </div>
@@ -623,8 +626,8 @@ $csrfToken = getCsrfToken();
                         <p class="card-subtitle">Log mutasi dan perubahan status master site</p>
                     </div>
                     <div>
-                        <input type="search" id="sm-search-input" class="table-search-input unified-search-input" placeholder="Search..."
-                            oninput="AllSummaryApp.filterMovementsTable()"
+                        <input type="search" id="sm-search-input" class="table-search-input unified-search-input"
+                            placeholder="Search..." oninput="AllSummaryApp.filterMovementsTable()"
                             style="max-width: 250px;">
                     </div>
                 </div>
@@ -636,7 +639,7 @@ $csrfToken = getCsrfToken();
                                 <tr>
                                     <th style="width: 45px; text-align: center;">NO</th>
                                     <th style="width: 120px; text-align: center;">SITE CODE</th>
-                                    <th>NAMA SITE</th>
+                                    <th style="text-align: left;">NAME SITE</th>
                                     <th>DEPT / SUB DEPT</th>
                                     <th style="text-align: center;">LOG HISTORY</th>
                                     <th style="text-align: center; width: 120px;">PERIODE EFEKTIF</th>

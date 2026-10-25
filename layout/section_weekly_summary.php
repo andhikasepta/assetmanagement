@@ -7,6 +7,26 @@
  * 3. Report SO (Reconciliation Data Table)
  * Controls: Only Switch of PMD and Outlet Regional, Bulan, Week (Week 1 - 4), Tahun
  */
+
+$latestWeeklyPeriod = null;
+try {
+    $weeklyDb = getDbConnection();
+    $wkLatestStmt = $weeklyDb->query("
+        SELECT 
+            COALESCE(period_month, EXTRACT(MONTH FROM period_end)::int) as period_month, 
+            COALESCE(period_week, CASE WHEN EXTRACT(DAY FROM period_end) <= 7 THEN 1 WHEN EXTRACT(DAY FROM period_end) <= 14 THEN 2 WHEN EXTRACT(DAY FROM period_end) <= 21 THEN 3 ELSE 4 END) as period_week, 
+            COALESCE(period_year, EXTRACT(YEAR FROM period_end)::int) as period_year 
+        FROM asset_reconciliation_weekly 
+        WHERE profile NOT ILIKE 'profile%'
+        ORDER BY period_year DESC, period_month DESC, period_week DESC, id DESC 
+        LIMIT 1
+    ");
+    $latestWeeklyPeriod = $wkLatestStmt ? $wkLatestStmt->fetch(PDO::FETCH_ASSOC) : null;
+} catch (Throwable $e) {}
+
+$defaultWeeklyYear  = !empty($latestWeeklyPeriod['period_year'])  ? (int)$latestWeeklyPeriod['period_year']  : (int)date('Y');
+$defaultWeeklyMonth = !empty($latestWeeklyPeriod['period_month']) ? (int)$latestWeeklyPeriod['period_month'] : (int)date('n');
+$defaultWeeklyWeek  = !empty($latestWeeklyPeriod['period_week'])  ? (int)$latestWeeklyPeriod['period_week']  : 1;
 ?>
 <section id="page-weekly-summary" class="page-section" style="display: none;">
 
@@ -14,11 +34,12 @@
     <div class="card sticky-controls-card" id="card-weekly-summary-controls">
         <div class="card-header sticky-controls-header"
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; padding: 0.75rem 1.25rem;">
-            
+
             <!-- Left: Switch of PMD and Outlet Regional ONLY -->
             <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 0.6rem;">
-                    <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">CATEGORY:</span>
+                    <span
+                        style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">CATEGORY:</span>
                     <div class="summary-type-slider-wrapper" id="weekly-cat-slider">
                         <button type="button" class="summary-type-slider-btn active" id="btn-weekly-cat-pmd"
                             onclick="App.switchWeeklyCategory('pmd')">
@@ -42,16 +63,24 @@
                     <label for="weekly-filter-month"
                         style="font-size: 12px; font-weight: 600; color: #475569;">BULAN</label>
                     <select id="weekly-filter-month" class="form-control unified-filter-select" style="width: auto;"
-                        onchange="App.loadWeeklySummary()">
+                        onchange="App.onWeeklyMonthChange()">
                         <?php
                         $monthNames = [
-                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                            1 => 'Januari',
+                            2 => 'Februari',
+                            3 => 'Maret',
+                            4 => 'April',
+                            5 => 'Mei',
+                            6 => 'Juni',
+                            7 => 'Juli',
+                            8 => 'Agustus',
+                            9 => 'September',
+                            10 => 'Oktober',
+                            11 => 'November',
+                            12 => 'Desember'
                         ];
-                        $curM = (int) date('n');
                         foreach ($monthNames as $num => $name): ?>
-                            <option value="<?= $num ?>" <?= ($num === $curM) ? 'selected' : '' ?>>
+                            <option value="<?= $num ?>" <?= ($num === $defaultWeeklyMonth) ? 'selected' : '' ?>>
                                 <?= $name ?>
                             </option>
                         <?php endforeach; ?>
@@ -64,10 +93,11 @@
                         style="font-size: 12px; font-weight: 600; color: #475569;">WEEK</label>
                     <select id="weekly-filter-week" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.loadWeeklySummary()">
-                        <option value="1" selected>Week 1</option>
-                        <option value="2">Week 2</option>
-                        <option value="3">Week 3</option>
-                        <option value="4">Week 4</option>
+                        <?php for ($wk = 1; $wk <= 4; $wk++): ?>
+                            <option value="<?= $wk ?>" <?= ($wk === $defaultWeeklyWeek) ? 'selected' : '' ?>>
+                                Week <?= $wk ?>
+                            </option>
+                        <?php endfor; ?>
                     </select>
                 </div>
 
@@ -76,11 +106,11 @@
                     <label for="weekly-filter-year"
                         style="font-size: 12px; font-weight: 600; color: #475569;">TAHUN</label>
                     <select id="weekly-filter-year" class="form-control unified-filter-select" style="width: auto;"
-                        onchange="App.loadWeeklySummary()">
-                        <?php 
+                        onchange="App.onWeeklyYearChange()">
+                        <?php
                         $curY = (int) date('Y');
                         for ($y = $curY; $y <= $curY + 5; $y++): ?>
-                            <option value="<?= $y ?>" <?= ($y === $curY) ? 'selected' : '' ?>><?= $y ?></option>
+                            <option value="<?= $y ?>" <?= ($y === $defaultWeeklyYear) ? 'selected' : '' ?>><?= $y ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -106,7 +136,7 @@
         <div class="card-body" style="padding: 1.25rem;">
             <!-- ── Achievement Cards (PMD: PMD, DNO, DSO; Outlet Regional: National, WRO, CRO, ERO) ── -->
             <div class="kpi-grid" id="weekly-achievement-cards" style="margin-bottom: 0;">
-                
+
                 <!-- PMD Cards (Default Active) -->
                 <div class="kpi-card kpi-card-split" id="weekly-kpi-card-pmd">
                     <div class="kpi-title">Summary PMD Achievement</div>
@@ -336,24 +366,25 @@
         </div>
 
         <div class="scorecard-grid" style="padding-bottom: 0.5rem;">
-            
+
             <!-- Sub-Card 1: Rating Summary -->
             <div class="scorecard-subcard" id="weekly-scorecard-rating-card">
                 <div class="scorecard-subcard-header">
                     <div>
                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Rating Summary</h3>
+                            <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Rating Summary
+                            </h3>
                             <span id="weekly-scorecard-rating-period-badge" class="badge"
                                 style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 2.5px 7px; border-radius: 6px;">
                                 September - Week 1 2026
                             </span>
                         </div>
-                        <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Evaluasi performa SO Sites periode weekly terpilih</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.35rem;">
                         <label for="weekly-scorecard-rating-filter"
                             style="font-size: 10.5px; font-weight: 600; color: #64748b; margin: 0;">Rating:</label>
-                        <select id="weekly-scorecard-rating-filter" class="form-control form-control-sm unified-filter-select"
+                        <select id="weekly-scorecard-rating-filter"
+                            class="form-control form-control-sm unified-filter-select"
                             style="font-size: 11.5px; padding: 2px 6px; width: auto; min-width: 115px; height: 26px;"
                             onchange="App.onWeeklyScorecardRatingFilterChange(this.value)">
                             <option value="all">Semua Rating</option>
@@ -373,25 +404,36 @@
                             <canvas id="chart-weekly-scorecard-rating-pie"></canvas>
                         </div>
                         <div class="scorecard-bottom-stats" id="weekly-scorecard-rating-pie-stats">
-                            <div style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">Rating:</div>
-                            <div class="scorecard-pie-stat-row" data-rating="very_good" onclick="App.toggleWeeklyScorecardRatingFilter('very_good')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #047857;"></span>Very Good</span>
+                            <div style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">
+                                Rating:</div>
+                            <div class="scorecard-pie-stat-row" data-rating="very_good"
+                                onclick="App.toggleWeeklyScorecardRatingFilter('very_good')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #047857;"></span>Very Good</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-vg">0 sites (0%)</span>
                             </div>
-                            <div class="scorecard-pie-stat-row" data-rating="good" onclick="App.toggleWeeklyScorecardRatingFilter('good')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #0284c7;"></span>Good</span>
+                            <div class="scorecard-pie-stat-row" data-rating="good"
+                                onclick="App.toggleWeeklyScorecardRatingFilter('good')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #0284c7;"></span>Good</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-g">0 sites (0%)</span>
                             </div>
-                            <div class="scorecard-pie-stat-row" data-rating="moderate" onclick="App.toggleWeeklyScorecardRatingFilter('moderate')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #d97706;"></span>Moderate</span>
+                            <div class="scorecard-pie-stat-row" data-rating="moderate"
+                                onclick="App.toggleWeeklyScorecardRatingFilter('moderate')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #d97706;"></span>Moderate</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-m">0 sites (0%)</span>
                             </div>
-                            <div class="scorecard-pie-stat-row" data-rating="poor" onclick="App.toggleWeeklyScorecardRatingFilter('poor')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #ea580c;"></span>Poor</span>
+                            <div class="scorecard-pie-stat-row" data-rating="poor"
+                                onclick="App.toggleWeeklyScorecardRatingFilter('poor')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #ea580c;"></span>Poor</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-p">0 sites (0%)</span>
                             </div>
-                            <div class="scorecard-pie-stat-row" data-rating="very_poor" onclick="App.toggleWeeklyScorecardRatingFilter('very_poor')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #b91c1c;"></span>Very Poor</span>
+                            <div class="scorecard-pie-stat-row" data-rating="very_poor"
+                                onclick="App.toggleWeeklyScorecardRatingFilter('very_poor')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #b91c1c;"></span>Very Poor</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-vp">0 sites (0%)</span>
                             </div>
                         </div>
@@ -404,18 +446,20 @@
                             <table class="reconciliation-table scorecard-table">
                                 <thead>
                                     <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        <th class="scorecard-col-no">NO</th>
                                         <th class="scorecard-col-subdept">DEPT</th>
                                         <th class="scorecard-col-sitecode">SITE CODE</th>
-                                        <th class="scorecard-col-namesite">NAMA SITE</th>
-                                        <th class="scorecard-col-month">FISIK %</th>
+                                        <th class="scorecard-col-namesite">NAME SITE</th>
+                                        <th class="scorecard-col-month">%</th>
                                         <th class="scorecard-col-status">RATING</th>
                                     </tr>
                                 </thead>
                                 <tbody id="weekly-scorecard-rating-tbody">
                                     <tr>
-                                        <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
-                                            <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Memuat data...</div>
+                                        <td colspan="5" class="text-center"
+                                            style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                                            <div
+                                                style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                                                Memuat data...</div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -430,18 +474,19 @@
                 <div class="scorecard-subcard-header">
                     <div>
                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">SO Execution Summary</h3>
+                            <h3 style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">SO Execution
+                                Summary</h3>
                             <span id="weekly-scorecard-exec-period-badge" class="badge"
                                 style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 2.5px 7px; border-radius: 6px;">
                                 September - Week 1 2026
                             </span>
                         </div>
-                        <p style="margin: 1px 0 0 0; font-size: 10.5px; color: #64748b;">Status eksekusi SO Sites periode weekly terpilih</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.35rem;">
                         <label for="weekly-scorecard-execution-filter"
                             style="font-size: 10.5px; font-weight: 600; color: #64748b; margin: 0;">Status:</label>
-                        <select id="weekly-scorecard-execution-filter" class="form-control form-control-sm unified-filter-select"
+                        <select id="weekly-scorecard-execution-filter"
+                            class="form-control form-control-sm unified-filter-select"
                             style="font-size: 11.5px; padding: 2px 6px; width: auto; min-width: 120px; height: 26px;"
                             onchange="App.onWeeklyScorecardExecutionFilterChange(this.value)">
                             <option value="all">Semua Status</option>
@@ -458,13 +503,18 @@
                             <canvas id="chart-weekly-scorecard-exec-pie"></canvas>
                         </div>
                         <div class="scorecard-bottom-stats" id="weekly-scorecard-exec-pie-stats">
-                            <div style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">Status Eksekusi:</div>
-                            <div class="scorecard-pie-stat-row" data-exec="executed" onclick="App.toggleWeeklyScorecardExecutionFilter('executed')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #047857;"></span>Executed</span>
+                            <div style="font-size: 10.5px; font-weight: 700; color: #475569; margin-bottom: 2px;">Status
+                                Eksekusi:</div>
+                            <div class="scorecard-pie-stat-row" data-exec="executed"
+                                onclick="App.toggleWeeklyScorecardExecutionFilter('executed')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #047857;"></span>Executed</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-exec">0 sites (0%)</span>
                             </div>
-                            <div class="scorecard-pie-stat-row" data-exec="not_executed" onclick="App.toggleWeeklyScorecardExecutionFilter('not_executed')">
-                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot" style="background: #b91c1c;"></span>Not Executed</span>
+                            <div class="scorecard-pie-stat-row" data-exec="not_executed"
+                                onclick="App.toggleWeeklyScorecardExecutionFilter('not_executed')">
+                                <span class="scorecard-pie-stat-label"><span class="scorecard-pie-stat-dot"
+                                        style="background: #b91c1c;"></span>Not Executed</span>
                                 <span class="scorecard-pie-stat-val" id="weekly-sc-stat-not-exec">0 sites (0%)</span>
                             </div>
                         </div>
@@ -477,18 +527,20 @@
                             <table class="reconciliation-table scorecard-table">
                                 <thead>
                                     <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        <th class="scorecard-col-no">NO</th>
                                         <th class="scorecard-col-subdept">DEPT</th>
                                         <th class="scorecard-col-sitecode">SITE CODE</th>
-                                        <th class="scorecard-col-namesite">NAMA SITE</th>
-                                        <th class="scorecard-col-month">FISIK %</th>
+                                        <th class="scorecard-col-namesite">NAME SITE</th>
+                                        <th class="scorecard-col-month"></th>
                                         <th class="scorecard-col-status">STATUS</th>
                                     </tr>
                                 </thead>
                                 <tbody id="weekly-scorecard-exec-tbody">
                                     <tr>
-                                        <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
-                                            <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Memuat data...</div>
+                                        <td colspan="5" class="text-center"
+                                            style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                                            <div
+                                                style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
+                                                Memuat data...</div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -518,7 +570,7 @@
                     Pencapaian dan Hasil Stock Opname Weekly
                 </p>
             </div>
-            
+
             <!-- Filters Toolbar -->
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                 <!-- Tampilkan Filter (Page Size) -->
@@ -571,7 +623,8 @@
                 <!-- Search Input: Rule placeholder="Search..." with .table-search-input.unified-search-input -->
                 <div style="display: flex; align-items: center;">
                     <input type="search" id="weekly-report-so-search" class="table-search-input unified-search-input"
-                        placeholder="Search..." autocomplete="off" oninput="App.applyWeeklyReportSoFilter()" style="max-width: 200px;">
+                        placeholder="Search..." autocomplete="off" oninput="App.applyWeeklyReportSoFilter()"
+                        style="max-width: 200px;">
                 </div>
             </div>
         </div>
@@ -580,51 +633,64 @@
             <div class="so-subdept-layout">
                 <!-- Left: Table Wrapper -->
                 <div class="so-subdept-table-wrapper">
-                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div class="table-responsive"
+                        style="max-height: 480px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <table class="table so-subdept-table" id="weekly-report-so-table"
                             style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0;">
                             <thead>
-                                <tr style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
-                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('sitecode')"
+                                <tr
+                                    style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
+                                    <th rowspan="2" class="sortable text-center"
+                                        onclick="App.toggleWeeklyReportSort('sitecode')"
                                         style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Site Code <span class="sort-indicator" data-weekly-col="sitecode">⇅</span>
                                     </th>
-                                    <th rowspan="2" class="sortable text-left" onclick="App.toggleWeeklyReportSort('name_site')"
-                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        Name Site <span class="sort-indicator" data-weekly-col="name_site">⇅</span>
+                                    <th rowspan="2" class="sortable text-left col-name-site"
+                                        onclick="App.toggleWeeklyReportSort('name_site')"
+                                        style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        NAME SITE <span class="sort-indicator" data-weekly-col="name_site">⇅</span>
                                     </th>
-                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('dept')"
-                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th rowspan="2" class="sortable text-center"
+                                        onclick="App.toggleWeeklyReportSort('dept')"
+                                        style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Dept <span class="sort-indicator" data-weekly-col="dept">⇅</span>
                                     </th>
-                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Result Match
                                     </th>
-                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Result Physic
                                     </th>
-                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Result DB
                                     </th>
-                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Total Physical
                                     </th>
-                                    <th class="text-center" style="padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Pencapaian
                                     </th>
-                                    <th rowspan="2" class="sortable text-center" onclick="App.toggleWeeklyReportSort('status')"
-                                        style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 150px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                    <th rowspan="2" class="sortable text-center"
+                                        onclick="App.toggleWeeklyReportSort('status')"
+                                        style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 150px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Status <span class="sort-indicator" data-weekly-col="status">⇅</span>
                                     </th>
                                 </tr>
-                                <tr style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
+                                <tr
+                                    style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
                                     <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('match_qty')"
                                         style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
                                         Physical (QTY) <span class="sort-indicator" data-weekly-col="match_qty">⇅</span>
                                     </th>
                                     <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('physic_qty')"
                                         style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                        Physical (QTY) <span class="sort-indicator" data-weekly-col="physic_qty">⇅</span>
+                                        Physical (QTY) <span class="sort-indicator"
+                                            data-weekly-col="physic_qty">⇅</span>
                                     </th>
                                     <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('db_qty')"
                                         style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
@@ -653,7 +719,8 @@
                         </table>
                     </div>
                     <!-- Table Pagination Footer -->
-                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <div class="table-pagination-footer"
+                        style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <div id="weekly-report-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
                         <div class="pagination-controls" id="weekly-report-so-pagination-controls"></div>
                     </div>
@@ -663,7 +730,8 @@
                 <div class="so-subdept-chart-wrapper">
                     <div class="so-pie-card">
                         <div class="so-pie-header">
-                            <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;" id="weekly-pie-title">
+                            <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;"
+                                id="weekly-pie-title">
                                 Status Pencapaian (Weekly)</h3>
                             <p style="font-size: 11px; color: #64748b; margin: 0;" id="weekly-pie-subtitle">
                                 Tercapai vs Tidak Tercapai</p>

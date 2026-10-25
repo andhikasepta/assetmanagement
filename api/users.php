@@ -36,6 +36,7 @@ try {
                 role, 
                 COALESCE(can_access_all_summary, TRUE) as can_access_all_summary,
                 COALESCE(can_access_weekly_summary, TRUE) as can_access_weekly_summary,
+                COALESCE(can_access_reports, TRUE) as can_access_reports,
                 COALESCE(can_access_master_data, TRUE) as can_access_master_data,
                 COALESCE(can_access_master_data_weekly, TRUE) as can_access_master_data_weekly,
                 COALESCE(can_access_user_management, TRUE) as can_access_user_management,
@@ -56,6 +57,7 @@ try {
             $u['id'] = (int) $u['id'];
             $u['can_access_all_summary'] = filter_var($u['can_access_all_summary'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_weekly_summary'] = filter_var($u['can_access_weekly_summary'], FILTER_VALIDATE_BOOLEAN);
+            $u['can_access_reports'] = filter_var($u['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data'] = filter_var($u['can_access_master_data'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data_weekly'] = filter_var($u['can_access_master_data_weekly'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_user_management'] = filter_var($u['can_access_user_management'], FILTER_VALIDATE_BOOLEAN);
@@ -108,6 +110,7 @@ try {
 
         $canAccessAllSummary = !empty($input['can_access_all_summary']);
         $canAccessWeeklySummary = !empty($input['can_access_weekly_summary']);
+        $canAccessReports = !empty($input['can_access_reports']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
         $canAccessUserManagement = !empty($input['can_access_user_management']);
@@ -127,6 +130,7 @@ try {
                 role, 
                 can_access_all_summary, 
                 can_access_weekly_summary, 
+                can_access_reports,
                 can_access_master_data, 
                 can_access_master_data_weekly, 
                 can_access_user_management, 
@@ -142,6 +146,7 @@ try {
                 :role, 
                 :can_all, 
                 :can_weekly, 
+                :can_rep,
                 :can_md, 
                 :can_md_wk, 
                 :can_usr_mgmt, 
@@ -160,6 +165,7 @@ try {
             ':role'         => 'admin',
             ':can_all'      => $canAccessAllSummary ? 't' : 'f',
             ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+            ':can_rep'      => $canAccessReports ? 't' : 'f',
             ':can_md'       => $canAccessMasterData ? 't' : 'f',
             ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
             ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -212,6 +218,7 @@ try {
 
         $canAccessAllSummary = !empty($input['can_access_all_summary']);
         $canAccessWeeklySummary = !empty($input['can_access_weekly_summary']);
+        $canAccessReports = !empty($input['can_access_reports']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
         $canAccessUserManagement = !empty($input['can_access_user_management']);
@@ -229,6 +236,7 @@ try {
             // D3utsch must always have full permissions
             $canAccessAllSummary = true;
             $canAccessWeeklySummary = true;
+            $canAccessReports = true;
             $canAccessMasterData = true;
             $canAccessMasterDataWeekly = true;
             $canAccessUserManagement = true;
@@ -248,6 +256,7 @@ try {
                     password = :password,
                     can_access_all_summary = :can_all,
                     can_access_weekly_summary = :can_weekly,
+                    can_access_reports = :can_rep,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
                     can_access_user_management = :can_usr_mgmt,
@@ -265,6 +274,7 @@ try {
                 ':password'     => $hashedPassword,
                 ':can_all'      => $canAccessAllSummary ? 't' : 'f',
                 ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+                ':can_rep'      => $canAccessReports ? 't' : 'f',
                 ':can_md'       => $canAccessMasterData ? 't' : 'f',
                 ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
                 ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -282,6 +292,7 @@ try {
                     username = :username,
                     can_access_all_summary = :can_all,
                     can_access_weekly_summary = :can_weekly,
+                    can_access_reports = :can_rep,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
                     can_access_user_management = :can_usr_mgmt,
@@ -298,6 +309,7 @@ try {
                 ':username'     => $username,
                 ':can_all'      => $canAccessAllSummary ? 't' : 'f',
                 ':can_weekly'   => $canAccessWeeklySummary ? 't' : 'f',
+                ':can_rep'      => $canAccessReports ? 't' : 'f',
                 ':can_md'       => $canAccessMasterData ? 't' : 'f',
                 ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
                 ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -318,6 +330,7 @@ try {
             $_SESSION['user']['permissions'] = [
                 'can_access_all_summary'        => $canAccessAllSummary,
                 'can_access_weekly_summary'     => $canAccessWeeklySummary,
+                'can_access_reports'            => $canAccessReports,
                 'can_access_master_data'        => $canAccessMasterData,
                 'can_access_master_data_weekly' => $canAccessMasterDataWeekly,
                 'can_access_user_management'    => $canAccessUserManagement,

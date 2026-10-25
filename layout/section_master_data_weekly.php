@@ -234,8 +234,9 @@ if (!isset($monthNames)) {
                     <div class="form-group">
                         <label class="form-label" for="import-weekly-month">Periode Bulan</label>
                         <select id="import-weekly-month" class="form-control unified-filter-select">
+                            <option value="auto" selected>Otomatis (Sesuai File Excel)</option>
                             <?php foreach ($monthNames as $num => $name): ?>
-                                <option value="<?= $num ?>" <?= ($num === $currentMonth) ? 'selected' : '' ?>>
+                                <option value="<?= $num ?>">
                                     <?= $name ?>
                                 </option>
                             <?php endforeach; ?>
@@ -246,7 +247,8 @@ if (!isset($monthNames)) {
                     <div class="form-group">
                         <label class="form-label" for="import-weekly-week">Week</label>
                         <select id="import-weekly-week" class="form-control unified-filter-select">
-                            <option value="1" selected>Week 1</option>
+                            <option value="auto" selected>Otomatis (Sesuai File Excel)</option>
+                            <option value="1">Week 1</option>
                             <option value="2">Week 2</option>
                             <option value="3">Week 3</option>
                             <option value="4">Week 4</option>
@@ -257,8 +259,9 @@ if (!isset($monthNames)) {
                     <div class="form-group">
                         <label class="form-label" for="import-weekly-year">Periode Tahun</label>
                         <select id="import-weekly-year" class="form-control unified-filter-select">
+                            <option value="auto" selected>Otomatis (Sesuai File Excel)</option>
                             <?php for ($y = 2024; $y <= 2030; $y++): ?>
-                                <option value="<?= $y ?>" <?= ($y === $currentYear) ? 'selected' : '' ?>>
+                                <option value="<?= $y ?>">
                                     <?= $y ?>
                                 </option>
                             <?php endfor; ?>

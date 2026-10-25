@@ -100,10 +100,15 @@ $monthNames = [
                 style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_all_summary'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 All Summary
             </button>
-            <button type="button" class="nav-link" data-page="weekly-summary"
-                id="tab-weekly-summary" onclick="App.navigateTo('weekly-summary')"
+            <button type="button" class="nav-link" data-page="weekly-summary" id="tab-weekly-summary"
+                onclick="App.navigateTo('weekly-summary')"
                 style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_weekly_summary'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 Weekly Summary
+            </button>
+            <button type="button" class="nav-link" data-page="reports" id="tab-reports"
+                onclick="App.navigateTo('reports')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_reports'] ?? true) !== false) ? '' : 'display: none;' ?>">
+                Reports
             </button>
             <button type="button" class="nav-link" data-page="master-data" id="tab-master-data"
                 onclick="App.navigateTo('master-data')"
@@ -122,33 +127,36 @@ $monthNames = [
             </button>
         </nav>
 
-        <!-- Navbar Actions: Public Login Button & Direct Logout Button -->
+        <!-- Navbar Actions: User Dropdown (Admin session only) -->
         <div class="navbar-actions">
-            <!-- User Session: Logout Button (Direct, no dropdown) -->
-            <button type="button" class="nav-logout-btn" id="btn-navbar-logout"
-                onclick="App.logout()" title="Logout"
-                style="<?= $isLoggedIn ? 'display: inline-flex;' : 'display: none;' ?>">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                <span>Logout</span>
-            </button>
-
-            <!-- Public Session: Login Button -->
-            <button type="button" class="nav-login-btn" id="btn-navbar-login"
-                onclick="App.openLoginModal(sessionStorage.getItem('active_page') || 'summary')"
-                style="<?= $isLoggedIn ? 'display: none;' : '' ?>">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                    <polyline points="10 17 15 12 10 7"></polyline>
-                    <line x1="15" y1="12" x2="3" y2="12"></line>
-                </svg>
-                <span>Login</span>
-            </button>
+            <div class="user-dropdown-container" id="user-dropdown-container"
+                style="<?= $isLoggedIn ? '' : 'display: none;' ?>">
+                <button type="button" class="user-dropdown-btn" id="user-dropdown-toggle"
+                    onclick="App.toggleUserDropdown(event)">
+                    <div class="user-avatar-circle" id="nav-user-avatar">
+                        <?= strtoupper(substr($currentUser['name'] ?? 'A', 0, 1)) ?>
+                    </div>
+                    <span class="user-name-text" id="nav-user-name">
+                        <?= htmlspecialchars($currentUser['name'] ?? 'Asset Management Administrator', ENT_QUOTES, 'UTF-8') ?>
+                    </span>
+                    <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                <div class="user-dropdown-menu" id="user-dropdown-menu">
+                    <a href="logout.php" onclick="event.preventDefault(); App.logout();"
+                        class="user-dropdown-item text-danger">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -1205,7 +1213,6 @@ $monthNames = [
                             <table class="reconciliation-table" id="exec-catatan-table" style="margin: 0;">
                                 <thead>
                                     <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        <th style="width: 38px; text-align: center;">NO</th>
                                         <th class="sortable text-center" style="width: 95px;"
                                             id="exec-catatan-th-period" onclick="App.toggleExecCatatanSort('period')">
                                             BULAN <span class="sort-indicator" data-ecat-col="period">⇅</span>
@@ -1228,7 +1235,7 @@ $monthNames = [
                                 </thead>
                                 <tbody id="exec-catatan-tbody">
                                     <tr>
-                                        <td colspan="5" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
+                                        <td colspan="4" class="text-center" style="padding: 2.2rem; color: #94a3b8;">
                                             Memuat catatan...
                                         </td>
                                     </tr>
@@ -1352,18 +1359,17 @@ $monthNames = [
                                     <table class="reconciliation-table scorecard-table">
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                <th class="scorecard-col-no">NO</th>
                                                 <th class="scorecard-col-subdept">DEPT</th>
                                                 <th class="scorecard-col-sitecode">SITE CODE</th>
-                                                <th class="scorecard-col-namesite">NAMA SITE</th>
-                                                <th id="sc-rating-th-selected" class="scorecard-col-month">FISIK %
+                                                <th class="scorecard-col-namesite">NAME SITE</th>
+                                                <th id="sc-rating-th-selected" class="scorecard-col-month">%
                                                 </th>
                                                 <th class="scorecard-col-status">RATING</th>
                                             </tr>
                                         </thead>
                                         <tbody id="scorecard-rating-tbody">
                                             <tr>
-                                                <td colspan="6" class="text-center"
+                                                <td colspan="5" class="text-center"
                                                     style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                                                     <div
                                                         style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
@@ -1440,18 +1446,17 @@ $monthNames = [
                                     <table class="reconciliation-table scorecard-table">
                                         <thead>
                                             <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                <th class="scorecard-col-no">NO</th>
                                                 <th class="scorecard-col-subdept">DEPT</th>
                                                 <th class="scorecard-col-sitecode">SITE CODE</th>
-                                                <th class="scorecard-col-namesite">NAMA SITE</th>
-                                                <th id="sc-exec-th-selected" class="scorecard-col-month">FISIK %
+                                                <th class="scorecard-col-namesite">NAME SITE</th>
+                                                <th id="sc-exec-th-selected" class="scorecard-col-month">%
                                                 </th>
                                                 <th class="scorecard-col-status">STATUS</th>
                                             </tr>
                                         </thead>
                                         <tbody id="scorecard-exec-tbody">
                                             <tr>
-                                                <td colspan="6" class="text-center"
+                                                <td colspan="5" class="text-center"
                                                     style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                                                     <div
                                                         style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
@@ -1523,17 +1528,16 @@ $monthNames = [
                                         <table class="reconciliation-table scorecard-table">
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    <th class="scorecard-col-no">NO</th>
                                                     <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
-                                                    <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                    <th class="scorecard-col-namesite">NAME SITE</th>
                                                     <th class="scorecard-col-month">%</th>
                                                     <th class="scorecard-col-status">RATING</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="national-rating-tbody-m1">
                                                 <tr>
-                                                    <td colspan="6" class="text-center"
+                                                    <td colspan="5" class="text-center"
                                                         style="padding: 1.5rem; color: #94a3b8;">No data</td>
                                                 </tr>
                                             </tbody>
@@ -1561,17 +1565,16 @@ $monthNames = [
                                         <table class="reconciliation-table scorecard-table">
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    <th class="scorecard-col-no">NO</th>
                                                     <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
-                                                    <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                    <th class="scorecard-col-namesite">NAME SITE</th>
                                                     <th class="scorecard-col-month">%</th>
                                                     <th class="scorecard-col-status">RATING</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="national-rating-tbody-m2">
                                                 <tr>
-                                                    <td colspan="6" class="text-center"
+                                                    <td colspan="5" class="text-center"
                                                         style="padding: 1.5rem; color: #94a3b8;">No data</td>
                                                 </tr>
                                             </tbody>
@@ -1599,17 +1602,16 @@ $monthNames = [
                                         <table class="reconciliation-table scorecard-table">
                                             <thead>
                                                 <tr style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                    <th class="scorecard-col-no">NO</th>
                                                     <th class="scorecard-col-subdept">DEPT</th>
                                                     <th class="scorecard-col-sitecode">SITE CODE</th>
-                                                    <th class="scorecard-col-namesite">NAMA SITE</th>
+                                                    <th class="scorecard-col-namesite">NAME SITE</th>
                                                     <th class="scorecard-col-month">%</th>
                                                     <th class="scorecard-col-status">RATING</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="national-rating-tbody-m3">
                                                 <tr>
-                                                    <td colspan="6" class="text-center"
+                                                    <td colspan="5" class="text-center"
                                                         style="padding: 1.5rem; color: #94a3b8;">No data</td>
                                                 </tr>
                                             </tbody>
@@ -1793,9 +1795,9 @@ $monthNames = [
                                             <th
                                                 style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Pencapaian</th>
-                                            <th rowspan="2" class="sortable col-status"
+                                            <th rowspan="2" class="sortable text-center col-status"
                                                 onclick="App.toggleSubdeptResultsSort('status')"
-                                                style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 190px; min-width: 170px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 190px; min-width: 170px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                                 Status <span class="sort-indicator" data-subdept-col="status">⇅</span>
                                             </th>
                                         </tr>
@@ -2039,7 +2041,6 @@ $monthNames = [
                             <table class="reconciliation-table" id="rdb-status-flat-table">
                                 <thead>
                                     <tr>
-                                        <th class="text-center align-middle" style="width: 45px;">NO</th>
                                         <th class="text-center align-middle sortable col-rdb-dept" id="rdb-th-dept-col"
                                             style="width: 85px;" onclick="App.toggleRekapDbStatusSort('dept')">
                                             <span id="rdb-th-dept">DIVISI</span> <span class="sort-indicator"
@@ -2058,7 +2059,7 @@ $monthNames = [
                                         </th>
                                         <th class="text-left align-middle sortable" style="min-width: 140px;"
                                             onclick="App.toggleRekapDbStatusSort('name_site')">
-                                            NAMA SITE <span class="sort-indicator"
+                                            NAME SITE <span class="sort-indicator"
                                                 data-rdb-status-col="name_site">⇅</span>
                                         </th>
                                         <th class="text-center align-middle sortable" style="width: 150px;"
@@ -2204,8 +2205,9 @@ $monthNames = [
                                         onclick="App.toggleRekapSort('sitecode')">
                                         SITECODE <span class="sort-indicator" data-rekap-col="sitecode">⇅</span>
                                     </th>
-                                    <th class="text-center align-middle sortable"
-                                        onclick="App.toggleRekapSort('name_site')">
+                                    <th class="text-left align-middle sortable"
+                                        onclick="App.toggleRekapSort('name_site')"
+                                        style="text-align: left;">
                                         NAME SITE <span class="sort-indicator" data-rekap-col="name_site">⇅</span>
                                     </th>
                                     <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m1')">
@@ -2410,7 +2412,7 @@ $monthNames = [
                                     <tr>
                                         <th style="padding: 8px 10px; width: 45px; text-align: center;">NO</th>
                                         <th style="padding: 8px 10px; width: 120px; text-align: center;">SITE CODE</th>
-                                        <th style="padding: 8px 10px;">NAMA SITE</th>
+                                        <th style="padding: 8px 10px; text-align: left;">NAME SITE</th>
                                         <th style="padding: 8px 10px;">DEPT / SUB DEPT</th>
                                         <th style="padding: 8px 10px; text-align: center; min-width: 175px;">LOG HISTORY
                                         </th>
@@ -2450,6 +2452,9 @@ $monthNames = [
 
         <!-- Weekly Summary Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_weekly_summary.php'; ?>
+
+        <!-- Reports Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_reports.php'; ?>
 
         <!-- Master Data Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_master_data.php'; ?>

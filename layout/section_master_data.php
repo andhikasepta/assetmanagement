@@ -34,13 +34,46 @@ if (!isset($monthNames)) {
         12 => 'Desember'
     ];
 }
+
+$masterLatestUpdateText = '';
+try {
+    $dbInstance = getDbConnection();
+    $luStmt = $dbInstance->query("
+        SELECT period_month, period_year, MAX(COALESCE(updated_at, created_at)) as latest_ts
+        FROM asset_reconciliation
+        WHERE period_month IS NOT NULL AND period_year IS NOT NULL
+        GROUP BY period_year, period_month
+        ORDER BY period_year DESC, period_month DESC
+        LIMIT 1
+    ");
+    $luRow = $luStmt ? $luStmt->fetch(PDO::FETCH_ASSOC) : null;
+    if ($luRow && !empty($luRow['latest_ts'])) {
+        $dt = new DateTime($luRow['latest_ts']);
+        $dt->setTimezone(new DateTimeZone('Asia/Jakarta'));
+        $day = $dt->format('d');
+        $mName = $monthNames[(int) $dt->format('n')] ?? $dt->format('F');
+        $yStr = $dt->format('Y');
+        $tStr = $dt->format('H:i:s');
+        $pm = (int) $luRow['period_month'];
+        $pName = $monthNames[$pm] ?? "Bulan $pm";
+        $masterLatestUpdateText = "Last Update : Periode $pName ($day $mName $yStr, $tStr WIB)";
+    }
+} catch (Throwable $e) {
+}
 ?>
 <section id="page-master-data" class="page-section" style="display: none;">
     <div class="card" id="card-master-opname">
         <div class="card-header">
             <div>
-                <h2 class="card-title">Stock Opname Master Data</h2>
-                <p class="card-subtitle">INTAN Raw Stock Opname Data (Download data per tanggal 26 setiap bulan)
+                <div style="display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+                    <h2 class="card-title" style="margin-bottom: 0;">Stock Opname Master Data</h2>
+                    <i id="master-opname-last-update"
+                        style="font-size: 13px; color: #64748b; font-weight: normal; font-style: italic;">
+                        <?= htmlspecialchars($masterLatestUpdateText ?: 'Last Update : Periode September (26 September 2026, 09:25:20 WIB)') ?>
+                    </i>
+                </div>
+                <p class="card-subtitle" style="margin-top: 4px;">INTAN Raw Stock Opname Data (Download data per tanggal
+                    26 setiap bulan)
                 </p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
@@ -260,7 +293,8 @@ if (!isset($monthNames)) {
                     onclick="App.bulkDeleteSiteRegional()">
                     Hapus Terpilih (<span id="sr-selected-count">0</span>)
                 </button>
-                <button class="btn btn-primary" data-uac="master-add-import" onclick="App.openSiteRegionalImportModal()">
+                <button class="btn btn-primary" data-uac="master-add-import"
+                    onclick="App.openSiteRegionalImportModal()">
                     Impor Data
                 </button>
             </div>
@@ -328,7 +362,7 @@ if (!isset($monthNames)) {
                 <table class="reconciliation-table" id="sr-table">
                     <thead>
                         <tr>
-                            <th colspan="5" class="text-center align-middle col-action-group">ACTION</th>
+                            <th colspan="6" class="text-center align-middle col-action-group">ACTION</th>
                             <th rowspan="2" class="text-center align-middle sortable"
                                 onclick="App.toggleSRSort('dept')">
                                 DEPT <span class="sort-indicator" data-sr-col="dept">⇅</span>
@@ -341,8 +375,8 @@ if (!isset($monthNames)) {
                                 onclick="App.toggleSRSort('sitecode')">
                                 SITECODE <span class="sort-indicator" data-sr-col="sitecode">⇅</span>
                             </th>
-                            <th rowspan="2" class="text-center align-middle sortable"
-                                onclick="App.toggleSRSort('name_site')">
+                            <th rowspan="2" class="text-left align-middle sortable"
+                                onclick="App.toggleSRSort('name_site')" style="text-align: left;">
                                 NAME SITE <span class="sort-indicator" data-sr-col="name_site">⇅</span>
                             </th>
                             <th rowspan="2" class="text-center align-middle sortable"
@@ -357,8 +391,7 @@ if (!isset($monthNames)) {
                         <tr>
                             <!-- Under ACTION -->
                             <th class="text-center align-middle col-action-select" style="padding: 4px;">
-                                <input type="checkbox" id="sr-select-all"
-                                    onchange="App.toggleSelectAllSR(this.checked)"
+                                <input type="checkbox" id="sr-select-all" onchange="App.toggleSelectAllSR(this.checked)"
                                     style="cursor: pointer; width: 15px; height: 15px;">
                             </th>
                             <th class="text-center align-middle col-action-delete"
@@ -377,11 +410,15 @@ if (!isset($monthNames)) {
                                 style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
                                 SYNC
                             </th>
+                            <th class="text-center align-middle col-action-weekly"
+                                style="padding: 4px 6px; font-size: 10px; font-weight: 600;">
+                                WEEKLY
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="sr-table-body">
                         <tr>
-                            <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                            <td colspan="12" class="text-center" style="padding: 2.5rem; color: #64748b;">
                                 Memuat data...
                             </td>
                         </tr>
@@ -573,7 +610,8 @@ if (!isset($monthNames)) {
                         <option value="12">Desember</option>
                     </select>
                 </div>
-                <button class="btn btn-primary btn-sm" data-uac="master-add-import" onclick="App.openAddExecutiveNoteModal()"
+                <button class="btn btn-primary btn-sm" data-uac="master-add-import"
+                    onclick="App.openAddExecutiveNoteModal()"
                     style="font-size: 11.5px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2.5">
@@ -637,7 +675,8 @@ if (!isset($monthNames)) {
                 <button class="btn btn-refresh" onclick="App.loadPicSites()">
                     Refresh
                 </button>
-                <button class="btn btn-outline-success btn-sm" data-uac="master-add-import" onclick="App.openPicSitesImportModal()"
+                <button class="btn btn-outline-success btn-sm" data-uac="master-add-import"
+                    onclick="App.openPicSitesImportModal()"
                     style="font-size: 12px; font-weight: 600; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -755,6 +794,259 @@ if (!isset($monthNames)) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CARD: Circular Sign PIC Master Data                         -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="card" id="card-circular-pics" style="margin-top: 2rem; margin-bottom: 2rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+                <h2 class="card-title">Circular Sign PIC Master Data</h2>
+                <p class="card-subtitle">Master data Circular Sign PIC</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-refresh" onclick="App.loadCircularPics()">
+                    Refresh
+                </button>
+                <button class="btn btn-outline-success btn-sm" data-uac="master-add-import"
+                    onclick="App.openCircularPicsImportModal()"
+                    style="font-size: 12px; font-weight: 600; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Import Excel</span>
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="App.exportCircularPicsExcel()"
+                    style="font-size: 12px; font-weight: 600; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 5px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Export Excel</span>
+                </button>
+                <button class="btn btn-primary" data-uac="master-add-import" onclick="App.openAddCircularPicModal()"
+                    style="display: inline-flex; align-items: center; gap: 5px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Tambah PIC</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Table Toolbar: Page Size, Filters & Search -->
+        <div class="table-toolbar" style="gap: 0.75rem; flex-wrap: wrap;">
+            <div class="table-toolbar-left" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <label for="circular-pics-page-size">Tampilkan</label>
+                <select id="circular-pics-page-size" class="form-control unified-filter-select" style="width: auto;"
+                    autocomplete="off" onchange="App.changeCircularPicsPageSize(this.value)">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="all">Semua</option>
+                </select>
+                <span>baris</span>
+
+                <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 4px;"></span>
+
+                <label for="circular-pics-filter-dept">DEPT</label>
+                <select id="circular-pics-filter-dept" class="form-control unified-filter-select" style="width: auto;"
+                    autocomplete="off" onchange="App.onCircularPicsDeptFilterChange()">
+                    <option value="all" selected>Semua Dept</option>
+                </select>
+
+                <label for="circular-pics-filter-subdept">SUB DEPT</label>
+                <select id="circular-pics-filter-subdept" class="form-control unified-filter-select"
+                    style="width: auto;" autocomplete="off" onchange="App.onCircularPicsSubDeptFilterChange()">
+                    <option value="all" selected>Semua Sub Dept</option>
+                </select>
+
+                <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 4px;"></span>
+
+                <label for="circular-pics-filter-status">STATUS</label>
+                <select id="circular-pics-filter-status" class="form-control unified-filter-select" style="width: auto;"
+                    autocomplete="off" onchange="App.onCircularPicsStatusFilterChange()">
+                    <option value="all" selected>Semua Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="table-toolbar-right">
+                <input type="text" id="circular-pics-search-input" class="table-search-input unified-search-input"
+                    placeholder="Search..." autocomplete="off" value=""
+                    oninput="App.handleCircularPicsSearch(this.value)">
+            </div>
+        </div>
+
+        <!-- Circular Sign PIC Table -->
+        <div class="card-body" style="padding: 0;">
+            <div class="table-responsive">
+                <table class="reconciliation-table" id="circular-pics-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width: 50px; text-align: center; vertical-align: middle;">NO</th>
+                            <th rowspan="2" class="sortable text-left" style="vertical-align: middle;"
+                                onclick="App.toggleCircularPicsSort('dept')">
+                                DEPT/SUBDEPT <span class="sort-indicator" data-cpics-col="dept">⇅</span>
+                            </th>
+                            <th rowspan="2" class="sortable text-left" style="vertical-align: middle;"
+                                onclick="App.toggleCircularPicsSort('pic')">
+                                PIC <span class="sort-indicator" data-cpics-col="pic">⇅</span>
+                            </th>
+                            <th rowspan="2" class="sortable text-left" style="vertical-align: middle;"
+                                onclick="App.toggleCircularPicsSort('job_title')">
+                                JOB TITLE <span class="sort-indicator" data-cpics-col="job_title">⇅</span>
+                            </th>
+                            <th colspan="3" class="text-center align-middle col-action-group"
+                                style="text-align: center; min-width: 140px;">ACTION</th>
+                        </tr>
+                        <tr>
+                            <!-- Sub headers under ACTION -->
+                            <th class="text-center align-middle col-action-edit"
+                                style="width: 50px; padding: 4px 6px; font-size: 10px; font-weight: 600; text-align: center;">
+                                EDIT
+                            </th>
+                            <th class="text-center align-middle col-action-delete"
+                                style="width: 50px; padding: 4px 6px; font-size: 10px; font-weight: 600; text-align: center;">
+                                DEL
+                            </th>
+                            <th class="text-center align-middle col-action-active"
+                                style="width: 44px; padding: 4px 2px; font-size: 10px; font-weight: 600; text-align: center;"
+                                title="Status Aktif / Inaktif">
+                                ACT
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="circular-pics-tbody">
+                        <tr>
+                            <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                Memuat data Circular Sign PIC...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Table Pagination Footer -->
+        <div class="table-pagination-footer">
+            <div id="circular-pics-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+            <div class="pagination-controls" id="circular-pics-pagination-controls"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- CARD: Template Report Master Data                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="card" id="card-template-reports" style="margin-top: 2rem;">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">Template Report Master Data</h2>
+                <p class="card-subtitle">Master data template dokumen laporan (.docx, .doc, .pdf)</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-refresh" onclick="App.loadTemplateReports()">
+                    Refresh
+                </button>
+                <button class="btn btn-primary" data-uac="master-add-import"
+                    onclick="App.openTemplateReportUploadModal()"
+                    style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Import Template Report</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Table Toolbar: Page Size, Filters & Search -->
+        <div class="table-toolbar" style="gap: 0.75rem; flex-wrap: wrap;">
+            <div class="table-toolbar-left" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <label for="template-reports-page-size">Tampilkan</label>
+                <select id="template-reports-page-size" class="form-control unified-filter-select" style="width: auto;"
+                    autocomplete="off" onchange="App.changeTemplateReportsPageSize(this.value)">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="all">Semua</option>
+                </select>
+                <span>baris</span>
+
+                <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 4px;"></span>
+
+                <label for="template-reports-filter-type">TIPE FILE</label>
+                <select id="template-reports-filter-type" class="form-control unified-filter-select"
+                    style="width: auto;" autocomplete="off" onchange="App.onTemplateReportsFilterTypeChange()">
+                    <option value="all" selected>Semua Tipe</option>
+                    <option value="word">Word (.docx, .doc)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                </select>
+            </div>
+            <div class="table-toolbar-right">
+                <input type="text" id="template-reports-search-input" class="table-search-input unified-search-input"
+                    placeholder="Search..." autocomplete="off" value=""
+                    oninput="App.handleTemplateReportsSearch(this.value)">
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card-body" style="padding: 0;">
+            <div class="table-responsive">
+                <table class="reconciliation-table" id="template-reports-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center; vertical-align: middle;">NO</th>
+                            <th class="sortable text-left" style="vertical-align: middle; min-width: 220px;"
+                                onclick="App.toggleTemplateReportsSort('title')">
+                                NAMA TEMPLATE <span class="sort-indicator" data-tr-col="title">⇅</span>
+                            </th>
+                            <th class="sortable text-center" style="width: 120px; vertical-align: middle;"
+                                onclick="App.toggleTemplateReportsSort('file_type')">
+                                TIPE FILE <span class="sort-indicator" data-tr-col="file_type">⇅</span>
+                            </th>
+                            <th class="text-left" style="vertical-align: middle; min-width: 200px;">
+
+                            </th>
+                            <th class="sortable text-center" style="width: 100px; vertical-align: middle;"
+                                onclick="App.toggleTemplateReportsSort('file_size')">
+                                UKURAN <span class="sort-indicator" data-tr-col="file_size">⇅</span>
+                            </th>
+                            <th class="sortable text-center" style="width: 150px; vertical-align: middle;"
+                                onclick="App.toggleTemplateReportsSort('created_at')">
+                                DATE <span class="sort-indicator" data-tr-col="created_at">⇅</span>
+                            </th>
+                            <th class="text-center align-middle" style="width: 170px; text-align: center;">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="template-reports-tbody">
+                        <tr>
+                            <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                                Memuat data Template Report...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Table Pagination Footer -->
+        <div class="table-pagination-footer">
+            <div id="template-reports-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+            <div class="pagination-controls" id="template-reports-pagination-controls"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- SECTION: Score Card KPI Master Data (Rating & Execution)    -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="scorecard-kpi-grid"
@@ -771,8 +1063,8 @@ if (!isset($monthNames)) {
                         style="font-size: 11.5px; padding: 3px 8px;">
                         Refresh
                     </button>
-                    <button class="btn btn-primary btn-sm" id="kpi-edit-btn" data-uac="master-edit" onclick="App.toggleEditScorecardKpi()"
-                        style="font-size: 11.5px; padding: 3px 8px;">
+                    <button class="btn btn-primary btn-sm" id="kpi-edit-btn" data-uac="master-edit"
+                        onclick="App.toggleEditScorecardKpi()" style="font-size: 11.5px; padding: 3px 8px;">
                         Edit Range (%)
                     </button>
                     <button class="btn btn-warning btn-sm" id="kpi-reset-btn"
@@ -1544,6 +1836,249 @@ if (!isset($monthNames)) {
                 onclick="App.submitPicSitesImport()">
                 Unggah &amp; Impor
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODAL: Tambah / Edit Circular Sign PIC                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="circular-pic-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="circular-pic-modal-title">Tambah Circular Sign PIC</h3>
+            <button class="modal-close-btn" onclick="App.closeCircularPicModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem;">
+            <form id="circular-pic-form" onsubmit="App.submitCircularPicForm(event)">
+                <input type="hidden" id="circular-pic-id" value="">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="circular-pic-dept">DEPT</label>
+                        <input type="text" id="circular-pic-dept" class="form-control" placeholder="Contoh: CRO">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="circular-pic-subdept">SUB DEPT</label>
+                        <input type="text" id="circular-pic-subdept" class="form-control" placeholder="Contoh: WJO">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="circular-pic-pic">Nama PIC <span
+                            style="color:#ef4444;">*</span></label>
+                    <input type="text" id="circular-pic-pic" class="form-control" required
+                        placeholder="Masukkan Nama PIC">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="circular-pic-job-title">Job Title <span
+                            style="color:#ef4444;">*</span></label>
+                    <input type="text" id="circular-pic-job-title" class="form-control" required
+                        placeholder="Contoh: Department Head PMD / Area Manager">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="circular-pic-is-active" checked
+                            style="width: 17px; height: 17px; accent-color: #2563eb; cursor: pointer;">
+                        <span style="font-size: 13px; font-weight: 600; color: #334155;">Status Aktif (Active)</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+                    <button type="button" class="btn btn-secondary" onclick="App.closeCircularPicModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-circular-pic">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODAL: Impor Data Circular Sign PIC                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="circular-pics-import-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" style="max-width: 540px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Impor Data Circular Sign PIC</h3>
+            <button class="modal-close-btn" onclick="App.closeCircularPicsImportModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem;">
+
+            <!-- Drag and Drop Upload Area -->
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Unggah File (.xlsx, .xls)</label>
+                <div id="circular-pics-drag-drop-zone" class="drag-drop-zone"
+                    onclick="document.getElementById('circular-pics-import-file-input').click()">
+                    <div class="drag-drop-text">Tarik &amp; lepas file Excel di sini</div>
+                    <div class="drag-drop-subtext">atau klik untuk memilih dari komputer</div>
+                </div>
+                <input type="file" id="circular-pics-import-file-input" accept=".xlsx,.xls,.csv" style="display: none;"
+                    onchange="App.handleCircularPicsFileSelect(this.files)">
+
+                <!-- Selected File Display -->
+                <div id="circular-pics-selected-file-display" style="display: none; margin-top: 0.5rem;">
+                    <div class="selected-file-badge">
+                        <div class="selected-file-info">
+                            <span id="circular-pics-selected-file-name">file.xlsx</span>
+                            <span id="circular-pics-selected-file-size" style="color: #64748b; font-size: 11px;">(0
+                                KB)</span>
+                        </div>
+                        <button type="button" class="selected-file-remove"
+                            onclick="App.clearCircularPicsSelectedFile()">&times;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sheet Selection Group -->
+            <div class="form-group" id="circular-pics-import-sheet-group" style="display: none; margin-top: 1rem;">
+                <label class="form-label" for="circular-pics-import-sheet-select">Pilih Sheet</label>
+                <select id="circular-pics-import-sheet-select" class="form-control unified-filter-select"
+                    style="cursor: pointer; width: 100%;">
+                    <option value="">Membaca sheet...</option>
+                </select>
+                <div id="circular-pics-import-sheet-hint" style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                </div>
+            </div>
+
+            <!-- Overwrite Option -->
+            <div class="form-group" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                <label
+                    style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 13px; color: #475569;">
+                    <input type="checkbox" id="circular-pics-import-replace-existing"
+                        style="width: 16px; height: 16px; margin-top: 2px; cursor: pointer;">
+                    <span><strong>Replace data yang ada</strong></span>
+                </label>
+            </div>
+
+            <!-- Download Template Button -->
+            <div style="margin-top: 0.75rem; text-align: right;">
+                <a href="javascript:void(0)" onclick="App.downloadCircularPicsTemplate()"
+                    style="font-size: 12px; color: #2563eb; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Unduh Format Template Excel
+                </a>
+            </div>
+
+            <!-- Status message in modal -->
+            <div id="circular-pics-modal-import-status"
+                style="display: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-top: 12px;">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="App.closeCircularPicsImportModal()">Batal</button>
+            <button type="button" class="btn btn-primary" id="circular-pics-modal-import-btn"
+                onclick="App.submitCircularPicsImport()">
+                Unggah &amp; Impor
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODAL: Impor / Unggah Template Report (Word & PDF)           -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="template-report-upload-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Import Template Report</h3>
+            <button class="modal-close-btn" onclick="App.closeTemplateReportUploadModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem;">
+            <form id="template-report-upload-form" onsubmit="App.submitTemplateReportUpload(event)">
+                <!-- Drag and Drop Upload Area (Word & PDF) -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label">Pilih Dokumen (.docx, .doc, .pdf) <span
+                            style="color:#ef4444;">*</span></label>
+                    <div id="template-report-drag-drop-zone" class="drag-drop-zone"
+                        onclick="document.getElementById('template-report-file-input').click()">
+                        <div class="drag-drop-text">Tarik &amp; lepas file Word (.docx, .doc) atau PDF di sini</div>
+                        <div class="drag-drop-subtext">atau klik untuk memilih dari komputer</div>
+                    </div>
+                    <input type="file" id="template-report-file-input" accept=".docx,.doc,.pdf" style="display: none;"
+                        onchange="App.handleTemplateReportFileSelect(this.files)">
+
+                    <!-- Selected File Display -->
+                    <div id="template-report-selected-file-display" style="display: none; margin-top: 0.5rem;">
+                        <div class="selected-file-badge">
+                            <div class="selected-file-info">
+                                <span id="template-report-selected-file-icon" style="margin-right: 4px;">📄</span>
+                                <span id="template-report-selected-file-name">dokumen.docx</span>
+                                <span id="template-report-selected-file-size"
+                                    style="color: #64748b; font-size: 11px;">(0 KB)</span>
+                            </div>
+                            <button type="button" class="selected-file-remove"
+                                onclick="App.clearTemplateReportSelectedFile()">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Nama Template -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="template-report-title">Nama Template <span
+                            style="color:#ef4444;">*</span></label>
+                    <input type="text" id="template-report-title" class="form-control" required
+                        placeholder="Masukkan Nama Template...">
+                </div>
+
+                <!-- Input Keterangan / Deskripsi -->
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label class="form-label" for="template-report-desc">Deskripsi</label>
+                    <textarea id="template-report-desc" class="form-control" rows="3"
+                        placeholder="Masukkan Deskripsi..."></textarea>
+                </div>
+
+                <!-- Status message in modal -->
+                <div id="template-report-modal-status"
+                    style="display: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-bottom: 1rem;">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="App.closeTemplateReportUploadModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btn-upload-template-report">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODAL: Edit Template Report                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="template-report-edit-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Template Report</h3>
+            <button class="modal-close-btn" onclick="App.closeTemplateReportEditModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem;">
+            <form id="template-report-edit-form" onsubmit="App.submitTemplateReportEdit(event)">
+                <input type="hidden" id="edit-template-report-id" value="">
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="edit-template-report-title">Nama Template <span
+                            style="color:#ef4444;">*</span></label>
+                    <input type="text" id="edit-template-report-title" class="form-control" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label class="form-label" for="edit-template-report-desc">Deskripsi</label>
+                    <textarea id="edit-template-report-desc" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="App.closeTemplateReportEditModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-edit-template-report">Simpan
+                        Perubahan</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

@@ -44,6 +44,7 @@ try {
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_counted BOOLEAN DEFAULT TRUE;
         ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE;
+        ALTER TABLE site_regional ADD COLUMN IF NOT EXISTS is_counted_weekly BOOLEAN DEFAULT TRUE;
 
         CREATE TABLE IF NOT EXISTS site_group_history (
             id SERIAL PRIMARY KEY,
@@ -357,6 +358,7 @@ try {
                 ) as group_type,
                 COALESCE(sr.is_active, TRUE) as is_active,
                 COALESCE(sr.is_counted, TRUE) as is_counted,
+                COALESCE(sr.is_counted_weekly, TRUE) as is_counted_weekly,
                 COALESCE(sr.is_synced, (SELECT COUNT(*) > 0 FROM site_group_history sgh WHERE sgh.sitecode = sr.sitecode)) as is_synced,
                 (SELECT COUNT(*) FROM site_group_history sgh WHERE sgh.sitecode = sr.sitecode) as history_count
             FROM site_regional sr
@@ -591,6 +593,23 @@ try {
             $stmt->execute([':counted' => $isCounted ? 1 : 0, ':id' => $id]);
 
             echo json_encode(['success' => true, 'message' => 'Status hitung berhasil diperbarui', 'is_counted' => $isCounted]);
+            exit;
+        }
+
+        if ($action === 'update_counted_weekly') {
+            $id = (int)($jsonPayload['id'] ?? $_POST['id'] ?? 0);
+            if ($id <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID tidak valid']);
+                exit;
+            }
+
+            $isCountedWeekly = filter_var($jsonPayload['is_counted_weekly'] ?? $_POST['is_counted_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+            $stmt = $db->prepare("UPDATE site_regional SET is_counted_weekly = :counted_weekly, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+            $stmt->execute([':counted_weekly' => $isCountedWeekly ? 1 : 0, ':id' => $id]);
+
+            echo json_encode(['success' => true, 'message' => 'Status hitung mingguan berhasil diperbarui', 'is_counted_weekly' => $isCountedWeekly]);
             exit;
         }
 

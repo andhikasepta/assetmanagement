@@ -803,14 +803,14 @@ const AllSummaryApp = (function () {
         const tbody = document.getElementById('hasil-so-table-body');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Report SO...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Report SO...</td></tr>`;
 
         try {
             const url = `api/reconciliation.php?action=subdept_results&category=all&so_type=${summarySOType}&month=${month}&year=${year}&dept=all&sub_dept=all`;
             const res = await fetch(url);
             const json = await res.json();
             if (!json.success) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
                 renderHasilPieChart(0, 0, 0, 0);
                 return;
             }
@@ -838,7 +838,7 @@ const AllSummaryApp = (function () {
             applyHasilFilter();
         } catch (err) {
             console.error('Error loading hasil SO:', err);
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
             renderHasilPieChart(0, 0, 0, 0);
         }
     }
@@ -874,7 +874,7 @@ const AllSummaryApp = (function () {
         if (!tbody) return;
 
         if (filteredHasilRows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
             updateHasilPagination(0);
             return;
         }
@@ -916,14 +916,13 @@ const AllSummaryApp = (function () {
 
             html += `
                 <tr>
-                    <td style="text-align: center; color: #64748b;">${no}</td>
                     <td style="font-weight: 700; color: #0284c7; text-align: center;">${r.sitecode || '-'}</td>
-                    <td style="font-weight: 500; color: #1e293b;">${r.name_site || '-'}</td>
-                    <td style="font-size: 11.5px; color: #475569;">${r.dept || '-'} / ${r.sub_dept || '-'}</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${Number(qtyMatch).toLocaleString('id-ID')}</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${Number(qtyPhysic).toLocaleString('id-ID')}</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${Number(qtyDb).toLocaleString('id-ID')}</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">${Number(qtyActual).toLocaleString('id-ID')}</td>
+                    <td style="font-weight: 500; color: #1e293b; text-align: left;">${r.name_site || '-'}</td>
+                    <td style="font-size: 11.5px; color: #475569; text-align: left;">${r.dept || '-'} / ${r.sub_dept || '-'}</td>
+                    <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyMatch).toLocaleString('id-ID')}</td>
+                    <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyPhysic).toLocaleString('id-ID')}</td>
+                    <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyDb).toLocaleString('id-ID')}</td>
+                    <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyActual).toLocaleString('id-ID')}</td>
                     <td style="text-align: center; ${pctColor}">${pctText}</td>
                     <td style="text-align: center;">${statusBadge}</td>
                 </tr>
@@ -1029,14 +1028,14 @@ const AllSummaryApp = (function () {
         if (!tbody) return;
 
         allRdbStatusPage = page;
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data status DB...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data status DB...</td></tr>`;
 
         try {
             const url = `api/rekap_db_status.php?category=all&month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}&page=${allRdbStatusPage}&limit=${allRdbStatusPageSize}`;
             const res = await fetch(url);
             const json = await res.json();
             if (!json.success) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
                 if (info) info.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
                 if (controls) controls.innerHTML = '';
                 return;
@@ -1055,7 +1054,7 @@ const AllSummaryApp = (function () {
 
             if (rows.length === 0) {
                 const emptyMsg = json.message || 'Tidak ada data status DB pada periode ini.';
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">${escapeHtml(emptyMsg)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">${escapeHtml(emptyMsg)}</td></tr>`;
                 return;
             }
 
@@ -1070,9 +1069,8 @@ const AllSummaryApp = (function () {
 
                 html += `
                     <tr>
-                        <td style="text-align: center; color: #64748b;">${no}</td>
                         <td style="font-weight: 700; color: #0284c7; text-align: center;">${r.sitecode || '-'}</td>
-                        <td style="font-weight: 500;">${r.name_site || '-'}</td>
+                        <td style="font-weight: 500; text-align: left;">${r.name_site || '-'}</td>
                         <td style="font-size: 11.5px; color: #475569;">${r.dept || '-'} / ${r.sub_dept || '-'}</td>
                         <td style="font-size: 11.5px; font-weight: 600;">${r.reg_no || '-'}</td>
                         <td style="font-size: 11.5px; color: #64748b;">${r.name || r.description || '-'}</td>
@@ -1083,7 +1081,7 @@ const AllSummaryApp = (function () {
             tbody.innerHTML = html;
         } catch (err) {
             console.error('Error loading rekap db status:', err);
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat status DB</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat status DB</td></tr>`;
             if (info) info.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
             if (controls) controls.innerHTML = '';
         }
@@ -1104,14 +1102,14 @@ const AllSummaryApp = (function () {
         const tbody = document.getElementById('all-rekap-table-body');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Rekapitulasi...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Rekapitulasi...</td></tr>`;
 
         try {
             const url = `api/rekapitulasi.php?category=all&so_type=${summarySOType}&year=${year}`;
             const res = await fetch(url);
             const json = await res.json();
             if (!json.success) {
-                tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat Rekapitulasi</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat Rekapitulasi</td></tr>`;
                 return;
             }
 
@@ -1119,7 +1117,7 @@ const AllSummaryApp = (function () {
             applyRekapFilter();
         } catch (err) {
             console.error('Error loading rekapitulasi:', err);
-            tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
         }
     }
 
@@ -1143,7 +1141,7 @@ const AllSummaryApp = (function () {
         if (!tbody) return;
 
         if (filteredRekapRows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
             updateRekapPagination(0);
             return;
         }
@@ -1166,9 +1164,8 @@ const AllSummaryApp = (function () {
 
             html += `
                 <tr>
-                    <td style="text-align: center; color: #64748b;">${no}</td>
-                    <td style="font-weight: 700; color: #0284c7;">${r.sitecode || '-'}</td>
-                    <td style="font-weight: 500; color: #1e293b;">${r.name_site || '-'}</td>
+                    <td style="font-weight: 700; color: #0284c7; text-align: center;">${r.sitecode || '-'}</td>
+                    <td style="font-weight: 500; color: #1e293b; text-align: left;">${r.name_site || '-'}</td>
                     <td style="font-size: 11.5px; color: #475569;">${r.dept || '-'} / ${r.sub_dept || '-'}</td>
                     ${monthCols}
                 </tr>
@@ -1649,6 +1646,33 @@ const AllSummaryApp = (function () {
         loadSiteMovements(year, '');
     }
 
+    function toggleUserDropdown(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const container = document.getElementById('user-dropdown-container');
+        if (container) {
+            container.classList.toggle('active');
+        }
+    }
+
+    function closeUserDropdown() {
+        const container = document.getElementById('user-dropdown-container');
+        if (container) {
+            container.classList.remove('active');
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('user-dropdown-container');
+        if (dropdown && dropdown.classList.contains('active')) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        }
+    });
+
     return {
         init,
         switchSOType,
@@ -1670,7 +1694,9 @@ const AllSummaryApp = (function () {
         toggleMovementDetails,
         viewAllYearMovements,
         loadSiteMovements,
-        toggleHasilStatusFilter
+        toggleHasilStatusFilter,
+        toggleUserDropdown,
+        closeUserDropdown
     };
 })();
 

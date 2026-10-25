@@ -94,6 +94,7 @@ function attemptLogin(string $username, string $password): array
                     'permissions' => [
                         'can_access_all_summary'         => filter_var($user['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_weekly_summary'      => filter_var($user['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_reports'             => filter_var($user['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data'         => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data_weekly'  => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_user_management'     => filter_var($user['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
@@ -125,6 +126,7 @@ function attemptLogin(string $username, string $password): array
             'permissions' => [
                 'can_access_all_summary'        => true,
                 'can_access_weekly_summary'     => true,
+                'can_access_reports'            => true,
                 'can_access_master_data'        => true,
                 'can_access_master_data_weekly' => true,
                 'can_access_user_management'    => true,

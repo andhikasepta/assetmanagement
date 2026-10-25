@@ -610,7 +610,7 @@ try {
         'B' => $deptHeader,
         'C' => $subDeptHeader,
         'D' => 'SITECODE',
-        'E' => 'NAMA SITE',
+        'E' => 'NAME SITE',
         'F' => 'REG NO',
         'G' => 'NAME',
         'H' => 'SN',

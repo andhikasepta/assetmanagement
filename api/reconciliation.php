@@ -1624,12 +1624,63 @@ try {
         }
         unset($row);
 
+        $latestUpdatesStmt = $db->query("
+            SELECT 
+                period_year,
+                period_month,
+                MAX(COALESCE(updated_at, created_at)) as latest_ts
+            FROM asset_reconciliation
+            WHERE period_month IS NOT NULL AND period_year IS NOT NULL
+            GROUP BY period_year, period_month
+            ORDER BY period_year DESC, period_month DESC
+        ");
+        $updateRows = $latestUpdatesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $indonesianMonths = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+
+        $periodUpdates = [];
+        $overallLatest = null;
+
+        foreach ($updateRows as $ur) {
+            $pm = (int) $ur['period_month'];
+            $py = (int) $ur['period_year'];
+            $ts = $ur['latest_ts'];
+            if (!$ts) continue;
+
+            $dt = new DateTime($ts);
+            $dt->setTimezone(new DateTimeZone('Asia/Jakarta'));
+            $day = $dt->format('d');
+            $mName = $indonesianMonths[(int)$dt->format('n')] ?? $dt->format('F');
+            $yStr = $dt->format('Y');
+            $tStr = $dt->format('H:i:s');
+            $pName = $indonesianMonths[$pm] ?? "Bulan $pm";
+
+            $updateObj = [
+                'period_month' => $pm,
+                'period_year' => $py,
+                'period_name' => $pName,
+                'datetime' => "$day $mName $yStr, $tStr WIB",
+                'text' => "Last Update : Periode $pName ($day $mName $yStr, $tStr WIB)"
+            ];
+
+            $periodUpdates["{$pm}_{$py}"] = $updateObj;
+            if ($overallLatest === null) {
+                $overallLatest = $updateObj;
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'data' => $rows,
             'totals' => $totals,
             'achievements' => $achievements,
             'total' => count($rows),
+            'latest_update' => $overallLatest,
+            'period_updates' => $periodUpdates
         ]);
         exit;
     }

@@ -157,6 +157,15 @@
 
                         <label
                             style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="user-uac-reports" checked
+                                style="width: 16px; height: 16px; cursor: pointer;">
+                            <div>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Reports</span>
+                            </div>
+                        </label>
+
+                        <label
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="user-uac-master-data" checked
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>

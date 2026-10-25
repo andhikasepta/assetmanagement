@@ -571,16 +571,19 @@ table thead th {
     background-color: #f8fafc;
 }
 
+.text-left,
 .reconciliation-table .text-left {
-    text-align: left;
+    text-align: left !important;
 }
 
+.text-center,
 .reconciliation-table .text-center {
-    text-align: center;
+    text-align: center !important;
 }
 
+.text-right,
 .reconciliation-table .text-right {
-    text-align: right;
+    text-align: right !important;
 }
 
 .reconciliation-table .align-middle {
@@ -1217,9 +1220,10 @@ select.form-control option {
     box-sizing: border-box;
 }
 
+.col-action-edit,
 .col-action-delete {
-    width: 68px;
-    min-width: 68px;
+    width: 58px;
+    min-width: 55px;
     text-align: center;
     padding: 4px 6px !important;
     white-space: nowrap;
@@ -1227,7 +1231,8 @@ select.form-control option {
 }
 
 .col-action-active,
-.col-action-counted {
+.col-action-counted,
+.col-action-weekly {
     width: 44px;
     min-width: 44px;
     max-width: 52px;
@@ -1239,36 +1244,63 @@ select.form-control option {
 .reconciliation-table thead th.col-action,
 .reconciliation-table thead th.col-action-group,
 .reconciliation-table thead th.col-action-select,
+.reconciliation-table thead th.col-action-edit,
 .reconciliation-table thead th.col-action-delete,
 .reconciliation-table thead th.col-action-active,
-.reconciliation-table thead th.col-action-counted {
+.reconciliation-table thead th.col-action-counted,
+.reconciliation-table thead th.col-action-sync,
+.reconciliation-table thead th.col-action-weekly {
     background-color: #f1f5f9;
 }
 
 .reconciliation-table tbody td.col-action,
 .reconciliation-table tbody td.col-action-select,
+.reconciliation-table tbody td.col-action-edit,
 .reconciliation-table tbody td.col-action-delete,
 .reconciliation-table tbody td.col-action-active,
-.reconciliation-table tbody td.col-action-counted {
+.reconciliation-table tbody td.col-action-counted,
+.reconciliation-table tbody td.col-action-sync,
+.reconciliation-table tbody td.col-action-weekly {
     background-color: #ffffff;
 }
 
 .reconciliation-table tbody tr:hover td.col-action,
 .reconciliation-table tbody tr:hover td.col-action-select,
+.reconciliation-table tbody tr:hover td.col-action-edit,
 .reconciliation-table tbody tr:hover td.col-action-delete,
 .reconciliation-table tbody tr:hover td.col-action-active,
-.reconciliation-table tbody tr:hover td.col-action-counted {
+.reconciliation-table tbody tr:hover td.col-action-counted,
+.reconciliation-table tbody tr:hover td.col-action-sync,
+.reconciliation-table tbody tr:hover td.col-action-weekly {
     background-color: #f8fafc;
 }
 
-.sr-counted-checkbox {
+.row-inactive {
+    opacity: 0.65;
+    background-color: #f8fafc;
+}
+.row-inactive td {
+    color: #64748b;
+}
+
+.circular-pic-active-checkbox,
+.sr-counted-checkbox,
+.sr-weekly-checkbox {
     cursor: pointer;
     width: 16px;
     height: 16px;
+}
+
+.sr-counted-checkbox {
     accent-color: #16a34a;
 }
 
-.sr-counted-checkbox:disabled {
+.sr-weekly-checkbox {
+    accent-color: #0284c7;
+}
+
+.sr-counted-checkbox:disabled,
+.sr-weekly-checkbox:disabled {
     cursor: not-allowed !important;
     opacity: 0.35 !important;
 }
@@ -1584,11 +1616,16 @@ th.sortable.desc .sort-indicator {
 }
 
 .so-subdept-table th.col-name-site,
-.so-subdept-table td.col-name-site {
+.so-subdept-table td.col-name-site,
+.so-subdept-table th.text-left,
+.so-subdept-table td.text-left {
     text-align: left !important;
 }
 
-.so-subdept-table th.col-status,
+.so-subdept-table th.col-status {
+    text-align: center !important;
+}
+
 .so-subdept-table td.col-status {
     text-align: initial;
 }
@@ -2027,6 +2064,7 @@ th.sortable.desc .sort-indicator {
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    text-align: left !important;
 }
 
 .scorecard-col-subdept {

@@ -312,14 +312,11 @@
                                 <tr
                                     style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
                                     <th rowspan="2"
-                                        style="width: 45px; text-align: center; vertical-align: middle; padding: 0.6rem 0.5rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        NO</th>
-                                    <th rowspan="2"
                                         style="width: 110px; text-align: center; vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         SITE CODE</th>
                                     <th rowspan="2"
                                         style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                        NAMA SITE</th>
+                                        NAME SITE</th>
                                     <th rowspan="2"
                                         style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         DEPT / SUB DEPT</th>
@@ -363,7 +360,7 @@
                             </thead>
                             <tbody id="hasil-so-table-body">
                                 <tr>
-                                    <td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                                    <td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">
                                         Memuat data Report SO...
                                     </td>
                                 </tr>
@@ -371,7 +368,8 @@
                         </table>
                     </div>
                     <!-- Table Pagination Footer -->
-                    <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <div class="table-pagination-footer"
+                        style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <div id="hasil-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
                         <div class="pagination-controls" id="hasil-so-pagination-controls"></div>
                     </div>
@@ -414,9 +412,8 @@
                 <table class="reconciliation-table" style="margin: 0; font-size: 12px; width: 100%;">
                     <thead>
                         <tr>
-                            <th style="width: 45px; text-align: center;">NO</th>
                             <th style="width: 120px; text-align: center;">SITE CODE</th>
-                            <th>NAMA SITE</th>
+                            <th style="text-align: left;">NAME SITE</th>
                             <th>DEPT / SUB DEPT</th>
                             <th style="width: 130px;">REG NO</th>
                             <th>DESKRIPSI</th>
@@ -425,7 +422,7 @@
                     </thead>
                     <tbody id="rekap-db-status-tbody">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                            <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">
                                 Memuat data status DB...
                             </td>
                         </tr>
@@ -433,7 +430,8 @@
                 </table>
             </div>
             <!-- Table Pagination Footer -->
-            <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div class="table-pagination-footer"
+                style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                 <div id="all-rdb-status-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
                 <div class="pagination-controls" id="all-rdb-status-pagination-controls"></div>
             </div>
@@ -445,7 +443,7 @@
         <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
             <div>
                 <h2 class="card-title">Rekapitulasi Stock Opname (All Sites)</h2>
-                <p class="card-subtitle">Rekapitulasi persentase fisik seluruh site per bulan</p>
+                <p class="card-subtitle">Rekapitulasi persentase seluruh site per bulan</p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                 <input type="search" id="all-rekap-search" class="table-search-input unified-search-input"
@@ -453,8 +451,8 @@
                 <button class="btn btn-success" id="btn-all-rekap-export-excel"
                     onclick="AllSummaryApp.exportRekapExcel()"
                     style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 0 1rem; border-radius: 8px; font-size: 12.5px; font-weight: 600; line-height: 1;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -469,9 +467,8 @@
                 <table class="reconciliation-table" style="margin: 0; font-size: 11.5px; width: 100%;">
                     <thead>
                         <tr>
-                            <th style="width: 40px; text-align: center;">NO</th>
                             <th style="width: 110px; text-align: center;">SITE CODE</th>
-                            <th>NAMA SITE</th>
+                            <th style="text-align: left;">NAME SITE</th>
                             <th>DEPT</th>
                             <th style="text-align: center;">JAN</th>
                             <th style="text-align: center;">FEB</th>
@@ -497,7 +494,8 @@
                 </table>
             </div>
             <!-- Table Pagination Footer -->
-            <div class="table-pagination-footer" style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div class="table-pagination-footer"
+                style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
                 <div id="all-rekap-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
                 <div class="pagination-controls" id="all-rekap-pagination-controls"></div>
             </div>
@@ -639,7 +637,7 @@
                             <tr>
                                 <th style="padding: 8px 10px; width: 45px; text-align: center;">NO</th>
                                 <th style="padding: 8px 10px; width: 120px; text-align: center;">SITE CODE</th>
-                                <th style="padding: 8px 10px;">NAMA SITE</th>
+                                <th style="padding: 8px 10px; text-align: left;">NAME SITE</th>
                                 <th style="padding: 8px 10px;">DEPT / SUB DEPT</th>
                                 <th style="padding: 8px 10px; text-align: center; min-width: 175px;">LOG HISTORY</th>
                                 <th style="padding: 8px 10px; text-align: center; width: 120px;">PERIODE EFEKTIF</th>
@@ -660,11 +658,11 @@
     </div>
 
     <!-- Floating Chat Room Action Button (WhatsApp Direct) -->
-    <button type="button" class="floating-chat-room-btn" id="btn-chat-room-fab-all"
-        onclick="App.openChatRoomModal()"
+    <button type="button" class="floating-chat-room-btn" id="btn-chat-room-fab-all" onclick="App.openChatRoomModal()"
         aria-label="Buka Chat Room PIC Sites">
         <svg viewBox="0 0 24 24">
-            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/>
+            <path
+                d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z" />
         </svg>
     </button>
 </section>

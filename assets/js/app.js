@@ -89,6 +89,8 @@
 const App = (() => {
     let allMasterRows = [];
     let filteredMasterRows = [];
+    let masterPeriodUpdates = {};
+    let masterLatestUpdate = null;
     let currentPage = 1;
     let pageSize = 10;
     let searchQuery = '';
@@ -222,6 +224,8 @@ const App = (() => {
         setupSRDragAndDrop();
         setupRekapDbDragAndDrop();
         setupPicSitesDragAndDrop();
+        setupCircularPicsDragAndDrop();
+        setupTemplateReportDragAndDrop();
         setupWeeklyDragAndDrop();
 
         // Clean legacy localStorage to prevent stale storage hijacking default landing page
@@ -233,7 +237,7 @@ const App = (() => {
         keepCleanUrl();
 
         let initialPage = window.AUTH_USER ? 'all-summary' : 'summary';
-        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'weekly-summary' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'master-data-weekly' || window.INITIAL_PAGE === 'user-management' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
+        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'weekly-summary' || window.INITIAL_PAGE === 'reports' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'master-data-weekly' || window.INITIAL_PAGE === 'user-management' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
             if (window.INITIAL_PAGE === 'login') {
                 initialPage = window.AUTH_USER ? 'all-summary' : 'login';
             } else {
@@ -241,7 +245,7 @@ const App = (() => {
             }
         } else {
             const savedPage = sessionStorage.getItem('active_page');
-            if (savedPage && (savedPage === 'all-summary' || savedPage === 'weekly-summary' || savedPage === 'master-data' || savedPage === 'master-data-weekly' || savedPage === 'user-management' || savedPage === 'summary' || savedPage === 'login')) {
+            if (savedPage && (savedPage === 'all-summary' || savedPage === 'weekly-summary' || savedPage === 'reports' || savedPage === 'master-data' || savedPage === 'master-data-weekly' || savedPage === 'user-management' || savedPage === 'summary' || savedPage === 'login')) {
                 if (savedPage === 'login') {
                     initialPage = window.AUTH_USER ? 'all-summary' : 'login';
                 } else {
@@ -304,7 +308,7 @@ const App = (() => {
     function keepCleanUrl() {
         try {
             let path = window.location.pathname;
-            let cleanPath = path.replace(/(index|login|summary|all-summary|weekly-summary|master-data-weekly|master-data|user-management)\.php.*$/i, '');
+            let cleanPath = path.replace(/(index|login|summary|all-summary|weekly-summary|reports|master-data-weekly|master-data|user-management)\.php.*$/i, '');
             if (!cleanPath.endsWith('/')) {
                 cleanPath += '/';
             }
@@ -327,6 +331,10 @@ const App = (() => {
         const tabWeeklySummary = document.getElementById('tab-weekly-summary');
         if (tabWeeklySummary) {
             tabWeeklySummary.style.display = perms.can_access_weekly_summary !== false ? '' : 'none';
+        }
+        const tabReports = document.getElementById('tab-reports');
+        if (tabReports) {
+            tabReports.style.display = perms.can_access_reports !== false ? '' : 'none';
         }
         const tabMasterData = document.getElementById('tab-master-data');
         if (tabMasterData) {
@@ -372,7 +380,7 @@ const App = (() => {
         });
     }
 
-    // ── Navigation (SPA Core: Summary vs All Summary vs Weekly Summary vs Master Data vs Master Data Weekly vs User Management) ──
+    // ── Navigation (SPA Core: Summary vs All Summary vs Weekly Summary vs Reports vs Master Data vs Master Data Weekly vs User Management) ──
     let pendingTargetPage = 'all-summary';
 
     function navigateTo(page, isInit = false) {
@@ -383,14 +391,15 @@ const App = (() => {
             const perms = window.AUTH_USER.permissions || {};
             const canAll = perms.can_access_all_summary !== false;
             const canWk = perms.can_access_weekly_summary !== false;
+            const canRep = perms.can_access_reports !== false;
             const canMst = perms.can_access_master_data !== false;
             const canMstWk = perms.can_access_master_data_weekly !== false;
             const canUserMgmt = perms.can_access_user_management !== false;
-            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))));
+            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canRep ? 'reports' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary')))));
         }
 
         // Protected pages require authenticated session
-        if ((page === 'all-summary' || page === 'weekly-summary' || page === 'master-data' || page === 'master-data-weekly' || page === 'user-management') && !window.AUTH_USER) {
+        if ((page === 'all-summary' || page === 'weekly-summary' || page === 'reports' || page === 'master-data' || page === 'master-data-weekly' || page === 'user-management') && !window.AUTH_USER) {
             showToast('info', 'Akses Terbatas', 'Silakan login untuk mengakses menu Administrator.');
             openLoginModal(page);
             return;
@@ -418,6 +427,12 @@ const App = (() => {
                 if (perms.can_access_master_data !== false) page = 'master-data';
                 else if (perms.can_access_all_summary !== false) page = 'all-summary';
                 else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else page = 'user-management';
+            } else if (page === 'reports' && perms.can_access_reports === false) {
+                if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
                 else page = 'user-management';
             } else if (page === 'user-management' && perms.can_access_user_management === false) {
                 if (perms.can_access_all_summary !== false) page = 'all-summary';
@@ -485,10 +500,14 @@ const App = (() => {
             loadScorecardKpi();
             loadMasterCatatan();
             loadPicSites();
+            loadCircularPics();
+            loadTemplateReports();
         } else if (page === 'master-data-weekly') {
             loadMasterDataWeekly();
         } else if (page === 'user-management') {
             loadUsers();
+        } else if (page === 'reports') {
+            // Empty page as requested - no data function needed
         }
 
         // Apply UAC rules (button visibility)
@@ -530,6 +549,12 @@ const App = (() => {
         { id: 'weekly-card-hasil-so', title: 'Report SO (Weekly)' }
     ];
 
+    const QUICK_ACCESS_ITEMS_REPORTS = [
+        { id: 'card-generate-report', title: 'Generate Report' },
+        { id: 'card-pending-report', title: 'Pending Report' },
+        { id: 'card-closed-report', title: 'Closed Report' }
+    ];
+
     const QUICK_ACCESS_ITEMS_USER_MANAGEMENT = [
         { id: 'card-user-management', title: 'User Management & UAC' }
     ];
@@ -540,6 +565,8 @@ const App = (() => {
         { id: 'card-master-rekap-db', title: 'Master Rekap DB' },
         { id: 'card-master-catatan', title: 'Catatan & Evaluasi Master' },
         { id: 'card-pic-sites', title: 'PIC Sites Master Data' },
+        { id: 'card-circular-pics', title: 'Circular Sign PIC Master Data' },
+        { id: 'card-template-reports', title: 'Template Report Master Data' },
         { id: 'card-scorecard-rating-kpi', title: 'KPI Rating Master' },
         { id: 'card-scorecard-exec-kpi', title: 'KPI Execution Master' }
     ];
@@ -584,6 +611,8 @@ const App = (() => {
             items = QUICK_ACCESS_ITEMS_ALL_SUMMARY;
         } else if (page === 'weekly-summary') {
             items = QUICK_ACCESS_ITEMS_WEEKLY_SUMMARY;
+        } else if (page === 'reports') {
+            items = QUICK_ACCESS_ITEMS_REPORTS;
         } else if (page === 'master-data') {
             items = QUICK_ACCESS_ITEMS_MASTER;
         } else if (page === 'master-data-weekly') {
@@ -711,14 +740,20 @@ const App = (() => {
 
                 // Update Navbar UI
                 const tabSummary = document.getElementById('tab-summary');
+                const tabUserManagement = document.getElementById('tab-user-management');
+                const userDropdown = document.getElementById('user-dropdown-container');
+                const navUserAvatar = document.getElementById('nav-user-avatar');
+                const navUserName = document.getElementById('nav-user-name');
                 const btnNavLogin = document.getElementById('btn-navbar-login');
                 const btnNavLogout = document.getElementById('btn-navbar-logout');
-                const tabUserManagement = document.getElementById('tab-user-management');
 
                 if (tabSummary) tabSummary.style.display = 'none';
                 if (tabUserManagement) tabUserManagement.style.display = ((window.AUTH_USER.permissions || {}).can_access_user_management !== false) ? '' : 'none';
+                if (userDropdown) userDropdown.style.display = 'inline-block';
+                if (navUserAvatar) navUserAvatar.textContent = (window.AUTH_USER.name || 'A').charAt(0).toUpperCase();
+                if (navUserName) navUserName.textContent = window.AUTH_USER.name || 'Asset Management Administrator';
                 if (btnNavLogin) btnNavLogin.style.display = 'none';
-                if (btnNavLogout) btnNavLogout.style.display = 'inline-flex';
+                if (btnNavLogout) btnNavLogout.style.display = 'none';
 
                 // Apply UAC permissions for tabs & buttons
                 applyUacPermissions();
@@ -770,6 +805,7 @@ const App = (() => {
         const tabMasterData = document.getElementById('tab-master-data');
         const tabMasterDataWeekly = document.getElementById('tab-master-data-weekly');
         const tabUserManagement = document.getElementById('tab-user-management');
+        const userDropdown = document.getElementById('user-dropdown-container');
         const btnNavLogin = document.getElementById('btn-navbar-login');
         const btnNavLogout = document.getElementById('btn-navbar-logout');
 
@@ -779,8 +815,9 @@ const App = (() => {
         if (tabMasterData) tabMasterData.style.display = 'none';
         if (tabMasterDataWeekly) tabMasterDataWeekly.style.display = 'none';
         if (tabUserManagement) tabUserManagement.style.display = 'none';
+        if (userDropdown) userDropdown.style.display = 'none';
         if (btnNavLogout) btnNavLogout.style.display = 'none';
-        if (btnNavLogin) btnNavLogin.style.display = 'inline-flex';
+        if (btnNavLogin) btnNavLogin.style.display = 'none';
 
         // Update Quick Access Drawer Header Login button
         const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
@@ -859,6 +896,8 @@ const App = (() => {
             }
 
             allMasterRows = json.data || [];
+            masterPeriodUpdates = json.period_updates || {};
+            masterLatestUpdate = json.latest_update || null;
             applyFilterAndRender();
         } catch (err) {
             tbody.innerHTML = `
@@ -986,7 +1025,38 @@ const App = (() => {
 
         filteredMasterRows = rows;
         currentPage = 1;
+        updateMasterLastUpdateText();
         renderMasterTable();
+    }
+
+    function updateMasterLastUpdateText() {
+        const el = document.getElementById('master-opname-last-update');
+        if (!el) return;
+
+        const monthFilter = document.getElementById('filter-month');
+        const yearFilter = document.getElementById('filter-year');
+        const m = monthFilter && monthFilter.value ? parseInt(monthFilter.value, 10) : null;
+        const y = yearFilter && yearFilter.value ? parseInt(yearFilter.value, 10) : 2026;
+
+        if (m && masterPeriodUpdates[`${m}_${y}`]) {
+            el.textContent = masterPeriodUpdates[`${m}_${y}`].text;
+        } else if (m) {
+            const key = Object.keys(masterPeriodUpdates).find(k => k.startsWith(`${m}_`));
+            if (key && masterPeriodUpdates[key]) {
+                el.textContent = masterPeriodUpdates[key].text;
+            } else {
+                const indonesianMonths = [
+                    '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+                ];
+                const pName = indonesianMonths[m] || `Bulan ${m}`;
+                el.textContent = `Last Update : Periode ${pName} (Belum ada data)`;
+            }
+        } else if (masterLatestUpdate && masterLatestUpdate.text) {
+            el.textContent = masterLatestUpdate.text;
+        } else {
+            el.textContent = 'Last Update : Periode September (26 September 2026, 09:25:20 WIB)';
+        }
     }
 
     // ── Table Header Sorting ───────────────────────────────────
@@ -1222,7 +1292,7 @@ const App = (() => {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                <td colspan="12" class="text-center" style="padding: 2.5rem; color: #64748b;">
                     Loading Site Regional records...
                 </td>
             </tr>
@@ -1235,7 +1305,7 @@ const App = (() => {
             if (!json.success) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center" style="padding: 2rem; color: #dc2626;">
+                        <td colspan="12" class="text-center" style="padding: 2rem; color: #dc2626;">
                             ${escapeHtml(json.message || 'Error loading records')}
                         </td>
                     </tr>
@@ -1249,7 +1319,7 @@ const App = (() => {
         } catch (err) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center" style="padding: 2rem; color: #dc2626;">
+                    <td colspan="12" class="text-center" style="padding: 2rem; color: #dc2626;">
                         Network error: ${escapeHtml(err.message || 'Unknown error')}
                     </td>
                 </tr>
@@ -1569,7 +1639,7 @@ const App = (() => {
         if (totalItems === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <td colspan="12" class="text-center" style="padding: 2.5rem; color: #64748b;">
                         ${allSRRows.length === 0 ? "Tidak ada data Site Regional." : "Data tidak ditemukan."}
                     </td>
                 </tr>
@@ -1595,8 +1665,9 @@ const App = (() => {
             const currentInfo = row.info || 'Outlet';
             const currentGt = row.group_type || 'monthly';
             const histCount = row.history_count || 0;
-            const isActive = row.is_active !== false && row.is_active !== 0 && row.is_active !== '0';
-            const isCounted = row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0';
+            const isActive = row.is_active !== false && row.is_active !== 0 && row.is_active !== '0' && row.is_active !== 'f';
+            const isCounted = row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0' && row.is_counted !== 'f';
+            const isCountedWeekly = row.is_counted_weekly !== false && row.is_counted_weekly !== 0 && row.is_counted_weekly !== '0' && row.is_counted_weekly !== 'f';
             const isSynced = row.is_synced === true || row.is_synced === 1 || row.is_synced === '1' || row.is_synced === 't';
             html += `
                 <tr class="${isChecked ? 'row-selected' : ''}">
@@ -1634,6 +1705,13 @@ const App = (() => {
                                 <span>Sync</span>
                             </button>
                         ` : ''}
+                    </td>
+                    <td class="text-center col-action-weekly" style="padding: 4px;">
+                        <input type="checkbox" class="sr-weekly-checkbox" id="sr-weekly-${row.id}"
+                            ${isActive && isCountedWeekly ? 'checked' : ''}
+                            ${!isActive ? 'disabled' : ''}
+                            onchange="App.toggleSRCountedWeekly(${row.id}, this.checked, this)"
+                            style="cursor: ${!isActive ? 'not-allowed' : 'pointer'}; width: 16px; height: 16px; accent-color: #0284c7; opacity: ${!isActive ? '0.45' : '1'};">
                     </td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.dept || '')}</td>
                     <td class="text-left" style="white-space: nowrap;">${escapeHtml(row.sub_dept || '')}</td>
@@ -1953,13 +2031,24 @@ const App = (() => {
                     countCb.disabled = !isActive;
                     countCb.style.cursor = !isActive ? 'not-allowed' : 'pointer';
                     countCb.style.opacity = !isActive ? '0.45' : '1';
-                    const isCounted = row ? (row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0') : countCb.checked;
+                    const isCounted = row ? (row.is_counted !== false && row.is_counted !== 0 && row.is_counted !== '0' && row.is_counted !== 'f') : countCb.checked;
                     countCb.checked = isActive && isCounted;
+                }
+
+                // Update Weekly checkbox state for this row
+                const weeklyCb = document.getElementById(`sr-weekly-${id}`) || checkboxEl?.closest('tr')?.querySelector('.sr-weekly-checkbox');
+                if (weeklyCb) {
+                    weeklyCb.disabled = !isActive;
+                    weeklyCb.style.cursor = !isActive ? 'not-allowed' : 'pointer';
+                    weeklyCb.style.opacity = !isActive ? '0.45' : '1';
+                    const isCountedWeekly = row ? (row.is_counted_weekly !== false && row.is_counted_weekly !== 0 && row.is_counted_weekly !== '0' && row.is_counted_weekly !== 'f') : weeklyCb.checked;
+                    weeklyCb.checked = isActive && isCountedWeekly;
                 }
 
                 showToast('success', 'Status Diperbarui', `Status site diatur menjadi ${isActive ? 'Aktif' : 'Nonaktif'}`);
                 if (typeof loadSummaryData === 'function') loadSummaryData();
                 if (typeof loadRekapitulasi === 'function') loadRekapitulasi();
+                if (typeof loadWeeklySummary === 'function') loadWeeklySummary();
             } else {
                 if (checkboxEl) checkboxEl.checked = !isActive;
                 showToast('error', 'Gagal Memperbarui', json.message || 'Gagal memperbarui status');
@@ -1993,6 +2082,32 @@ const App = (() => {
             }
         } catch (err) {
             if (checkboxEl) checkboxEl.checked = !isCounted;
+            showToast('error', 'Kesalahan Jaringan', err.message);
+        }
+    }
+
+    async function toggleSRCountedWeekly(id, isCountedWeekly, checkboxEl) {
+        try {
+            const res = await fetch('api/site_regional.php?action=update_counted_weekly', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ id: id, is_counted_weekly: isCountedWeekly })
+            });
+            const json = await res.json();
+            if (json.success) {
+                const row = allSRRows.find(r => r.id == id);
+                if (row) row.is_counted_weekly = isCountedWeekly;
+                showToast('success', 'Status Mingguan Diperbarui', `Site ${isCountedWeekly ? 'dihitung' : 'tidak dihitung'} dalam ringkasan mingguan (Weekly Summary)`);
+                if (typeof loadWeeklySummary === 'function') loadWeeklySummary();
+            } else {
+                if (checkboxEl) checkboxEl.checked = !isCountedWeekly;
+                showToast('error', 'Gagal Memperbarui', json.message || 'Gagal memperbarui status mingguan');
+            }
+        } catch (err) {
+            if (checkboxEl) checkboxEl.checked = !isCountedWeekly;
             showToast('error', 'Kesalahan Jaringan', err.message);
         }
     }
@@ -5866,7 +5981,6 @@ const App = (() => {
                                 <table class="reconciliation-table" style="font-size: 11.5px; width: 100%;">
                                     <thead>
                                         <tr style="background: #f8fafc;">
-                                            <th class="text-center" style="width: 45px; padding: 5px 8px;">NO</th>
                                             <th class="text-center" style="width: 170px; padding: 5px 8px;">REG NO</th>
                                             <th class="text-left rdb-col-name" style="padding: 5px 8px;">NAME</th>
                                             <th class="text-center" style="width: 160px; padding: 5px 8px;">SN</th>
@@ -5897,7 +6011,6 @@ const App = (() => {
 
                 return `
                                                 <tr>
-                                                    <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
                                                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${regNo}</td>
                                                     <td class="text-left rdb-col-name" style="color: #334155; font-weight: 500;">${name}</td>
                                                     <td class="text-center" style="color: #475569; font-weight: 500;">${sn}</td>
@@ -5940,7 +6053,7 @@ const App = (() => {
                 : 'No data.';
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="${noDept ? 9 : 11}" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                    <td colspan="${noDept ? 8 : 10}" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
                         ${noDataMsg}
                     </td>
                 </tr>
@@ -5985,7 +6098,6 @@ const App = (() => {
 
             html += `
                 <tr>
-                    <td class="text-center" style="color: #64748b; font-weight: 600;">${no}</td>
                     ${deptColsHtml}
                     <td class="text-center" style="font-weight: 600; color: #1e293b;">${sc}</td>
                     <td class="text-left" style="font-weight: 500; color: #1e293b;">${nameSite}</td>
@@ -6540,7 +6652,7 @@ const App = (() => {
             if (filtered.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="text-center" style="padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 11px;">
+                        <td colspan="5" class="text-center" style="padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 11px;">
                             Tidak ada data untuk rating ini
                         </td>
                     </tr>
@@ -6554,7 +6666,6 @@ const App = (() => {
                 const ratingBadge = renderRatingBadge(r[ratingKey]);
                 html += `
                     <tr>
-                        <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
                         <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
                         <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
                         <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
@@ -6684,7 +6795,7 @@ const App = (() => {
         if (scorecardRatingData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
                             No data
                         </div>
@@ -6702,7 +6813,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
                         Tidak ada data yang sesuai dengan filter rating.
                     </td>
                 </tr>
@@ -6715,7 +6826,6 @@ const App = (() => {
             const pctVal = r.pct !== undefined && r.pct !== null ? r.pct : r.m3_pct;
             html += `
                 <tr>
-                    <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
                     <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(r.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
@@ -6743,7 +6853,7 @@ const App = (() => {
         if (scorecardExecutionData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">
                             No data
                         </div>
@@ -6761,7 +6871,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2rem 0.5rem; color: #94a3b8;">
                         Tidak ada data yang sesuai dengan filter status.
                     </td>
                 </tr>
@@ -6774,7 +6884,6 @@ const App = (() => {
             const pctVal = e.pct !== undefined && e.pct !== null ? e.pct : e.m3_pct;
             html += `
                 <tr>
-                    <td class="scorecard-col-no" style="color: #64748b;">${idx + 1}</td>
                     <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(e.sub_dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(e.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(e.name_site || '-')}</td>
@@ -7195,7 +7304,13 @@ const App = (() => {
         const statusFilter = statusSelect ? statusSelect.value : 'all';
         const month = monthSelect ? monthSelect.value : '9';
         const year = yearSelect ? yearSelect.value : '2026';
-        const isPmdMode = (currentCategory === 'pmd' || dept === 'PMD');
+        const isTarget98 = (
+            currentCategory === 'pmd' ||
+            dept === 'PMD' ||
+            currentCategory === 'warehouse_tekno' ||
+            currentCategory === 'it_coorporate' ||
+            currentCategory === 'it_corporate'
+        );
 
         // Update period badge next to title
         const periodBadge = document.getElementById('subdept-period-badge');
@@ -7212,6 +7327,7 @@ const App = (() => {
         if (currentCategory === 'pmd') catLabel = 'PMD';
         else if (currentCategory === 'outlet_subarep') catLabel = 'Outlet Subarep';
         else if (currentCategory === 'warehouse_hub') catLabel = 'Warehouse HUB';
+        else if (currentCategory === 'warehouse_tekno') catLabel = 'Warehouse Tekno';
         else if (currentCategory === 'it_coorporate') catLabel = 'IT Coorporate';
 
         function renderSubDeptJsonData(json) {
@@ -7225,7 +7341,7 @@ const App = (() => {
                         </td>
                     </tr>
                 `;
-                renderSubDeptPieChart(0, 0, 0);
+                renderSubDeptPieChart(0, 0, 0, isTarget98);
                 return;
             }
 
@@ -7251,7 +7367,7 @@ const App = (() => {
                 let isTercapai = false;
                 if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
                     const pct = Math.round(parseFloat(r.total_physic_pct));
-                    if (isPmdMode) {
+                    if (isTarget98) {
                         isTercapai = (pct >= 98);
                     } else {
                         isTercapai = (pct >= 85);
@@ -7281,6 +7397,14 @@ const App = (() => {
                 let label = '';
                 if (currentCategory === 'pmd') {
                     label = (subDept === 'all') ? 'Semua Dept' : `PMD - ${subDept}`;
+                } else if (currentCategory === 'it_coorporate') {
+                    label = 'IT Coorporate';
+                } else if (currentCategory === 'warehouse_tekno') {
+                    label = (summarySOType === 'quarterly') ? 'Warehouse Tekno (Quarterly)' : 'Warehouse Tekno';
+                } else if (currentCategory === 'warehouse_hub') {
+                    label = (summarySOType === 'quarterly') ? 'Warehouse HUB (Quarterly)' : 'Warehouse HUB';
+                } else if (currentCategory === 'outlet_subarep') {
+                    label = (dept === 'all' && subDept === 'all') ? 'Outlet Subarep (Semua DEPT)' : (subDept === 'all' ? `${dept} (Semua Sub Dept)` : `${dept} - ${subDept}`);
                 } else {
                     if (dept === 'all' && subDept === 'all') {
                         label = 'Semua DEPT';
@@ -7306,7 +7430,7 @@ const App = (() => {
                     </tr>
                 `;
                 if (tfoot) tfoot.innerHTML = '';
-                renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length);
+                renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length, isTarget98);
                 return;
             }
 
@@ -7332,7 +7456,7 @@ const App = (() => {
                     let progressClass = 'so-progress-red';
                     let color = '#dc2626';
 
-                    if (isPmdMode) {
+                    if (isTarget98) {
                         if (pct >= 98) {
                             statusText = 'Tercapai';
                             statusClass = 'status-green';
@@ -7425,7 +7549,7 @@ const App = (() => {
                 let overallColor = '#64748b';
 
                 if (countWithData > 0) {
-                    if (isPmdMode) {
+                    if (isTarget98) {
                         if (avgPct >= 98) {
                             overallText = 'Tercapai';
                             overallStatusClass = 'status-green';
@@ -7491,7 +7615,7 @@ const App = (() => {
             }
 
             // Update Pie Chart
-            renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length);
+            renderSubDeptPieChart(countTercapai, countTidakTercapai, rows.length, isTarget98);
         }
 
         const subdeptCacheKey = `${summarySOType}_${currentCategory}_${dept}_${subDept}_${month}_${year}`;
@@ -7549,7 +7673,7 @@ const App = (() => {
                     </td>
                 </tr>
             `;
-            renderSubDeptPieChart(0, 0, 0);
+            renderSubDeptPieChart(0, 0, 0, isTarget98);
         }
     }
 
@@ -7611,7 +7735,7 @@ const App = (() => {
         loadSubDeptResults();
     }
 
-    function renderSubDeptPieChart(tercapai, tidakTercapai, total) {
+    function renderSubDeptPieChart(tercapai, tidakTercapai, total, isTarget98 = null) {
         const canvas = document.getElementById('chart-subdept-pie');
         const statsContainer = document.getElementById('subdept-pie-stats');
         if (!canvas) return;
@@ -7718,7 +7842,10 @@ const App = (() => {
         if (statsContainer) {
             const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
             const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
-            const thresholdLabel = (summaryCategory === 'pmd') ? '98%' : '85%';
+            const isCat98 = (isTarget98 !== null)
+                ? !!isTarget98
+                : (summaryCategory === 'pmd' || summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate' || summaryCategory === 'it_corporate');
+            const thresholdLabel = isCat98 ? '98%' : '85%';
             const statusSel = document.getElementById('status-result-filter');
             const curStatus = statusSel ? statusSel.value : 'all';
             const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
@@ -9016,7 +9143,7 @@ const App = (() => {
                 <tr>
                     ${deptColsHtml}
                     <td class="text-center font-monospace">${escapeHtml(row.sitecode)}</td>
-                    <td class="text-left" style="font-weight: 500;">${escapeHtml(row.name_site)}</td>
+                    <td class="text-left" style="font-weight: 500; text-align: left;">${escapeHtml(row.name_site)}</td>
                     ${monthCells}
                 </tr>
             `;
@@ -9805,7 +9932,6 @@ const App = (() => {
 
                 html += `
                     <tr>
-                        <td class="text-center" style="color: #64748b; font-weight: 600;">${idx + 1}</td>
                         <td class="text-center" style="font-weight: 600; color: #334155; font-size: 11.5px; white-space: nowrap;">
                             <span class="badge" style="background: #f1f5f9; color: #1e293b; font-weight: 600; font-size: 11px; padding: 2.5px 8px; border-radius: 5px; border: 1px solid #cbd5e1;">
                                 ${escapeHtml(periodDisplay)}
@@ -10464,7 +10590,7 @@ const App = (() => {
                     <td class="text-center"><span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">${escapeHtml(r.dept || '-')}</span></td>
                     <td class="text-center" style="font-size: 11.5px; font-weight: 600; color: #475569;">${escapeHtml(r.sub_dept || '-')}</td>
                     <td class="text-center" style="font-weight: 700; color: #0284c7;">${escapeHtml(r.sitecode || '-')}</td>
-                    <td style="font-weight: 600; color: #1e293b;">${escapeHtml(r.name_site || '-')}</td>
+                    <td style="font-weight: 600; color: #1e293b; text-align: left;">${escapeHtml(r.name_site || '-')}</td>
                     <td>${picDisplay}</td>
                     <td>${phoneDisplay}</td>
                     <td class="text-center">
@@ -11060,6 +11186,1266 @@ const App = (() => {
     }
 
     // ═════════════════════════════════════════════════════════════════
+    // ── Circular Sign PIC Master Data ────────────────────────────────
+    // ═════════════════════════════════════════════════════════════════
+    let circularPicsCurrentPage = 1;
+    let circularPicsPageSize = '10';
+    let circularPicsTotalPages = 1;
+    let circularPicsTotalItems = 0;
+    let circularPicsSearchQuery = '';
+    let circularPicsDeptFilter = 'all';
+    let circularPicsSubDeptFilter = 'all';
+    let circularPicsStatusFilter = 'all';
+    let circularPicsSortCol = 'dept';
+    let circularPicsSortDir = 'asc';
+    let circularPicsDebounceTimer = null;
+    let circularPicsCache = [];
+
+    async function loadCircularPics(page = circularPicsCurrentPage) {
+        const tbody = document.getElementById('circular-pics-tbody');
+        const infoEl = document.getElementById('circular-pics-pagination-info');
+        const controlsEl = document.getElementById('circular-pics-pagination-controls');
+        if (!tbody) return;
+
+        circularPicsCurrentPage = page;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                            <line x1="12" y1="2" x2="12" y2="6"></line>
+                            <line x1="12" y1="18" x2="12" y2="22"></line>
+                            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        </svg>
+                        <span>Memuat data Circular Sign PIC...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                page: circularPicsCurrentPage,
+                limit: circularPicsPageSize,
+                dept: circularPicsDeptFilter,
+                sub_dept: circularPicsSubDeptFilter,
+                status: circularPicsStatusFilter,
+                search: circularPicsSearchQuery,
+                sort_col: circularPicsSortCol,
+                sort_dir: circularPicsSortDir
+            });
+
+            const res = await fetch(`api/circular_pics.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.message || 'Gagal memuat data');
+            }
+
+            circularPicsCache = json.data || [];
+            circularPicsTotalItems = json.total || 0;
+            circularPicsTotalPages = json.total_pages || 1;
+
+            populateCircularPicsFilters(json.depts || [], json.sub_depts || []);
+            renderCircularPicsTable(json.data || []);
+            updateCircularPicsPagination(json.page, json.total, json.total_pages);
+            updateCircularPicsSortIndicators();
+
+        } catch (err) {
+            console.error('Error loading Circular Sign PICs:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.5rem; color: #ef4444;">
+                        Terjadi kesalahan saat memuat data: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            if (controlsEl) controlsEl.innerHTML = '';
+        }
+    }
+
+    function renderCircularPicsTable(rows) {
+        const tbody = document.getElementById('circular-pics-tbody');
+        if (!tbody) return;
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                        Tidak ada data Circular Sign PIC yang ditemukan
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const startIndex = circularPicsPageSize === 'all' ? 0 : (circularPicsCurrentPage - 1) * parseInt(circularPicsPageSize, 10);
+        let html = '';
+
+        rows.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const deptText = escapeHtml(r.dept || '-');
+            const subDeptText = r.sub_dept ? escapeHtml(r.sub_dept) : '';
+            const isActive = r.is_active === true || r.is_active === 1 || r.is_active === '1' || r.is_active === 't';
+
+            html += `
+                <tr id="circular-pic-row-${r.id}" class="${!isActive ? 'row-inactive' : ''}" style="${!isActive ? 'opacity: 0.65; background-color: #f8fafc;' : ''}">
+                    <td class="text-center" style="color: #64748b; vertical-align: middle;">${no}</td>
+                    <td style="vertical-align: middle;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">${deptText}</span>
+                            ${subDeptText ? `<span style="font-size: 11.5px; font-weight: 600; color: #475569;">/ ${subDeptText}</span>` : ''}
+                        </div>
+                    </td>
+                    <td class="circular-pic-name-cell" style="vertical-align: middle;">
+                        <div style="display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                            <span style="font-weight: 600; color: ${isActive ? '#0f172a' : '#64748b'};">${escapeHtml(r.pic || '-')}</span>
+                            ${!isActive ? `<span class="badge circular-pic-inactive-badge" style="background: #f1f5f9; color: #64748b; font-size: 10px; font-weight: 600; border: 1px solid #cbd5e1; padding: 1px 5px; border-radius: 4px;">Inactive</span>` : ''}
+                        </div>
+                    </td>
+                    <td style="vertical-align: middle;">
+                        <span style="font-weight: 500; color: ${isActive ? '#334155' : '#64748b'};">${escapeHtml(r.job_title || '-')}</span>
+                    </td>
+                    <td class="text-center col-action-edit" style="vertical-align: middle; width: 50px;">
+                        <button class="btn btn-outline-primary btn-sm" onclick="App.openEditCircularPicModal(${r.id})"
+                            style="font-size: 11px; padding: 2px 7px;">
+                            Edit
+                        </button>
+                    </td>
+                    <td class="text-center col-action-delete" style="vertical-align: middle; width: 50px;">
+                        <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteCircularPic(${r.id})"
+                            style="font-size: 11px; padding: 2px 7px;">
+                            Hapus
+                        </button>
+                    </td>
+                    <td class="text-center col-action-active" style="vertical-align: middle; width: 44px;">
+                        <input type="checkbox" class="circular-pic-active-checkbox"
+                            ${isActive ? 'checked' : ''}
+                            onchange="App.toggleCircularPicActive(${r.id}, this.checked, this)"
+                            title="${isActive ? 'User aktif (klik untuk nonaktifkan)' : 'User nonaktif (klik untuk aktifkan)'}"
+                            style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb; vertical-align: middle;">
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    async function toggleCircularPicActive(id, isActive, checkboxEl) {
+        if (!id) return;
+        const origChecked = !isActive;
+        try {
+            const res = await fetch('api/circular_pics.php?action=toggle_active', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, is_active: isActive })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                if (checkboxEl) checkboxEl.checked = origChecked;
+                alert(json.message || 'Gagal mengubah status aktif');
+                return;
+            }
+
+            const item = circularPicsCache.find(x => x.id === id);
+            if (item) {
+                item.is_active = isActive;
+            }
+
+            if (circularPicsStatusFilter !== 'all') {
+                loadCircularPics(circularPicsCurrentPage);
+            } else {
+                const row = document.getElementById(`circular-pic-row-${id}`);
+                if (row) {
+                    if (isActive) {
+                        row.classList.remove('row-inactive');
+                        row.style.opacity = '1';
+                        row.style.backgroundColor = '';
+                        const badge = row.querySelector('.circular-pic-inactive-badge');
+                        if (badge) badge.remove();
+                    } else {
+                        row.classList.add('row-inactive');
+                        row.style.opacity = '0.65';
+                        row.style.backgroundColor = '#f8fafc';
+                        const picCell = row.querySelector('.circular-pic-name-cell div');
+                        if (picCell && !picCell.querySelector('.circular-pic-inactive-badge')) {
+                            const badge = document.createElement('span');
+                            badge.className = 'badge circular-pic-inactive-badge';
+                            badge.style.cssText = 'background: #f1f5f9; color: #64748b; font-size: 10px; font-weight: 600; border: 1px solid #cbd5e1; padding: 1px 5px; border-radius: 4px;';
+                            badge.textContent = 'Inactive';
+                            picCell.appendChild(badge);
+                        }
+                    }
+                }
+            }
+
+            if (typeof showToast === 'function') {
+                showToast('success', 'Status Diperbarui', isActive ? 'User Circular PIC diaktifkan' : 'User Circular PIC dinonaktifkan (inactive)');
+            }
+        } catch (err) {
+            console.error('Error toggling circular pic status:', err);
+            if (checkboxEl) checkboxEl.checked = origChecked;
+            alert('Gagal mengubah status aktif');
+        }
+    }
+
+    function updateCircularPicsPagination(page, total, totalPages) {
+        const infoEl = document.getElementById('circular-pics-pagination-info');
+        const controlsEl = document.getElementById('circular-pics-pagination-controls');
+
+        if (infoEl) {
+            const start = total > 0 ? (page - 1) * (circularPicsPageSize === 'all' ? total : parseInt(circularPicsPageSize, 10)) + 1 : 0;
+            const end = circularPicsPageSize === 'all' ? total : Math.min(page * parseInt(circularPicsPageSize, 10), total);
+            infoEl.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
+        }
+
+        if (controlsEl) {
+            if (totalPages <= 1 || circularPicsPageSize === 'all') {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            html += `<button class="pagination-btn" ${page === 1 ? 'disabled' : ''} onclick="App.goToCircularPicsPage(${page - 1})">&laquo; Prev</button>`;
+
+            const maxButtons = 5;
+            let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="App.goToCircularPicsPage(1)">1</button>`;
+                if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                html += `<button class="pagination-btn ${p === page ? 'active' : ''}" onclick="App.goToCircularPicsPage(${p})">${p}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+                html += `<button class="pagination-btn" onclick="App.goToCircularPicsPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            html += `<button class="pagination-btn" ${page === totalPages ? 'disabled' : ''} onclick="App.goToCircularPicsPage(${page + 1})">Next &raquo;</button>`;
+            controlsEl.innerHTML = html;
+        }
+    }
+
+    function goToCircularPicsPage(p) {
+        if (p < 1) p = 1;
+        if (p > circularPicsTotalPages) p = circularPicsTotalPages;
+        loadCircularPics(p);
+    }
+
+    function changeCircularPicsPageSize(sz) {
+        circularPicsPageSize = sz;
+        circularPicsCurrentPage = 1;
+        loadCircularPics(1);
+    }
+
+    function handleCircularPicsSearch(val) {
+        clearTimeout(circularPicsDebounceTimer);
+        circularPicsDebounceTimer = setTimeout(() => {
+            circularPicsSearchQuery = (val || '').trim();
+            circularPicsCurrentPage = 1;
+            loadCircularPics(1);
+        }, 300);
+    }
+
+    function onCircularPicsDeptFilterChange() {
+        const el = document.getElementById('circular-pics-filter-dept');
+        circularPicsDeptFilter = el ? el.value : 'all';
+        circularPicsCurrentPage = 1;
+        loadCircularPics(1);
+    }
+
+    function onCircularPicsSubDeptFilterChange() {
+        const el = document.getElementById('circular-pics-filter-subdept');
+        circularPicsSubDeptFilter = el ? el.value : 'all';
+        circularPicsCurrentPage = 1;
+        loadCircularPics(1);
+    }
+
+    function onCircularPicsStatusFilterChange() {
+        const el = document.getElementById('circular-pics-filter-status');
+        circularPicsStatusFilter = el ? el.value : 'all';
+        circularPicsCurrentPage = 1;
+        loadCircularPics(1);
+    }
+
+    function populateCircularPicsFilters(depts, subDepts) {
+        const deptSelect = document.getElementById('circular-pics-filter-dept');
+        const subDeptSelect = document.getElementById('circular-pics-filter-subdept');
+
+        if (deptSelect && deptSelect.options.length <= 1 && Array.isArray(depts)) {
+            const currentVal = deptSelect.value;
+            deptSelect.innerHTML = '<option value="all">Semua Dept</option>';
+            depts.forEach(d => {
+                if (d && d.trim()) {
+                    const opt = document.createElement('option');
+                    opt.value = d;
+                    opt.textContent = d;
+                    if (d === currentVal) opt.selected = true;
+                    deptSelect.appendChild(opt);
+                }
+            });
+        }
+
+        if (subDeptSelect && subDeptSelect.options.length <= 1 && Array.isArray(subDepts)) {
+            const currentVal = subDeptSelect.value;
+            subDeptSelect.innerHTML = '<option value="all">Semua Sub Dept</option>';
+            subDepts.forEach(s => {
+                if (s && s.trim()) {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    if (s === currentVal) opt.selected = true;
+                    subDeptSelect.appendChild(opt);
+                }
+            });
+        }
+    }
+
+    function toggleCircularPicsSort(col) {
+        if (circularPicsSortCol === col) {
+            circularPicsSortDir = circularPicsSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            circularPicsSortCol = col;
+            circularPicsSortDir = 'asc';
+        }
+        loadCircularPics(1);
+    }
+
+    function updateCircularPicsSortIndicators() {
+        document.querySelectorAll('#circular-pics-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#circular-pics-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (circularPicsSortCol) {
+            const activeTh = document.querySelector(`#circular-pics-table th.sortable[onclick*="'${circularPicsSortCol}'"]`);
+            if (activeTh) activeTh.classList.add(circularPicsSortDir);
+            const activeInd = document.querySelector(`#circular-pics-table .sort-indicator[data-cpics-col="${circularPicsSortCol}"]`);
+            if (activeInd) activeInd.textContent = circularPicsSortDir === 'asc' ? '▲' : '▼';
+        }
+    }
+
+    function exportCircularPicsExcel() {
+        const params = new URLSearchParams({
+            action: 'export',
+            dept: circularPicsDeptFilter,
+            sub_dept: circularPicsSubDeptFilter,
+            status: circularPicsStatusFilter,
+            search: circularPicsSearchQuery
+        });
+        window.location.href = `api/circular_pics.php?${params.toString()}`;
+    }
+
+    function downloadCircularPicsTemplate() {
+        window.location.href = 'api/circular_pics.php?action=template';
+    }
+
+    function openAddCircularPicModal() {
+        document.getElementById('circular-pic-modal-title').textContent = 'Tambah Circular Sign PIC';
+        document.getElementById('circular-pic-id').value = '';
+        document.getElementById('circular-pic-dept').value = '';
+        document.getElementById('circular-pic-subdept').value = '';
+        document.getElementById('circular-pic-pic').value = '';
+        document.getElementById('circular-pic-job-title').value = '';
+        const activeChk = document.getElementById('circular-pic-is-active');
+        if (activeChk) activeChk.checked = true;
+
+        const modal = document.getElementById('circular-pic-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function openEditCircularPicModal(id) {
+        const item = circularPicsCache.find(x => x.id === id);
+        if (!item) return;
+
+        document.getElementById('circular-pic-modal-title').textContent = 'Edit Circular Sign PIC';
+        document.getElementById('circular-pic-id').value = item.id;
+        document.getElementById('circular-pic-dept').value = item.dept || '';
+        document.getElementById('circular-pic-subdept').value = item.sub_dept || '';
+        document.getElementById('circular-pic-pic').value = item.pic || '';
+        document.getElementById('circular-pic-job-title').value = item.job_title || '';
+        const activeChk = document.getElementById('circular-pic-is-active');
+        if (activeChk) {
+            activeChk.checked = item.is_active !== false && item.is_active !== 0 && item.is_active !== '0' && item.is_active !== 'f';
+        }
+
+        const modal = document.getElementById('circular-pic-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeCircularPicModal() {
+        const modal = document.getElementById('circular-pic-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function submitCircularPicForm(e) {
+        if (e) e.preventDefault();
+        const btn = document.getElementById('btn-save-circular-pic');
+        const origText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+        }
+
+        try {
+            const activeChk = document.getElementById('circular-pic-is-active');
+            const payload = {
+                id: document.getElementById('circular-pic-id').value || null,
+                dept: document.getElementById('circular-pic-dept').value.trim(),
+                sub_dept: document.getElementById('circular-pic-subdept').value.trim(),
+                pic: document.getElementById('circular-pic-pic').value.trim(),
+                job_title: document.getElementById('circular-pic-job-title').value.trim(),
+                is_active: activeChk ? activeChk.checked : true
+            };
+
+            const res = await fetch('api/circular_pics.php?action=save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                alert(json.message || 'Gagal menyimpan data');
+                return;
+            }
+
+            closeCircularPicModal();
+            loadCircularPics(circularPicsCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error saving Circular Sign PIC:', err);
+            alert('Terjadi kesalahan jaringan saat menyimpan data');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origText;
+            }
+        }
+    }
+
+    async function deleteCircularPic(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus data Circular Sign PIC ini?')) return;
+        try {
+            const res = await fetch('api/circular_pics.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                alert(json.message || 'Gagal menghapus data');
+                return;
+            }
+            loadCircularPics(circularPicsCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error deleting Circular Sign PIC:', err);
+            alert('Gagal menghapus data');
+        }
+    }
+
+    // ── Circular Sign PIC Import Excel ───────────────────────────────
+    let circularPicsSelectedFile = null;
+    let circularPicsFileToken = null;
+
+    function setupCircularPicsDragAndDrop() {
+        const dropZone = document.getElementById('circular-pics-drag-drop-zone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleCircularPicsFileSelect(dt.files);
+            }
+        });
+    }
+
+    function openCircularPicsImportModal() {
+        clearCircularPicsSelectedFile();
+        const statusDiv = document.getElementById('circular-pics-modal-import-status');
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.textContent = '';
+        }
+        const chk = document.getElementById('circular-pics-import-replace-existing');
+        if (chk) chk.checked = false;
+
+        const modal = document.getElementById('circular-pics-import-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeCircularPicsImportModal() {
+        const modal = document.getElementById('circular-pics-import-modal');
+        if (modal) modal.style.display = 'none';
+        clearCircularPicsSelectedFile();
+    }
+
+    async function handleCircularPicsFileSelect(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        const validExts = ['.xlsx', '.xls', '.csv'];
+        const nameLower = file.name.toLowerCase();
+        const isValid = validExts.some(ext => nameLower.endsWith(ext));
+
+        if (!isValid) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'Format File Salah', 'Hanya file .xlsx, .xls, atau .csv yang didukung.');
+            } else {
+                alert('Hanya file .xlsx, .xls, atau .csv yang didukung.');
+            }
+            return;
+        }
+
+        circularPicsSelectedFile = file;
+
+        // Update selected file display
+        const displayEl = document.getElementById('circular-pics-selected-file-display');
+        const nameEl = document.getElementById('circular-pics-selected-file-name');
+        const sizeEl = document.getElementById('circular-pics-selected-file-size');
+        if (displayEl && nameEl && sizeEl) {
+            nameEl.textContent = file.name;
+            sizeEl.textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
+            displayEl.style.display = 'block';
+        }
+
+        // Show sheet selection and set loading state
+        const sheetGroup = document.getElementById('circular-pics-import-sheet-group');
+        const sheetSelect = document.getElementById('circular-pics-import-sheet-select');
+        const sheetHint = document.getElementById('circular-pics-import-sheet-hint');
+        const submitBtn = document.getElementById('circular-pics-modal-import-btn');
+
+        if (sheetGroup && sheetSelect) {
+            sheetGroup.style.display = 'block';
+            sheetSelect.innerHTML = '<option value="">Membaca sheet dari file...</option>';
+            sheetSelect.disabled = true;
+            if (sheetHint) sheetHint.textContent = 'Mohon tunggu saat membaca sheet...';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Membaca sheet...';
+        }
+
+        try {
+            const json = await fetchExcelSheets(file);
+            if (json.success && json.sheets && json.sheets.length > 0) {
+                circularPicsFileToken = json.file_token || null;
+                sheetSelect.innerHTML = '';
+                json.sheets.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    sheetSelect.appendChild(opt);
+                });
+                sheetSelect.selectedIndex = 0;
+                sheetSelect.disabled = false;
+                if (sheetHint) {
+                    sheetHint.textContent = json.sheets.length === 1
+                        ? '1 sheet terdeteksi pada file.'
+                        : `${json.sheets.length} sheet ditemukan. Silakan pilih sheet untuk diimpor.`;
+                }
+            } else {
+                sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+                sheetSelect.disabled = false;
+                if (sheetHint) sheetHint.textContent = 'Sheet default akan digunakan.';
+            }
+        } catch (err) {
+            if (sheetSelect) {
+                sheetSelect.innerHTML = '<option value="">Sheet Default</option>';
+                sheetSelect.disabled = false;
+            }
+            if (sheetHint) sheetHint.textContent = 'Sheet default akan digunakan.';
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    function clearCircularPicsSelectedFile() {
+        circularPicsSelectedFile = null;
+        circularPicsFileToken = null;
+        const fileInput = document.getElementById('circular-pics-import-file-input');
+        if (fileInput) fileInput.value = '';
+
+        const displayEl = document.getElementById('circular-pics-selected-file-display');
+        if (displayEl) displayEl.style.display = 'none';
+
+        const sheetGroup = document.getElementById('circular-pics-import-sheet-group');
+        const sheetSelect = document.getElementById('circular-pics-import-sheet-select');
+        const sheetHint = document.getElementById('circular-pics-import-sheet-hint');
+        if (sheetGroup) sheetGroup.style.display = 'none';
+        if (sheetSelect) {
+            sheetSelect.innerHTML = '<option value="">Pilih Sheet...</option>';
+            sheetSelect.disabled = false;
+        }
+        if (sheetHint) sheetHint.textContent = '';
+
+        const submitBtn = document.getElementById('circular-pics-modal-import-btn');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unggah & Impor';
+        }
+    }
+
+    async function submitCircularPicsImport() {
+        if (!circularPicsSelectedFile) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'File Belum Dipilih', 'Silakan pilih atau seret & lepas file Excel.');
+            } else {
+                alert('Silakan pilih atau seret & lepas file Excel.');
+            }
+            return;
+        }
+
+        const submitBtn = document.getElementById('circular-pics-modal-import-btn');
+        const statusDiv = document.getElementById('circular-pics-modal-import-status');
+        const replaceExisting = document.getElementById('circular-pics-import-replace-existing')?.checked ? '1' : '0';
+        const sheetSelect = document.getElementById('circular-pics-import-sheet-select');
+        const sheetName = sheetSelect ? sheetSelect.value : '';
+
+        const formData = new FormData();
+        formData.append('action', 'import');
+        formData.append('replace_existing', replaceExisting);
+        formData.append('sheet_name', sheetName);
+        if (circularPicsFileToken) {
+            formData.append('file_token', circularPicsFileToken);
+        } else {
+            formData.append('excel_file', circularPicsSelectedFile);
+        }
+        formData.append('csrf_token', csrfToken);
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mengunggah & Memproses...';
+        }
+
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#eff6ff';
+            statusDiv.style.color = '#1d4ed8';
+            statusDiv.style.border = '1px solid #bfdbfe';
+            statusDiv.textContent = 'Mengunggah dan mengimpor data Circular Sign PIC...';
+        }
+
+        try {
+            const res = await fetch('api/circular_pics.php?action=import', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
+            });
+
+            const json = await res.json();
+
+            if (json.success) {
+                if (statusDiv) {
+                    statusDiv.style.background = '#f0fdf4';
+                    statusDiv.style.color = '#15803d';
+                    statusDiv.style.border = '1px solid #bbf7d0';
+                    statusDiv.textContent = json.message || 'Impor berhasil!';
+                }
+
+                if (typeof showToast === 'function') {
+                    showToast('success', 'Impor Selesai', json.message || 'Data berhasil diimpor.');
+                }
+
+                loadCircularPics(1);
+
+                setTimeout(() => {
+                    closeCircularPicsImportModal();
+                }, 1200);
+            } else {
+                if (statusDiv) {
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = json.message || 'Impor gagal.';
+                }
+                if (typeof showToast === 'function') {
+                    showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor data.');
+                } else {
+                    alert(json.message || 'Gagal mengimpor data.');
+                }
+            }
+        } catch (err) {
+            console.error('Error importing Circular Sign PICs:', err);
+            if (statusDiv) {
+                statusDiv.style.background = '#fef2f2';
+                statusDiv.style.color = '#b91c1c';
+                statusDiv.style.border = '1px solid #fecaca';
+                statusDiv.textContent = 'Kesalahan jaringan: ' + err.message;
+            }
+            if (typeof showToast === 'function') {
+                showToast('error', 'Kesalahan Sistem', 'Terjadi kesalahan jaringan.');
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah & Impor';
+            }
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // ── Template Report Master Data (Word & PDF) ─────────────────────
+    // ═════════════════════════════════════════════════════════════════
+    let templateReportsCurrentPage = 1;
+    let templateReportsPageSize = '10';
+    let templateReportsTotalPages = 1;
+    let templateReportsTotalItems = 0;
+    let templateReportsSearchQuery = '';
+    let templateReportsTypeFilter = 'all';
+    let templateReportsSortCol = 'created_at';
+    let templateReportsSortDir = 'desc';
+    let templateReportsDebounceTimer = null;
+    let templateReportsCache = [];
+    let templateReportSelectedFile = null;
+
+    async function loadTemplateReports(page = templateReportsCurrentPage) {
+        const tbody = document.getElementById('template-reports-tbody');
+        const infoEl = document.getElementById('template-reports-pagination-info');
+        const controlsEl = document.getElementById('template-reports-pagination-controls');
+        if (!tbody) return;
+
+        templateReportsCurrentPage = page;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 2.5rem; color: #64748b;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite;">
+                            <line x1="12" y1="2" x2="12" y2="6"></line>
+                            <line x1="12" y1="18" x2="12" y2="22"></line>
+                            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        </svg>
+                        <span>Memuat data Template Report...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                page: templateReportsCurrentPage,
+                limit: templateReportsPageSize,
+                type: templateReportsTypeFilter,
+                search: templateReportsSearchQuery,
+                sort_col: templateReportsSortCol,
+                sort_dir: templateReportsSortDir
+            });
+
+            const res = await fetch(`api/template_reports.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                throw new Error(json.message || 'Gagal memuat template');
+            }
+
+            templateReportsCache = json.data || [];
+            templateReportsTotalItems = json.total || 0;
+            templateReportsTotalPages = json.total_pages || 1;
+
+            renderTemplateReportsTable(json.data || []);
+            updateTemplateReportsPagination(json.page, json.total, json.total_pages);
+            updateTemplateReportsSortIndicators();
+
+        } catch (err) {
+            console.error('Error loading Template Reports:', err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.5rem; color: #ef4444;">
+                        Terjadi kesalahan saat memuat data: ${escapeHtml(err.message || 'Unknown error')}
+                    </td>
+                </tr>
+            `;
+            if (infoEl) infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            if (controlsEl) controlsEl.innerHTML = '';
+        }
+    }
+
+    function formatTemplateFileSize(bytes) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function renderTemplateReportsTable(rows) {
+        const tbody = document.getElementById('template-reports-tbody');
+        if (!tbody) return;
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="padding: 2.5rem; color: #94a3b8;">
+                        Tidak ada data Template Report yang ditemukan
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const startIndex = templateReportsPageSize === 'all' ? 0 : (templateReportsCurrentPage - 1) * parseInt(templateReportsPageSize, 10);
+        let html = '';
+
+        rows.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const isWord = r.file_type === 'word' || r.file_ext === 'docx' || r.file_ext === 'doc';
+            const badgeType = isWord
+                ? `<span class="badge" style="background: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; font-size: 11px;">Word (.${escapeHtml(r.file_ext || 'docx')})</span>`
+                : `<span class="badge" style="background: #fef2f2; color: #b91c1c; font-weight: 700; border: 1px solid #fecaca; font-size: 11px;">PDF (.pdf)</span>`;
+            
+            const docIcon = isWord
+                ? `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #dbeafe; color: #1d4ed8; font-size: 13px; font-weight: 700;">W</span>`
+                : `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #fee2e2; color: #b91c1c; font-size: 13px; font-weight: 700;">P</span>`;
+
+            const dateStr = r.created_at ? r.created_at.substring(0, 16) : '-';
+
+            html += `
+                <tr id="template-report-row-${r.id}">
+                    <td class="text-center" style="color: #64748b; vertical-align: middle;">${no}</td>
+                    <td style="vertical-align: middle;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${docIcon}
+                            <div>
+                                <div style="font-weight: 600; color: #0f172a;">${escapeHtml(r.title || '-')}</div>
+                                <div style="font-size: 11px; color: #64748b; font-family: monospace;">${escapeHtml(r.file_name || '-')}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-center" style="vertical-align: middle;">${badgeType}</td>
+                    <td style="vertical-align: middle; color: #475569; font-size: 12.5px;">${escapeHtml(r.description || '-')}</td>
+                    <td class="text-center" style="vertical-align: middle; font-size: 12px; color: #64748b; font-family: monospace;">${formatTemplateFileSize(r.file_size)}</td>
+                    <td class="text-center" style="vertical-align: middle; font-size: 12px; color: #64748b;">${escapeHtml(dateStr)}</td>
+                    <td class="text-center" style="vertical-align: middle;">
+                        <div style="display: inline-flex; align-items: center; gap: 4px;">
+                            <a href="api/template_reports.php?action=download&id=${r.id}" class="btn btn-outline-primary btn-sm"
+                                style="font-size: 11px; padding: 2px 7px; text-decoration: none;" title="Unduh File Template">
+                                Download
+                            </a>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="App.openTemplateReportEditModal(${r.id})"
+                                style="font-size: 11px; padding: 2px 7px;">
+                                Edit
+                            </button>
+                            <button class="btn btn-danger btn-sm btn-delete" onclick="App.deleteTemplateReport(${r.id})"
+                                style="font-size: 11px; padding: 2px 7px;">
+                                Hapus
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function updateTemplateReportsPagination(page, total, totalPages) {
+        const infoEl = document.getElementById('template-reports-pagination-info');
+        const controlsEl = document.getElementById('template-reports-pagination-controls');
+
+        if (infoEl) {
+            const start = total > 0 ? (page - 1) * (templateReportsPageSize === 'all' ? total : parseInt(templateReportsPageSize, 10)) + 1 : 0;
+            const end = templateReportsPageSize === 'all' ? total : Math.min(page * parseInt(templateReportsPageSize, 10), total);
+            infoEl.textContent = `Menampilkan ${start.toLocaleString('id-ID')} sampai ${end.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} data`;
+        }
+
+        if (controlsEl) {
+            if (totalPages <= 1 || templateReportsPageSize === 'all') {
+                controlsEl.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            html += `<button class="pagination-btn" ${page === 1 ? 'disabled' : ''} onclick="App.goToTemplateReportsPage(${page - 1})">&laquo; Prev</button>`;
+
+            const maxButtons = 5;
+            let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="App.goToTemplateReportsPage(1)">1</button>`;
+                if (startPage > 2) html += `<span class="pagination-ellipsis">...</span>`;
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                html += `<button class="pagination-btn ${p === page ? 'active' : ''}" onclick="App.goToTemplateReportsPage(${p})">${p}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span class="pagination-ellipsis">...</span>`;
+                html += `<button class="pagination-btn" onclick="App.goToTemplateReportsPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            html += `<button class="pagination-btn" ${page === totalPages ? 'disabled' : ''} onclick="App.goToTemplateReportsPage(${page + 1})">Next &raquo;</button>`;
+            controlsEl.innerHTML = html;
+        }
+    }
+
+    function goToTemplateReportsPage(p) {
+        if (p < 1) p = 1;
+        if (p > templateReportsTotalPages) p = templateReportsTotalPages;
+        loadTemplateReports(p);
+    }
+
+    function changeTemplateReportsPageSize(sz) {
+        templateReportsPageSize = sz;
+        templateReportsCurrentPage = 1;
+        loadTemplateReports(1);
+    }
+
+    function handleTemplateReportsSearch(val) {
+        clearTimeout(templateReportsDebounceTimer);
+        templateReportsDebounceTimer = setTimeout(() => {
+            templateReportsSearchQuery = (val || '').trim();
+            templateReportsCurrentPage = 1;
+            loadTemplateReports(1);
+        }, 300);
+    }
+
+    function onTemplateReportsFilterTypeChange() {
+        const el = document.getElementById('template-reports-filter-type');
+        templateReportsTypeFilter = el ? el.value : 'all';
+        templateReportsCurrentPage = 1;
+        loadTemplateReports(1);
+    }
+
+    function toggleTemplateReportsSort(col) {
+        if (templateReportsSortCol === col) {
+            templateReportsSortDir = templateReportsSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            templateReportsSortCol = col;
+            templateReportsSortDir = 'asc';
+        }
+        loadTemplateReports(1);
+    }
+
+    function updateTemplateReportsSortIndicators() {
+        document.querySelectorAll('#template-reports-table th.sortable').forEach(th => {
+            th.classList.remove('asc', 'desc');
+        });
+        document.querySelectorAll('#template-reports-table .sort-indicator').forEach(ind => {
+            ind.textContent = '⇅';
+        });
+
+        if (templateReportsSortCol) {
+            const activeTh = document.querySelector(`#template-reports-table th.sortable[onclick*="'${templateReportsSortCol}'"]`);
+            if (activeTh) activeTh.classList.add(templateReportsSortDir);
+            const activeInd = document.querySelector(`#template-reports-table .sort-indicator[data-tr-col="${templateReportsSortCol}"]`);
+            if (activeInd) activeInd.textContent = templateReportsSortDir === 'asc' ? '▲' : '▼';
+        }
+    }
+
+    // ── Template Report Upload / Import Modal ────────────────────────
+    function setupTemplateReportDragAndDrop() {
+        const dropZone = document.getElementById('template-report-drag-drop-zone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                handleTemplateReportFileSelect(dt.files);
+            }
+        });
+    }
+
+    function openTemplateReportUploadModal() {
+        clearTemplateReportSelectedFile();
+        const titleInput = document.getElementById('template-report-title');
+        const descInput = document.getElementById('template-report-desc');
+        const statusDiv = document.getElementById('template-report-modal-status');
+        if (titleInput) titleInput.value = '';
+        if (descInput) descInput.value = '';
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.textContent = '';
+        }
+        const modal = document.getElementById('template-report-upload-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeTemplateReportUploadModal() {
+        const modal = document.getElementById('template-report-upload-modal');
+        if (modal) modal.style.display = 'none';
+        clearTemplateReportSelectedFile();
+    }
+
+    function handleTemplateReportFileSelect(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        const validExts = ['.docx', '.doc', '.pdf'];
+        const nameLower = file.name.toLowerCase();
+        const isValid = validExts.some(ext => nameLower.endsWith(ext));
+
+        if (!isValid) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'Format File Tidak Sesuai', 'Hanya file Word (.docx, .doc) dan PDF (.pdf) yang diperbolehkan.');
+            } else {
+                alert('Hanya file Word (.docx, .doc) dan PDF (.pdf) yang diperbolehkan.');
+            }
+            return;
+        }
+
+        templateReportSelectedFile = file;
+
+        // Auto-fill title if empty
+        const titleInput = document.getElementById('template-report-title');
+        if (titleInput && !titleInput.value.trim()) {
+            const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_.-]+/g, ' ');
+            titleInput.value = cleanName;
+        }
+
+        const displayEl = document.getElementById('template-report-selected-file-display');
+        const nameEl = document.getElementById('template-report-selected-file-name');
+        const sizeEl = document.getElementById('template-report-selected-file-size');
+        const iconEl = document.getElementById('template-report-selected-file-icon');
+        if (displayEl && nameEl && sizeEl) {
+            nameEl.textContent = file.name;
+            sizeEl.textContent = `(${(file.size / 1024).toFixed(1)} KB)`;
+            if (iconEl) {
+                iconEl.textContent = nameLower.endsWith('.pdf') ? '📕' : '📘';
+            }
+            displayEl.style.display = 'block';
+        }
+    }
+
+    function clearTemplateReportSelectedFile() {
+        templateReportSelectedFile = null;
+        const fileInput = document.getElementById('template-report-file-input');
+        if (fileInput) fileInput.value = '';
+        const displayEl = document.getElementById('template-report-selected-file-display');
+        if (displayEl) displayEl.style.display = 'none';
+    }
+
+    async function submitTemplateReportUpload(e) {
+        if (e) e.preventDefault();
+        if (!templateReportSelectedFile) {
+            alert('Silakan pilih file Word (.docx, .doc) atau PDF terlebih dahulu.');
+            return;
+        }
+
+        const title = (document.getElementById('template-report-title')?.value || '').trim();
+        const desc = (document.getElementById('template-report-desc')?.value || '').trim();
+        const submitBtn = document.getElementById('btn-upload-template-report');
+        const statusDiv = document.getElementById('template-report-modal-status');
+
+        if (!title) {
+            alert('Nama template wajib diisi.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'upload');
+        formData.append('template_file', templateReportSelectedFile);
+        formData.append('title', title);
+        formData.append('description', desc);
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mengunggah...';
+        }
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#eff6ff';
+            statusDiv.style.color = '#1d4ed8';
+            statusDiv.style.border = '1px solid #bfdbfe';
+            statusDiv.textContent = 'Sedang mengunggah template report...';
+        }
+
+        try {
+            const res = await fetch('api/template_reports.php?action=upload', {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                if (statusDiv) {
+                    statusDiv.style.background = '#f0fdf4';
+                    statusDiv.style.color = '#15803d';
+                    statusDiv.style.border = '1px solid #bbf7d0';
+                    statusDiv.textContent = json.message || 'Template berhasil diunggah!';
+                }
+                if (typeof showToast === 'function') {
+                    showToast('success', 'Berhasil', json.message || 'Template report berhasil diunggah.');
+                }
+                loadTemplateReports(1);
+                setTimeout(() => {
+                    closeTemplateReportUploadModal();
+                }, 1000);
+            } else {
+                if (statusDiv) {
+                    statusDiv.style.background = '#fef2f2';
+                    statusDiv.style.color = '#b91c1c';
+                    statusDiv.style.border = '1px solid #fecaca';
+                    statusDiv.textContent = json.message || 'Gagal mengunggah template.';
+                }
+                alert(json.message || 'Gagal mengunggah template.');
+            }
+        } catch (err) {
+            console.error('Error uploading template report:', err);
+            alert('Terjadi kesalahan jaringan saat mengunggah file.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Unggah Template';
+            }
+        }
+    }
+
+    function openTemplateReportEditModal(id) {
+        const item = templateReportsCache.find(x => x.id === id);
+        if (!item) return;
+
+        document.getElementById('edit-template-report-id').value = item.id;
+        document.getElementById('edit-template-report-title').value = item.title || '';
+        document.getElementById('edit-template-report-desc').value = item.description || '';
+
+        const modal = document.getElementById('template-report-edit-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeTemplateReportEditModal() {
+        const modal = document.getElementById('template-report-edit-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function submitTemplateReportEdit(e) {
+        if (e) e.preventDefault();
+        const id = document.getElementById('edit-template-report-id')?.value;
+        const title = (document.getElementById('edit-template-report-title')?.value || '').trim();
+        const desc = (document.getElementById('edit-template-report-desc')?.value || '').trim();
+
+        if (!id || !title) {
+            alert('Nama template wajib diisi.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-save-edit-template-report');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+        }
+
+        try {
+            const res = await fetch('api/template_reports.php?action=edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, title, description: desc })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                alert(json.message || 'Gagal memperbarui data.');
+                return;
+            }
+
+            closeTemplateReportEditModal();
+            loadTemplateReports(templateReportsCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error updating template report:', err);
+            alert('Gagal memperbarui template report.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Simpan Perubahan';
+            }
+        }
+    }
+
+    async function deleteTemplateReport(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus file template report ini?')) return;
+        try {
+            const res = await fetch('api/template_reports.php?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                alert(json.message || 'Gagal menghapus template');
+                return;
+            }
+            loadTemplateReports(templateReportsCurrentPage);
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', json.message);
+            } else {
+                alert(json.message);
+            }
+        } catch (err) {
+            console.error('Error deleting template report:', err);
+            alert('Gagal menghapus template report');
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
     // ── Chat Room PIC Sites (WhatsApp Direct) ────────────────────────
     // ═════════════════════════════════════════════════════════════════
     let chatRoomSitesData = [];
@@ -11422,6 +12808,12 @@ const App = (() => {
                 uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Weekly Summary</span>`);
             }
 
+            if (u.can_access_reports !== false) {
+                uacBadges.push(`<span class="badge" style="background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Reports</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Reports</span>`);
+            }
+
             if (u.can_access_master_data !== false) {
                 uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master Data</span>`);
             } else {
@@ -11518,6 +12910,8 @@ const App = (() => {
 
         document.getElementById('user-uac-all-summary').checked = true;
         document.getElementById('user-uac-weekly-summary').checked = true;
+        const uacReportsAdd = document.getElementById('user-uac-reports');
+        if (uacReportsAdd) uacReportsAdd.checked = true;
         document.getElementById('user-uac-master-data').checked = true;
         document.getElementById('user-uac-master-data-weekly').checked = true;
         const uacUserMgmtAdd = document.getElementById('user-uac-user-management');
@@ -11550,6 +12944,8 @@ const App = (() => {
 
         document.getElementById('user-uac-all-summary').checked = user.can_access_all_summary !== false;
         document.getElementById('user-uac-weekly-summary').checked = user.can_access_weekly_summary !== false;
+        const uacReportsEdit = document.getElementById('user-uac-reports');
+        if (uacReportsEdit) uacReportsEdit.checked = user.can_access_reports !== false;
         document.getElementById('user-uac-master-data').checked = user.can_access_master_data !== false;
         document.getElementById('user-uac-master-data-weekly').checked = user.can_access_master_data_weekly !== false;
         const uacUserMgmtEdit = document.getElementById('user-uac-user-management');
@@ -11596,6 +12992,7 @@ const App = (() => {
             password: password,
             can_access_all_summary: document.getElementById('user-uac-all-summary').checked,
             can_access_weekly_summary: document.getElementById('user-uac-weekly-summary').checked,
+            can_access_reports: document.getElementById('user-uac-reports') ? document.getElementById('user-uac-reports').checked : true,
             can_access_master_data: document.getElementById('user-uac-master-data').checked,
             can_access_master_data_weekly: document.getElementById('user-uac-master-data-weekly').checked,
             can_access_user_management: document.getElementById('user-uac-user-management') ? document.getElementById('user-uac-user-management').checked : true,
@@ -11636,6 +13033,7 @@ const App = (() => {
                     window.AUTH_USER.permissions = {
                         can_access_all_summary: payload.can_access_all_summary,
                         can_access_weekly_summary: payload.can_access_weekly_summary,
+                        can_access_reports: payload.can_access_reports,
                         can_access_master_data: payload.can_access_master_data,
                         can_access_master_data_weekly: payload.can_access_master_data_weekly,
                         can_master_add_import: payload.can_master_add_import,
@@ -12076,12 +13474,21 @@ const App = (() => {
             if (json.success && json.sheets && json.sheets.length > 0) {
                 importFileTokenWeekly = json.file_token || null;
                 sheetSelect.innerHTML = '';
+                let bestSheetVal = '';
                 json.sheets.forEach(s => {
                     const opt = document.createElement('option');
                     opt.value = s;
                     opt.textContent = s;
                     sheetSelect.appendChild(opt);
+
+                    const sLower = s.toLowerCase();
+                    if (!bestSheetVal && (sLower.includes('reconcil') || sLower.includes('weekly') || sLower.includes('profile') || sLower.includes('so'))) {
+                        bestSheetVal = s;
+                    }
                 });
+                if (bestSheetVal) {
+                    sheetSelect.value = bestSheetVal;
+                }
                 sheetSelect.disabled = false;
                 if (sheetHint) {
                     sheetHint.textContent = json.sheets.length === 1
@@ -12203,8 +13610,17 @@ const App = (() => {
 
                 showToast('success', 'Impor Selesai', json.message || 'Data SO Weekly berhasil diimpor.');
 
+                if (json.detected_period) {
+                    const mFilter = document.getElementById('filter-weekly-month');
+                    const wFilter = document.getElementById('filter-weekly-week');
+                    const yFilter = document.getElementById('filter-weekly-year');
+                    if (mFilter && json.detected_period.month) mFilter.value = String(json.detected_period.month);
+                    if (wFilter && json.detected_period.week) wFilter.value = String(json.detected_period.week);
+                    if (yFilter && json.detected_period.year) yFilter.value = String(json.detected_period.year);
+                }
+
                 loadMasterDataWeekly();
-                loadWeeklySummary();
+                loadWeeklySummary(true);
 
                 setTimeout(() => {
                     closeImportModalWeekly();
@@ -12271,7 +13687,7 @@ const App = (() => {
                 showToast('success', 'Berhasil', json.message || 'Data SO Weekly berhasil dihapus.');
                 closeBulkDeleteModalWeekly();
                 loadMasterDataWeekly();
-                loadWeeklySummary();
+                loadWeeklySummary(true);
             } else {
                 if (statusDiv) {
                     statusDiv.style.display = 'block';
@@ -12313,6 +13729,8 @@ const App = (() => {
     let currentWeeklyReportPage = 1;
     let filteredWeeklyReportRows = [];
     let weeklySummaryInitialized = false;
+    let weeklyAvailablePeriods = [];
+    let weeklyLatestPeriod = null;
 
     function switchWeeklyCategory(cat) {
         currentWeeklyCategory = cat === 'outlet' ? 'outlet' : 'pmd';
@@ -12377,66 +13795,49 @@ const App = (() => {
         loadWeeklySummary();
     }
 
-    async function loadWeeklySummary() {
+    async function loadWeeklySummary(forceLatest = false) {
         const monthEl = document.getElementById('weekly-filter-month');
         const weekEl = document.getElementById('weekly-filter-week');
         const yearEl = document.getElementById('weekly-filter-year');
 
-        if (!weeklySummaryInitialized) {
-            const savedM = sessionStorage.getItem('weekly_filter_month');
-            const savedW = sessionStorage.getItem('weekly_filter_week');
-            const savedY = sessionStorage.getItem('weekly_filter_year');
+        const isInitial = !weeklySummaryInitialized || forceLatest;
 
-            if (monthEl && savedM !== null && savedM !== undefined && Array.from(monthEl.options).some(o => o.value === String(savedM))) {
-                monthEl.value = String(savedM);
-            }
-            if (weekEl && savedW !== null && savedW !== undefined && Array.from(weekEl.options).some(o => o.value === String(savedW))) {
-                weekEl.value = String(savedW);
-            }
-            if (yearEl && savedY) {
-                const sY = String(savedY);
-                if (!Array.from(yearEl.options).some(o => o.value === sY)) {
-                    const opt = document.createElement('option');
-                    opt.value = sY;
-                    opt.textContent = sY;
-                    yearEl.appendChild(opt);
-                }
-                yearEl.value = sY;
-            }
-            weeklySummaryInitialized = true;
-        }
-
-        const m = monthEl?.value || 9;
-        const w = weekEl?.value || 1;
-        const y = yearEl?.value || 2026;
-
-        try {
-            sessionStorage.setItem('weekly_filter_month', m);
-            sessionStorage.setItem('weekly_filter_week', w);
-            sessionStorage.setItem('weekly_filter_year', y);
-        } catch (e) { }
+        // If not initial, read selected values from dropdowns
+        const m = (!isInitial && monthEl && monthEl.value) ? monthEl.value : '';
+        const w = (!isInitial && weekEl && weekEl.value) ? weekEl.value : '';
+        const y = (!isInitial && yearEl && yearEl.value) ? yearEl.value : '';
 
         const monthNames = {
             1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
             5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
             9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
         };
-        const periodStr = `${monthNames[parseInt(m, 10)] || 'Bulan ' + m} - Week ${w} ${y}`;
 
-        // Update period badges
-        const badges = [
-            'weekly-executive-period-badge',
-            'weekly-scorecard-rating-period-badge',
-            'weekly-scorecard-exec-period-badge',
-            'weekly-report-period-badge'
-        ];
-        badges.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = periodStr;
-        });
+        const updateBadges = (monthVal, weekVal, yearVal) => {
+            const periodStr = `${monthNames[parseInt(monthVal, 10)] || 'Bulan ' + monthVal} - Week ${weekVal} ${yearVal}`;
+            const badges = [
+                'weekly-executive-period-badge',
+                'weekly-scorecard-rating-period-badge',
+                'weekly-scorecard-exec-period-badge',
+                'weekly-report-period-badge'
+            ];
+            badges.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = periodStr;
+            });
+        };
+
+        if (m && w && y) {
+            updateBadges(m, w, y);
+        }
 
         try {
-            const res = await fetch(`api/reconciliation_weekly.php?action=summary&month=${m}&week=${w}&year=${y}&category=${currentWeeklyCategory}`);
+            let url = `api/reconciliation_weekly.php?action=summary&category=${currentWeeklyCategory}`;
+            if (m && w && y) {
+                url += `&month=${encodeURIComponent(m)}&week=${encodeURIComponent(w)}&year=${encodeURIComponent(y)}`;
+            }
+
+            const res = await fetch(url);
             const json = await res.json();
 
             if (!json.success) {
@@ -12445,6 +13846,37 @@ const App = (() => {
             }
 
             weeklySummaryData = json;
+            weeklyAvailablePeriods = json.available_periods || [];
+            weeklyLatestPeriod = json.latest_period || null;
+
+            // Automatically sync dropdowns to the returned (latest or active) period
+            if (json.period) {
+                const resM = String(json.period.month);
+                const resW = String(json.period.week);
+                const resY = String(json.period.year);
+
+                if (monthEl && resM) monthEl.value = resM;
+                if (weekEl && resW) weekEl.value = resW;
+                if (yearEl && resY) {
+                    if (!Array.from(yearEl.options).some(o => o.value === resY)) {
+                        const opt = document.createElement('option');
+                        opt.value = resY;
+                        opt.textContent = resY;
+                        yearEl.appendChild(opt);
+                    }
+                    yearEl.value = resY;
+                }
+
+                updateBadges(resM, resW, resY);
+
+                try {
+                    sessionStorage.setItem('weekly_filter_month', resM);
+                    sessionStorage.setItem('weekly_filter_week', resW);
+                    sessionStorage.setItem('weekly_filter_year', resY);
+                } catch (e) { }
+            }
+
+            weeklySummaryInitialized = true;
 
             // 1. Render Achievements Cards
             renderWeeklyAchievements(json.achievements);
@@ -12460,6 +13892,44 @@ const App = (() => {
             console.error('loadWeeklySummary error:', err);
             showToast('error', 'Error', 'Gagal memuat data Weekly Summary.');
         }
+    }
+
+    function onWeeklyMonthChange() {
+        const monthEl = document.getElementById('weekly-filter-month');
+        const weekEl = document.getElementById('weekly-filter-week');
+        const yearEl = document.getElementById('weekly-filter-year');
+
+        const m = parseInt(monthEl?.value, 10);
+        const y = parseInt(yearEl?.value, 10) || (new Date()).getFullYear();
+
+        if (m && weeklyAvailablePeriods.length > 0) {
+            const matching = weeklyAvailablePeriods.filter(p => p.month === m && (!y || p.year === y));
+            if (matching.length > 0) {
+                // Automatically choose latest available week for this month
+                const maxWeek = Math.max(...matching.map(p => p.week));
+                if (weekEl) weekEl.value = String(maxWeek);
+            }
+        }
+        loadWeeklySummary();
+    }
+
+    function onWeeklyYearChange() {
+        const monthEl = document.getElementById('weekly-filter-month');
+        const weekEl = document.getElementById('weekly-filter-week');
+        const yearEl = document.getElementById('weekly-filter-year');
+
+        const y = parseInt(yearEl?.value, 10);
+        if (y && weeklyAvailablePeriods.length > 0) {
+            const matching = weeklyAvailablePeriods.filter(p => p.year === y);
+            if (matching.length > 0) {
+                const maxMonth = Math.max(...matching.map(p => p.month));
+                const monthWeeks = matching.filter(p => p.month === maxMonth);
+                const maxWeek = Math.max(...monthWeeks.map(p => p.week));
+                if (monthEl) monthEl.value = String(maxMonth);
+                if (weekEl) weekEl.value = String(maxWeek);
+            }
+        }
+        loadWeeklySummary();
     }
 
     function renderWeeklyAchievements(achievements) {
@@ -12610,8 +14080,9 @@ const App = (() => {
 
         if (isPmd) {
             const main = achievements.main || {};
-            const dno = achievements.sub_depts ? (achievements.sub_depts['DNO'] || {}) : {};
-            const dso = achievements.sub_depts ? (achievements.sub_depts['DSO'] || {}) : {};
+            const subDepts = achievements.sub_depts || {};
+            const dno = subDepts['DNO'] || subDepts['dno'] || {};
+            const dso = subDepts['DSO'] || subDepts['dso'] || {};
 
             updateWeeklyAchCard('weekly-kpi-pmd-achievement', 'weekly-kpi-pmd-subtext', 'weekly-kpi-pmd-trend', 'weekly-kpi-pmd-status', main, 'Avg PMD Divisi', true);
             updateWeeklyAchCard('weekly-kpi-dno-achievement', 'weekly-kpi-dno-subtext', 'weekly-kpi-dno-trend', 'weekly-kpi-dno-status', dno, 'Avg DEPT DNO', true);
@@ -12619,9 +14090,9 @@ const App = (() => {
         } else {
             const main = achievements.main || {};
             const depts = achievements.depts || {};
-            const cro = depts['CRO'] || {};
-            const ero = depts['ERO'] || {};
-            const wro = depts['WRO'] || {};
+            const cro = depts['CRO'] || depts['cro'] || {};
+            const ero = depts['ERO'] || depts['ero'] || {};
+            const wro = depts['WRO'] || depts['wro'] || {};
 
             updateWeeklyAchCard('weekly-kpi-outlet-achievement', 'weekly-kpi-outlet-subtext', 'weekly-kpi-outlet-trend', 'weekly-kpi-outlet-status', main, 'Avg Outlet Regional', false, 85);
             updateWeeklyAchCard('weekly-kpi-cro-achievement', 'weekly-kpi-cro-subtext', 'weekly-kpi-cro-trend', 'weekly-kpi-cro-status', cro, 'Avg DEPT CRO', false, 85);
@@ -12828,7 +14299,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Tidak Ada Data</div>
                         <div style="font-size: 11px;">Tidak ditemukan site dengan kriteria rating ini.</div>
                     </td>
@@ -12842,7 +14313,6 @@ const App = (() => {
             const ratingBadge = renderRatingBadge(s.rating);
             html += `
                 <tr>
-                    <td class="scorecard-col-no text-center">${idx + 1}</td>
                     <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(s.sub_dept || s.dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(s.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(s.name_site || '-')}</td>
@@ -12893,7 +14363,7 @@ const App = (() => {
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
+                    <td colspan="5" class="text-center" style="padding: 2.2rem 0.5rem; color: #94a3b8;">
                         <div style="font-size: 12.5px; font-weight: 700; color: #64748b; margin-bottom: 3px;">Tidak Ada Data</div>
                         <div style="font-size: 11px;">Tidak ditemukan site dengan status eksekusi ini.</div>
                     </td>
@@ -12907,7 +14377,6 @@ const App = (() => {
             const execBadge = renderExecutionBadge(s.execution_status);
             html += `
                 <tr>
-                    <td class="scorecard-col-no text-center">${idx + 1}</td>
                     <td class="scorecard-col-subdept" style="color: #475569;">${escapeHtml(s.sub_dept || s.dept || '-')}</td>
                     <td class="scorecard-col-sitecode">${escapeHtml(s.sitecode)}</td>
                     <td class="scorecard-col-namesite" style="font-weight: 600; color: #1e293b;">${escapeHtml(s.name_site || '-')}</td>
@@ -13163,7 +14632,10 @@ const App = (() => {
             const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
             const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
             const pctNoData = total > 0 ? Math.round((noData / total) * 100) : 0;
-            const thresholdLabel = (currentWeeklyCategory === 'pmd') ? '98%' : '97%';
+            const targetPctNum = weeklySummaryData?.achievements?.target_pct !== undefined
+                ? Number(weeklySummaryData.achievements.target_pct)
+                : (currentWeeklyCategory === 'pmd' ? 98.0 : 85.0);
+            const thresholdLabel = `${Math.round(targetPctNum)}%`;
             const statusSel = document.getElementById('weekly-report-so-status-filter');
             const curStatus = statusSel ? statusSel.value : 'all';
             const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
@@ -13221,7 +14693,7 @@ const App = (() => {
         const searchInput = document.getElementById('weekly-report-so-search');
         const query = (searchInput?.value || '').toLowerCase().trim();
 
-        const targetPct = weeklySummaryData.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+        const targetPct = weeklySummaryData?.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 85.0);
 
         // Base rows filtered by Dept/Subdept & Search query (used for pie chart calculations)
         let baseRows = reportData.slice();
@@ -13256,7 +14728,8 @@ const App = (() => {
         let countNoData = 0;
         baseRows.forEach(r => {
             if (r.has_data && r.pct !== null && r.pct !== undefined) {
-                if (r.pct >= targetPct) {
+                const rounded = Math.round(parseFloat(r.pct));
+                if (rounded >= targetPct) {
                     countTercapai++;
                 } else {
                     countTidakTercapai++;
@@ -13273,9 +14746,9 @@ const App = (() => {
         let filtered = baseRows.slice();
         if (statusFilter !== 'all') {
             if (statusFilter === 'tercapai') {
-                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && r.pct >= targetPct);
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && Math.round(parseFloat(r.pct)) >= targetPct);
             } else if (statusFilter === 'tidak_tercapai') {
-                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && r.pct < targetPct);
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && Math.round(parseFloat(r.pct)) < targetPct);
             } else if (statusFilter === 'no_data') {
                 filtered = filtered.filter(r => !r.has_data || r.pct === null || r.pct === undefined);
             }
@@ -13313,7 +14786,7 @@ const App = (() => {
         if (!tbody) return;
 
         const total = filteredWeeklyReportRows.length;
-        const targetPct = weeklySummaryData?.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 97.0);
+        const targetPct = weeklySummaryData?.achievements?.target_pct || (currentWeeklyCategory === 'pmd' ? 98.0 : 85.0);
         const statusFilter = document.getElementById('weekly-report-so-status-filter')?.value || 'all';
 
         const pageSize = (weeklyReportPageSize === 'all') ? total : parseInt(weeklyReportPageSize, 10);
@@ -13350,7 +14823,8 @@ const App = (() => {
         let html = '';
         pageRows.forEach(r => {
             const hasData = r.has_data && r.pct !== null && r.pct !== undefined;
-            const isTercapai = hasData && (r.pct >= targetPct);
+            const roundedPct = hasData ? Math.round(parseFloat(r.pct)) : null;
+            const isTercapai = hasData && (roundedPct >= targetPct);
 
             let statusBadge = '';
             if (hasData) {
@@ -13374,17 +14848,17 @@ const App = (() => {
                     <td class="text-center font-mono" style="font-weight: 600; font-size: 12px; color: #1e293b;">
                         ${escapeHtml(r.sitecode)}
                     </td>
-                    <td class="text-left" style="font-weight: 500; color: #0f172a; max-width: 260px; white-space: normal;">
+                    <td class="text-left col-name-site" style="font-weight: 500; color: #0f172a; max-width: 260px; white-space: normal; text-align: left;">
                         ${escapeHtml(r.name_site || '-')}
                     </td>
                     <td class="text-center" style="font-size: 12px; font-weight: 600; color: #475569;">
                         ${deptDisplay}
                     </td>
-                    <td class="text-right">${hasData ? formatNumber(r.match_qty) : '-'}</td>
-                    <td class="text-right">${hasData ? formatNumber(r.physic_qty) : '-'}</td>
-                    <td class="text-right">${hasData ? formatNumber(r.db_qty) : '-'}</td>
-                    <td class="text-right" style="font-weight: 600;">${hasData ? formatNumber(r.target_qty) : '-'}</td>
-                    <td class="text-right">${pctDisplay}</td>
+                    <td class="text-center">${hasData ? formatNumber(r.match_qty) : '-'}</td>
+                    <td class="text-center">${hasData ? formatNumber(r.physic_qty) : '-'}</td>
+                    <td class="text-center">${hasData ? formatNumber(r.db_qty) : '-'}</td>
+                    <td class="text-center" style="font-weight: 600;">${hasData ? formatNumber(r.target_qty) : '-'}</td>
+                    <td class="text-center">${pctDisplay}</td>
                     <td class="text-center">${statusBadge}</td>
                 </tr>
             `;
@@ -13407,7 +14881,7 @@ const App = (() => {
             });
 
             const avgPct = countWithData > 0 ? (sumPct / countWithData) : 0;
-            const isOverallTercapai = avgPct >= targetPct;
+            const isOverallTercapai = Math.round(avgPct) >= targetPct;
             let filterNote = '';
             if (statusFilter === 'tercapai') filterNote = ' - Tercapai';
             else if (statusFilter === 'tidak_tercapai') filterNote = ' - Tidak Tercapai';
@@ -13418,11 +14892,11 @@ const App = (() => {
                     <td colspan="3" style="color: #0f172a; padding: 0.75rem 1rem; text-align: left;">
                         Grand Total (${total} Sites${filterNote})
                     </td>
-                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumMatch)}</td>
-                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumPhysic)}</td>
-                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumDb)}</td>
-                    <td class="text-right" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumTarget)}</td>
-                    <td class="text-right" style="font-weight: 700; color: ${countWithData > 0 ? (isOverallTercapai ? '#16a34a' : '#dc2626') : '#64748b'}; padding: 0.75rem 0.5rem;">
+                    <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumMatch)}</td>
+                    <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumPhysic)}</td>
+                    <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumDb)}</td>
+                    <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumTarget)}</td>
+                    <td class="text-center" style="font-weight: 700; color: ${countWithData > 0 ? (isOverallTercapai ? '#16a34a' : '#dc2626') : '#64748b'}; padding: 0.75rem 0.5rem;">
                         ${countWithData > 0 ? formatPercent(avgPct) : '-'}
                     </td>
                     <td class="text-center" style="padding: 0.75rem 0.5rem;">
@@ -13517,6 +14991,7 @@ const App = (() => {
         updateSRGroupType,
         toggleSRActive,
         toggleSRCounted,
+        toggleSRCountedWeekly,
         syncSiteProfile,
         syncAllSiteProfiles,
         openSRHistoryModal,
@@ -13648,6 +15123,48 @@ const App = (() => {
         handlePicSitesFileSelect,
         clearPicSitesSelectedFile,
         submitPicSitesImport,
+        // Circular Sign PIC Master Data exports
+        loadCircularPics,
+        renderCircularPicsTable,
+        updateCircularPicsPagination,
+        goToCircularPicsPage,
+        changeCircularPicsPageSize,
+        handleCircularPicsSearch,
+        onCircularPicsDeptFilterChange,
+        onCircularPicsSubDeptFilterChange,
+        onCircularPicsStatusFilterChange,
+        toggleCircularPicActive,
+        toggleCircularPicsSort,
+        exportCircularPicsExcel,
+        downloadCircularPicsTemplate,
+        openAddCircularPicModal,
+        openEditCircularPicModal,
+        closeCircularPicModal,
+        submitCircularPicForm,
+        deleteCircularPic,
+        openCircularPicsImportModal,
+        closeCircularPicsImportModal,
+        handleCircularPicsFileSelect,
+        clearCircularPicsSelectedFile,
+        submitCircularPicsImport,
+        // Template Reports exports
+        loadTemplateReports,
+        renderTemplateReportsTable,
+        updateTemplateReportsPagination,
+        goToTemplateReportsPage,
+        changeTemplateReportsPageSize,
+        handleTemplateReportsSearch,
+        onTemplateReportsFilterTypeChange,
+        toggleTemplateReportsSort,
+        openTemplateReportUploadModal,
+        closeTemplateReportUploadModal,
+        handleTemplateReportFileSelect,
+        clearTemplateReportSelectedFile,
+        submitTemplateReportUpload,
+        openTemplateReportEditModal,
+        closeTemplateReportEditModal,
+        submitTemplateReportEdit,
+        deleteTemplateReport,
         // Chat Room PIC Sites exports
         openChatRoomModal,
         closeChatRoomModal,
@@ -13701,6 +15218,8 @@ const App = (() => {
         // Weekly Summary exports
         switchWeeklyCategory,
         loadWeeklySummary,
+        onWeeklyMonthChange,
+        onWeeklyYearChange,
         renderWeeklyAchievements,
         renderWeeklyScorecard,
         onWeeklyScorecardRatingFilterChange,
