@@ -43,6 +43,41 @@ try {
         mkdir($uploadDir, 0755, true);
     }
 
+    // Seed bundled default templates (once). Marker prevents re-seeding after user deletion.
+    $seedMarker = $uploadDir . '.seeded_ba_asset_opname_v1_2';
+    if (!file_exists($seedMarker)) {
+        $seedDir = __DIR__ . '/../database/templates/';
+        $seedTitle = 'Berita Acara Hasil Asset Opname dan Tindak Lanjut data DB';
+        $seedDesc = 'Template BA v1.2 (2 halaman): Hasil Asset Opname, Tindak Lanjut data DB, tanda tangan, dan Lampiran Rincian Perangkat.';
+        $seedFiles = [
+            ['file' => 'BA_Asset_Opname_Tindak_Lanjut_DB.docx', 'ext' => 'docx', 'type' => 'word'],
+            ['file' => 'BA_Asset_Opname_Tindak_Lanjut_DB.pdf',  'ext' => 'pdf',  'type' => 'pdf'],
+        ];
+        $existsStmt = $db->prepare("SELECT COUNT(*) FROM template_reports WHERE file_name = :fn");
+        $insStmt = $db->prepare("
+            INSERT INTO template_reports (title, description, file_name, file_path, file_type, file_ext, file_size, uploaded_by, created_at, updated_at)
+            VALUES (:title, :description, :file_name, :file_path, :file_type, :file_ext, :file_size, 'System', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ");
+        foreach ($seedFiles as $sf) {
+            $src = $seedDir . $sf['file'];
+            if (!is_file($src)) continue;
+            $existsStmt->execute([':fn' => $sf['file']]);
+            if ((int)$existsStmt->fetchColumn() > 0) continue;
+            $target = $uploadDir . $sf['file'];
+            if (!@copy($src, $target)) continue;
+            $insStmt->execute([
+                ':title' => $seedTitle,
+                ':description' => $seedDesc,
+                ':file_name' => $sf['file'],
+                ':file_path' => 'uploads/templates/' . $sf['file'],
+                ':file_type' => $sf['type'],
+                ':file_ext' => $sf['ext'],
+                ':file_size' => filesize($target),
+            ]);
+        }
+        @file_put_contents($seedMarker, date('c'));
+    }
+
     // ── GET: Read / List Operations ──────────────────────────────────
     if ($method === 'GET' && $action === 'list') {
         header('Content-Type: application/json; charset=utf-8');

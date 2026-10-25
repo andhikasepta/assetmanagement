@@ -507,7 +507,7 @@ const App = (() => {
         } else if (page === 'user-management') {
             loadUsers();
         } else if (page === 'reports') {
-            // Empty page as requested - no data function needed
+            loadReportsData();
         }
 
         // Apply UAC rules (button visibility)
@@ -12446,6 +12446,525 @@ const App = (() => {
     }
 
     // ═════════════════════════════════════════════════════════════════
+    // ── Reports Page (Berita Acara & WhatsApp Delivery) ───────────────
+    // ═════════════════════════════════════════════════════════════════
+    let reportsState = {
+        page: 1,
+        limit: 15,
+        dept: 'all',
+        sub_dept: 'all',
+        status: 'all',
+        search: '',
+        total: 0,
+        totalPages: 1,
+        data: [],
+        activeSitecode: '',
+        activePdfUrl: '',
+        activeWaPhone: '',
+        generatingSites: {}
+    };
+
+    function getReportsSelectedPeriod() {
+        const monthEl = document.getElementById('reports-filter-month');
+        const yearEl = document.getElementById('reports-filter-year');
+        const now = new Date();
+        const month = monthEl ? parseInt(monthEl.value) || (now.getMonth() + 1) : (now.getMonth() + 1);
+        const year = yearEl ? parseInt(yearEl.value) || now.getFullYear() : now.getFullYear();
+        return { month, year };
+    }
+
+    async function loadReportsData(targetPage = reportsState.page) {
+        reportsState.page = targetPage;
+        const { month, year } = getReportsSelectedPeriod();
+
+        const tbody = document.getElementById('reports-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg class="spin-animation" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-linecap="round"></circle>
+                            </svg>
+                            <span>Memuat data laporan...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                month: month,
+                year: year,
+                dept: reportsState.dept,
+                sub_dept: reportsState.sub_dept,
+                status: reportsState.status,
+                search: reportsState.search,
+                page: reportsState.page,
+                limit: reportsState.limit
+            });
+
+            const res = await fetch(`api/generate_report.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data laporan')}</td></tr>`;
+                return;
+            }
+
+            reportsState.data = json.data || [];
+            reportsState.total = json.total || 0;
+            reportsState.totalPages = json.total_pages || 1;
+
+            // Update stats cards
+            if (json.stats) {
+                const elTot = document.getElementById('stat-reports-total-sites');
+                const elGen = document.getElementById('stat-reports-generated');
+                const elSent = document.getElementById('stat-reports-sent');
+                const elPend = document.getElementById('stat-reports-pending');
+                if (elTot) elTot.textContent = Number(json.stats.total_sites || 0).toLocaleString('id-ID');
+                if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
+                if (elSent) elSent.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
+                if (elPend) elPend.textContent = Number(json.stats.total_pending || 0).toLocaleString('id-ID');
+            }
+
+            // Populate filter dropdowns if not already populated
+            populateReportsDropdowns(json.depts || [], json.sub_depts || []);
+
+            // Render table rows
+            renderReportsTable();
+
+            // Update pagination
+            renderReportsPagination();
+
+        } catch (err) {
+            console.error('Error loading reports data:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal terhubung ke server untuk memuat laporan.</td></tr>`;
+            }
+        }
+    }
+
+    function populateReportsDropdowns(depts, subDepts) {
+        const deptEl = document.getElementById('reports-filter-dept');
+        if (deptEl && deptEl.options.length <= 1) {
+            depts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                deptEl.appendChild(opt);
+            });
+        }
+
+        const subDeptEl = document.getElementById('reports-filter-subdept');
+        if (subDeptEl && subDeptEl.options.length <= 1) {
+            subDepts.forEach(sd => {
+                const opt = document.createElement('option');
+                opt.value = sd;
+                opt.textContent = sd;
+                subDeptEl.appendChild(opt);
+            });
+        }
+    }
+
+    function renderReportsTable() {
+        const tbody = document.getElementById('reports-tbody');
+        if (!tbody) return;
+
+        if (!reportsState.data || reportsState.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                        <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-bottom: 4px;">Tidak ada data ditemukan</div>
+                        <div style="font-size: 12px;">Coba ubah kata kunci pencarian atau filter periode / departemen.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const startIndex = (reportsState.page - 1) * (reportsState.limit === 'all' ? 0 : parseInt(reportsState.limit));
+        let html = '';
+
+        reportsState.data.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const sitecode = escapeHtml(r.sitecode);
+            const sitename = escapeHtml(r.sitename || '-');
+            const dept = escapeHtml(r.dept || '-');
+            const subDept = escapeHtml(r.sub_dept || '-');
+            const picName = escapeHtml(r.pic_name || 'PIC Belum Terdaftar');
+            const picPhone = escapeHtml(r.pic_phone || '');
+            const status = r.report_status;
+            const isGenerating = !!reportsState.generatingSites[r.sitecode];
+
+            // Status Badge (Generated vs Not Generated)
+            let statusBadge = '';
+            if (status === 'sent') {
+                statusBadge = `
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                        <span class="badge" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Generated
+                        </span>
+                        <span style="font-size:10.5px;color:#0891b2;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Sent to WA
+                        </span>
+                    </div>
+                `;
+            } else if (status === 'generated') {
+                statusBadge = `
+                    <span class="badge" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Generated
+                    </span>
+                `;
+            } else {
+                statusBadge = `
+                    <span class="badge" style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>
+                        Not Generated
+                    </span>
+                `;
+            }
+
+            // Action Buttons (Generate vs Preview/PDF/Send with checked indicator)
+            let actionHtml = '';
+            if (isGenerating) {
+                actionHtml = `
+                    <button class="btn btn-sm btn-primary" disabled style="opacity: 0.8; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 12px;"></i>
+                        <span>Generating...</span>
+                    </button>
+                `;
+            } else if (status === 'generated') {
+                actionHtml = `
+                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <span title="Dokumen siap dikirim (Checked)" style="color:#059669;display:inline-flex;align-items:center;gap:3px;font-weight:600;font-size:11px;background:#ecfdf5;border:1px solid #a7f3d0;padding:3px 6px;border-radius:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Ready
+                        </span>
+                        <button class="btn btn-sm btn-outline-info" onclick="App.previewReport('${sitecode}')" title="Preview Dokumen BA">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Preview</span>
+                        </button>
+                        <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(r.pdf_path || '#')}" target="_blank" title="Download PDF" download>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>PDF</span>
+                        </a>
+                        <button class="btn btn-sm btn-success" onclick="App.sendReportWhatsApp('${sitecode}')" title="Kirim Dokumen ke WhatsApp PIC" style="display:inline-flex;align-items:center;gap:6px;background:#10b981;border-color:#10b981;color:#fff;font-weight:600;">
+                            <i class="fa-solid fa-arrow-right fa-arrow-right" style="font-size: 12px;"></i>
+                            <span>Send</span>
+                        </button>
+                    </div>
+                `;
+            } else if (status === 'sent') {
+                actionHtml = `
+                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <span title="Dokumen sudah terkirim (Checked)" style="color:#0891b2;display:inline-flex;align-items:center;gap:3px;font-weight:600;font-size:11px;background:#ecfeff;border:1px solid #a5f3fc;padding:3px 6px;border-radius:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Sent
+                        </span>
+                        <button class="btn btn-sm btn-outline-info" onclick="App.previewReport('${sitecode}')" title="Preview Dokumen BA">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Preview</span>
+                        </button>
+                        <a class="btn btn-sm btn-outline-secondary" href="${escapeHtml(r.pdf_path || '#')}" target="_blank" title="Download PDF" download>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>PDF</span>
+                        </a>
+                        <button class="btn btn-sm btn-outline-success" onclick="App.sendReportWhatsApp('${sitecode}')" title="Kirim Ulang ke WhatsApp PIC" style="display:inline-flex;align-items:center;gap:6px;">
+                            <i class="fa-solid fa-arrow-right fa-arrow-right" style="font-size: 12px;"></i>
+                            <span>Send Again</span>
+                        </button>
+                    </div>
+                `;
+            } else {
+                actionHtml = `
+                    <button class="btn btn-sm btn-primary" onclick="App.generateReportForSite('${sitecode}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                        <i class="fa-solid fa-file fa-file" style="font-size: 12px;"></i>
+                        <span>Generate</span>
+                    </button>
+                `;
+            }
+
+            const phoneBadge = picPhone ? `<span style="font-size:11px;color:#059669;background:#ecfdf5;padding:1px 5px;border-radius:4px;margin-left:4px;">📱 ${picPhone}</span>` : '';
+
+            html += `
+                <tr>
+                    <td style="text-align: center; color: #94a3b8; font-size: 12px;">${no}</td>
+                    <td style="font-weight: 600; color: #1e293b;">${dept}</td>
+                    <td style="color: #475569;">${subDept}</td>
+                    <td>
+                        <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-family: monospace; font-weight: 700; color: #0284c7; font-size: 13px;">${sitecode}</span>
+                            <span style="font-weight: 600; color: #0f172a; font-size: 13px;">${sitename}</span>
+                        </div>
+                        <div style="font-size: 11.5px; color: #64748b; margin-top: 3px; display: flex; align-items: center; gap: 6px;">
+                            <span>👤 ${picName}</span>
+                            ${phoneBadge}
+                        </div>
+                    </td>
+                    <td style="text-align: center;">${actionHtml}</td>
+                    <td style="text-align: center;">${statusBadge}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function renderReportsPagination() {
+        const infoEl = document.getElementById('reports-pagination-info');
+        const ctrlEl = document.getElementById('reports-pagination-controls');
+        if (!infoEl || !ctrlEl) return;
+
+        if (reportsState.total === 0) {
+            infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            ctrlEl.innerHTML = '';
+            return;
+        }
+
+        const pageSize = (reportsState.limit === 'all') ? reportsState.total : parseInt(reportsState.limit);
+        const start = ((reportsState.page - 1) * pageSize) + 1;
+        const end = Math.min(reportsState.page * pageSize, reportsState.total);
+        infoEl.textContent = `Menampilkan ${start} sampai ${end} dari ${reportsState.total} data`;
+
+        let html = '';
+        html += `<button class="pagination-btn" ${reportsState.page <= 1 ? 'disabled' : ''} onclick="App.goToReportsPage(${reportsState.page - 1})">Prev</button>`;
+
+        const totalP = reportsState.totalPages;
+        const curP = reportsState.page;
+        let startP = Math.max(1, curP - 2);
+        let endP = Math.min(totalP, startP + 4);
+        if (endP - startP < 4) startP = Math.max(1, endP - 4);
+
+        if (startP > 1) {
+            html += `<button class="pagination-btn" onclick="App.goToReportsPage(1)">1</button>`;
+            if (startP > 2) html += `<span class="pagination-dots">...</span>`;
+        }
+
+        for (let p = startP; p <= endP; p++) {
+            html += `<button class="pagination-btn ${p === curP ? 'active' : ''}" onclick="App.goToReportsPage(${p})">${p}</button>`;
+        }
+
+        if (endP < totalP) {
+            if (endP < totalP - 1) html += `<span class="pagination-dots">...</span>`;
+            html += `<button class="pagination-btn" onclick="App.goToReportsPage(${totalP})">${totalP}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${curP >= totalP ? 'disabled' : ''} onclick="App.goToReportsPage(${curP + 1})">Next</button>`;
+        ctrlEl.innerHTML = html;
+    }
+
+    function goToReportsPage(p) {
+        if (p < 1 || p > reportsState.totalPages || p === reportsState.page) return;
+        loadReportsData(p);
+    }
+
+    async function generateReportForSite(sitecode) {
+        if (!sitecode) return;
+        const { month, year } = getReportsSelectedPeriod();
+
+        reportsState.generatingSites[sitecode] = true;
+        renderReportsTable();
+
+        try {
+            const res = await fetch('api/generate_report.php?action=generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitecode, month, year })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Generate', json.message || 'Terjadi kesalahan saat generate laporan');
+                return;
+            }
+
+            showToast('success', 'Berhasil Di-generate', `Laporan Berita Acara untuk ${sitecode} berhasil dibuat!`);
+            await loadReportsData(reportsState.page);
+
+        } catch (err) {
+            console.error('Error generating report:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat generate.');
+        } finally {
+            delete reportsState.generatingSites[sitecode];
+            renderReportsTable();
+        }
+    }
+
+    async function sendReportWhatsApp(sitecode) {
+        if (!sitecode) return;
+        const { month, year } = getReportsSelectedPeriod();
+
+        try {
+            const res = await fetch('api/generate_report.php?action=send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitecode, month, year })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Mengirim', json.message || 'Gagal menyiapkan pengiriman WhatsApp');
+                return;
+            }
+
+            showToast('success', 'WhatsApp Dibuka', `Membuka WhatsApp untuk ${json.pic_name || sitecode}...`);
+
+            if (json.wa_url) {
+                window.open(json.wa_url, '_blank');
+            }
+
+            await loadReportsData(reportsState.page);
+
+        } catch (err) {
+            console.error('Error sending report via WhatsApp:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal menghubungi server');
+        }
+    }
+
+    function previewReport(sitecode) {
+        if (!sitecode) return;
+        reportsState.activeSitecode = sitecode;
+        const { month, year } = getReportsSelectedPeriod();
+
+        const modal = document.getElementById('report-preview-modal');
+        const iframe = document.getElementById('report-preview-iframe');
+        const titleEl = document.getElementById('report-preview-title');
+        const subEl = document.getElementById('report-preview-sub');
+        const metaEl = document.getElementById('report-preview-meta');
+        const dlBtn = document.getElementById('report-preview-download-pdf');
+
+        if (titleEl) titleEl.textContent = `Preview Berita Acara - ${sitecode}`;
+        if (subEl) subEl.textContent = `Periode Bulan ${month} Tahun ${year}`;
+        if (metaEl) metaEl.textContent = `Site: ${sitecode}`;
+
+        const previewUrl = `api/generate_report.php?action=preview_html&sitecode=${encodeURIComponent(sitecode)}&month=${month}&year=${year}`;
+        if (iframe) iframe.src = previewUrl;
+
+        const row = reportsState.data.find(r => r.sitecode === sitecode);
+        if (dlBtn) {
+            dlBtn.href = row && row.pdf_path ? row.pdf_path : `api/generate_report.php?action=preview_html&sitecode=${encodeURIComponent(sitecode)}&month=${month}&year=${year}`;
+        }
+
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeReportPreviewModal() {
+        const modal = document.getElementById('report-preview-modal');
+        const iframe = document.getElementById('report-preview-iframe');
+        if (modal) modal.style.display = 'none';
+        if (iframe) iframe.src = 'about:blank';
+        document.body.style.overflow = '';
+    }
+
+    function printReportIframe() {
+        const iframe = document.getElementById('report-preview-iframe');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }
+    }
+
+    function sendCurrentPreviewWhatsApp() {
+        if (reportsState.activeSitecode) {
+            sendReportWhatsApp(reportsState.activeSitecode);
+        }
+    }
+
+    function onReportsPeriodChange() {
+        reportsState.page = 1;
+        loadReportsData(1);
+    }
+
+    function onReportsDeptChange() {
+        const el = document.getElementById('reports-filter-dept');
+        reportsState.dept = el ? el.value : 'all';
+        reportsState.page = 1;
+        loadReportsData(1);
+    }
+
+    function onReportsSubDeptChange() {
+        const el = document.getElementById('reports-filter-subdept');
+        reportsState.sub_dept = el ? el.value : 'all';
+        reportsState.page = 1;
+        loadReportsData(1);
+    }
+
+    function onReportsStatusFilterChange() {
+        const el = document.getElementById('reports-filter-status');
+        reportsState.status = el ? el.value : 'all';
+        reportsState.page = 1;
+        loadReportsData(1);
+    }
+
+    function changeReportsPageSize(size) {
+        reportsState.limit = size;
+        reportsState.page = 1;
+        loadReportsData(1);
+    }
+
+    let reportsSearchTimeout = null;
+    function handleReportsSearch(term) {
+        clearTimeout(reportsSearchTimeout);
+        reportsSearchTimeout = setTimeout(() => {
+            reportsState.search = term.trim();
+            reportsState.page = 1;
+            loadReportsData(1);
+        }, 300);
+    }
+
+    function downloadReportsSummaryExcel() {
+        const { month, year } = getReportsSelectedPeriod();
+        const url = `api/generate_report.php?action=list&month=${month}&year=${year}&dept=${reportsState.dept}&sub_dept=${reportsState.sub_dept}&limit=all`;
+        fetch(url)
+            .then(res => res.json())
+            .then(json => {
+                if (!json.success || !json.data || json.data.length === 0) {
+                    showToast('error', 'Tidak Ada Data', 'Tidak ada data laporan untuk diekspor.');
+                    return;
+                }
+                const csvRows = [
+                    ['NO', 'DEPT', 'SUB DEPT', 'SITECODE', 'SITENAME', 'PIC', 'NO TELP', 'STATUS', 'GENERATED AT', 'SENT AT']
+                ];
+                json.data.forEach((r, idx) => {
+                    csvRows.push([
+                        idx + 1,
+                        r.dept || '',
+                        r.sub_dept || '',
+                        r.sitecode || '',
+                        r.sitename || '',
+                        r.pic_name || '',
+                        r.pic_phone || '',
+                        r.report_status || 'pending',
+                        r.generated_at || '',
+                        r.sent_at || ''
+                    ]);
+                });
+                const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `Laporan_Status_BA_${year}_${month}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast('success', 'Ekspor Berhasil', 'File CSV berhasil diunduh.');
+            })
+            .catch(err => {
+                console.error(err);
+                showToast('error', 'Gagal Ekspor', 'Terjadi kesalahan saat mengekspor data.');
+            });
+    }
+
+    // ═════════════════════════════════════════════════════════════════
     // ── Chat Room PIC Sites (WhatsApp Direct) ────────────────────────
     // ═════════════════════════════════════════════════════════════════
     let chatRoomSitesData = [];
@@ -15165,6 +15684,24 @@ const App = (() => {
         closeTemplateReportEditModal,
         submitTemplateReportEdit,
         deleteTemplateReport,
+        // Reports Page exports
+        loadReportsData,
+        renderReportsTable,
+        renderReportsPagination,
+        goToReportsPage,
+        generateReportForSite,
+        sendReportWhatsApp,
+        previewReport,
+        closeReportPreviewModal,
+        printReportIframe,
+        sendCurrentPreviewWhatsApp,
+        onReportsPeriodChange,
+        onReportsDeptChange,
+        onReportsSubDeptChange,
+        onReportsStatusFilterChange,
+        changeReportsPageSize,
+        handleReportsSearch,
+        downloadReportsSummaryExcel,
         // Chat Room PIC Sites exports
         openChatRoomModal,
         closeChatRoomModal,
