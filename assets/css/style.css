@@ -4557,6 +4557,107 @@ textarea,
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath fill='currentColor' d='M438.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-160-160c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L338.8 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l306.7 0-105.4 105.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l160-160z'/%3E") no-repeat center / contain;
 }
 
+/* ==========================================================================
+   Reports Page: Unified Action Buttons & Badges
+   ========================================================================== */
+.btn-report-action {
+    height: 28px;
+    padding: 0 9px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    box-sizing: border-box;
+    font-family: inherit;
+    outline: none;
+}
+.btn-report-action svg {
+    flex-shrink: 0;
+}
+
+/* Generate (Green) */
+.btn-report-generate {
+    background: #10b981;
+    border-color: #059669;
+    color: #ffffff !important;
+    font-weight: 600;
+    padding: 0 14px;
+    box-shadow: 0 1px 2px rgba(16, 185, 129, 0.2);
+}
+.btn-report-generate:hover:not(:disabled) {
+    background: #059669;
+    border-color: #047857;
+    color: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+.btn-report-generate:disabled {
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+/* Regenerate (Blue) */
+.btn-report-regenerate {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8 !important;
+    font-weight: 500;
+}
+.btn-report-regenerate:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+    color: #1e40af !important;
+}
+
+/* Preview Style (Neutral Slate - for Preview, PDF, Send, Send Again) */
+.btn-report-preview-style {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #334155 !important;
+    font-weight: 500;
+}
+.btn-report-preview-style:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #0f172a !important;
+}
+
+/* Action Badges (Ready & Sent) */
+.report-badge-action {
+    height: 28px;
+    padding: 0 7px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    line-height: 1;
+    white-space: nowrap;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+.report-badge-ready {
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+}
+.report-badge-sent {
+    color: #0891b2;
+    background: #ecfeff;
+    border: 1px solid #a5f3fc;
+}
+
+
 
 
 

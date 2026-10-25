@@ -18,11 +18,25 @@
         style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
             <h1 style="font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.2;">Reports</h1>
-            <p style="font-size: 12.5px; color: #64748b; margin: 2px 0 0 0;">Berita Acara Hasil Asset Opname dan Tindak Lanjut Data DB</p>
+            <p style="font-size: 12.5px; color: #64748b; margin: 2px 0 0 0;">Berita Acara Hasil Asset Opname dan Tindak
+                Lanjut Data DB</p>
         </div>
 
         <!-- Periode Month & Year Filters -->
         <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;" id="reports-so-type-filter-group">
+                <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em;">SO TYPE:</span>
+                <div class="summary-type-slider-wrapper">
+                    <button type="button" class="summary-type-slider-btn active" id="reports-btn-so-type-monthly"
+                        onclick="App.switchReportsSOType('monthly')">
+                        <span>Monthly</span>
+                    </button>
+                    <button type="button" class="summary-type-slider-btn" id="reports-btn-so-type-quarterly"
+                        onclick="App.switchReportsSOType('quarterly')">
+                        <span>Quarterly</span>
+                    </button>
+                </div>
+            </div>
             <div style="display: flex; align-items: center; gap: 0.45rem;">
                 <label for="reports-filter-month"
                     style="font-size: 12px; font-weight: 600; color: #475569;">BULAN</label>
@@ -30,12 +44,21 @@
                     onchange="App.onReportsPeriodChange()">
                     <?php
                     $reportsMonthNames = [
-                        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                        1 => 'Januari',
+                        2 => 'Februari',
+                        3 => 'Maret',
+                        4 => 'April',
+                        5 => 'Mei',
+                        6 => 'Juni',
+                        7 => 'Juli',
+                        8 => 'Agustus',
+                        9 => 'September',
+                        10 => 'Oktober',
+                        11 => 'November',
+                        12 => 'Desember'
                     ];
-                    $defaultReportsMonth = (int)date('n');
-                    $defaultReportsYear = (int)date('Y');
+                    $defaultReportsMonth = (int) date('n');
+                    $defaultReportsYear = (int) date('Y');
                     foreach ($reportsMonthNames as $num => $name): ?>
                         <option value="<?= $num ?>" <?= ($num === $defaultReportsMonth) ? 'selected' : '' ?>>
                             <?= $name ?>
@@ -65,54 +88,69 @@
     </div>
 
     <!-- Overview Stats Cards -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <div class="card" style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #3b82f6;">
-            <div style="width: 44px; height: 44px; border-radius: 10px; background: #eff6ff; display: flex; align-items: center; justify-content: center; color: #2563eb;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                 </svg>
             </div>
             <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Total Sites</div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Total Sites
+                </div>
                 <div id="stat-reports-total-sites" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
             </div>
         </div>
 
-        <div class="card" style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #10b981;">
-            <div style="width: 44px; height: 44px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; color: #059669;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
             </div>
             <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Generated</div>
-                <div id="stat-reports-generated" style="font-size: 20px; font-weight: 700; color: #059669;">-</div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Generated
+                </div>
+                <div id="stat-reports-generated" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
             </div>
         </div>
 
-        <div class="card" style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #06b6d4;">
-            <div style="width: 44px; height: 44px; border-radius: 10px; background: #ecfeff; display: flex; align-items: center; justify-content: center; color: #0891b2;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
+                    </path>
                 </svg>
             </div>
             <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Sent to WhatsApp</div>
-                <div id="stat-reports-sent" style="font-size: 20px; font-weight: 700; color: #0891b2;">-</div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Sent to
+                    PIC Outlet</div>
+                <div id="stat-reports-sent" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
             </div>
         </div>
 
-        <div class="card" style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border-left: 4px solid #f59e0b;">
-            <div style="width: 44px; height: 44px; border-radius: 10px; background: #fffbeb; display: flex; align-items: center; justify-content: center; color: #d97706;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
             </div>
             <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Not Generated</div>
-                <div id="stat-reports-pending" style="font-size: 20px; font-weight: 700; color: #d97706;">-</div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Not
+                    Generated</div>
+                <div id="stat-reports-pending" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
             </div>
         </div>
     </div>
@@ -124,20 +162,8 @@
         <div class="card-header"
             style="display: flex; justify-content: space-between; align-items: center; padding: 0.95rem 1.25rem; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-                <h2 class="card-title" style="font-size: 15px; margin: 0; color: #0f172a; font-weight: 700;">Generate Report</h2>
-                <p class="card-subtitle" style="font-size: 12px; color: #64748b; margin: 2px 0 0 0;">
-                    Tarik data periode terbaru, buat dokumen Berita Acara, dan kirimkan ke WhatsApp PIC Sites
-                </p>
-            </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button class="btn btn-outline-primary btn-sm" onclick="App.downloadReportsSummaryExcel()" title="Export Ringkasan Status">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Ekspor Excel</span>
-                </button>
+                <h2 class="card-title" style="font-size: 15px; margin: 0; color: #0f172a; font-weight: 700;">Generate
+                    Report</h2>
             </div>
         </div>
 
@@ -147,7 +173,8 @@
             <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
                 <!-- Page size -->
                 <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <label for="reports-page-size" style="font-size: 12px; font-weight: 600; color: #475569;">Tampilkan</label>
+                    <label for="reports-page-size"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">Tampilkan</label>
                     <select id="reports-page-size" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.changeReportsPageSize(this.value)">
                         <option value="10">10</option>
@@ -161,7 +188,8 @@
 
                 <!-- Dept filter -->
                 <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <label for="reports-filter-dept" style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
+                    <label for="reports-filter-dept"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
                     <select id="reports-filter-dept" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.onReportsDeptChange()">
                         <option value="all">Semua DEPT</option>
@@ -170,7 +198,8 @@
 
                 <!-- Subdept filter -->
                 <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <label for="reports-filter-subdept" style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                    <label for="reports-filter-subdept" style="font-size: 12px; font-weight: 600; color: #475569;">SUB
+                        DEPT</label>
                     <select id="reports-filter-subdept" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.onReportsSubDeptChange()">
                         <option value="all">Semua SUB DEPT</option>
@@ -179,7 +208,8 @@
 
                 <!-- Status filter -->
                 <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <label for="reports-filter-status" style="font-size: 12px; font-weight: 600; color: #475569;">STATUS</label>
+                    <label for="reports-filter-status"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">STATUS</label>
                     <select id="reports-filter-status" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.onReportsStatusFilterChange()">
                         <option value="all">Semua Status</option>
@@ -203,11 +233,11 @@
                 <thead>
                     <tr>
                         <th style="width: 45px; text-align: center;">NO</th>
-                        <th style="width: 110px;">DEPT</th>
-                        <th style="width: 120px;">SUB DEPT</th>
-                        <th>SITE CODE / SITE NAME</th>
-                        <th style="width: 290px; text-align: center;">ACTION</th>
-                        <th style="width: 150px; text-align: center;">STATUS</th>
+                        <th style="width: 105px;">DEPT</th>
+                        <th style="width: 115px;">SUB DEPT</th>
+                        <th style="width: 250px; max-width: 270px;">SITE CODE / SITE NAME</th>
+                        <th style="width: 380px; min-width: 380px; text-align: center; white-space: nowrap;">ACTION</th>
+                        <th style="width: 130px; text-align: center;">STATUS</th>
                     </tr>
                 </thead>
                 <tbody id="reports-tbody">
@@ -235,52 +265,113 @@
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- PREVIEW MODAL: Berita Acara BA Document                     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div id="report-preview-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(2px);">
-        <div class="modal-card" style="background: #fff; width: 100%; max-width: 960px; max-height: 92vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+    <div id="report-preview-modal" class="modal-backdrop"
+        style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(2px);">
+        <div class="modal-card"
+            style="background: #fff; width: 100%; max-width: 960px; max-height: 92vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
             <!-- Modal Header -->
-            <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+            <div
+                style="padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
                 <div>
-                    <h3 id="report-preview-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Preview Berita Acara</h3>
-                    <p id="report-preview-sub" style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">Pratinjau dokumen BA 2 Halaman</p>
+                    <h3 id="report-preview-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">
+                        Preview Berita Acara Tindak Lanjut DB</h3>
                 </div>
                 <button type="button" class="modal-close-btn" onclick="App.closeReportPreviewModal()"
                     style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
             </div>
 
             <!-- Modal Body (Iframe for pixel-perfect print layout) -->
-            <div style="flex: 1; padding: 0; background: #e2e8f0; overflow: hidden; position: relative; min-height: 520px;">
+            <div
+                style="flex: 1; padding: 0; background: #e2e8f0; overflow: hidden; position: relative; min-height: 520px;">
                 <iframe id="report-preview-iframe" src="about:blank"
                     style="width: 100%; height: 100%; min-height: 520px; border: none; background: #fff;"></iframe>
             </div>
 
             <!-- Modal Footer -->
-            <div style="padding: 0.85rem 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; flex-wrap: wrap; gap: 0.5rem;">
+            <div
+                style="padding: 0.85rem 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="font-size: 12px; color: #64748b;">
                     <span id="report-preview-meta">Dokumen Berita Acara v1.2</span>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="App.printReportIframe()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                            <rect x="6" y="14" width="12" height="8"></rect>
+                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                    <a id="report-preview-open-new-tab" href="#" target="_blank" class="btn btn-secondary btn-sm"
+                        style="display: inline-flex; align-items: center; gap: 6px;" title="Buka Dokumen PDF di Tab Baru">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
                         </svg>
-                        <span>Cetak / Print</span>
-                    </button>
-                    <a id="report-preview-download-pdf" href="#" target="_blank" class="btn btn-outline-primary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <span>Tab Baru</span>
+                    </a>
+                    <a id="report-preview-download-pdf" href="#" target="_blank" class="btn btn-primary btn-sm"
+                        style="display: inline-flex; align-items: center; gap: 6px;" title="Download PDF">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        <span>Unduh PDF</span>
+                        <span>Download PDF</span>
                     </a>
-                    <button type="button" id="report-preview-btn-wa" class="btn btn-success btn-sm" onclick="App.sendCurrentPreviewWhatsApp()" style="display: inline-flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-arrow-right fa-arrow-right" style="font-size: 12px;"></i>
+                    <button type="button" id="report-preview-btn-wa" class="btn btn-success btn-sm"
+                        onclick="App.sendCurrentPreviewWhatsApp()"
+                        style="display: inline-flex; align-items: center; gap: 6px;">
                         <span>Kirim WhatsApp</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
                     </button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="App.closeReportPreviewModal()">Tutup</button>
+                    <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="App.closeReportPreviewModal()">Tutup</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Input Keterangan DB Sebelum Generate Berita Acara     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="report-keterangan-modal" class="modal-backdrop"
+        style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(2px);">
+        <div class="modal-card"
+            style="background: #fff; width: 100%; max-width: 520px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <!-- Modal Header -->
+            <div
+                style="padding: 1.1rem 1.4rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <div>
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">Input Keterangan DB</h3>
+                    <p id="report-keterangan-site-info" style="margin: 3px 0 0 0; font-size: 12px; color: #64748b;">
+                        Site: -</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="App.closeReportKeteranganModal()"
+                    style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div style="padding: 1.25rem 1.4rem;">
+                <label for="report-keterangan-input"
+                    style="display: block; font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">
+                    Keterangan DB
+                </label>
+                <textarea id="report-keterangan-input" class="form-control" rows="3"
+                    style="width: 100%; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; resize: vertical;"
+                    placeholder="Isi Keterangan..." oninput="App.onReportKeteranganInput(this.value)"></textarea>
+                <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 6px;">
+                    <span id="report-keterangan-char-count" style="font-size: 11px; color: #94a3b8;">0 / 500</span>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div
+                style="padding: 0.85rem 1.4rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.5rem; background: #f8fafc;">
+                <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="App.closeReportKeteranganModal()">Batal</button>
+                <button type="button" id="btn-submit-report-keterangan" class="btn btn-success btn-sm"
+                    onclick="App.submitReportKeteranganAndGenerate()"
+                    style="background: #10b981; border-color: #10b981; color: #fff; font-weight: 600; padding: 6px 16px; border-radius: 6px;">
+                    Generate BA
+                </button>
             </div>
         </div>
     </div>

@@ -48,7 +48,7 @@ try {
     if (!file_exists($seedMarker)) {
         $seedDir = __DIR__ . '/../database/templates/';
         $seedTitle = 'Berita Acara Hasil Asset Opname dan Tindak Lanjut data DB';
-        $seedDesc = 'Template BA v1.2 (2 halaman): Hasil Asset Opname, Tindak Lanjut data DB, tanda tangan, dan Lampiran Rincian Perangkat.';
+        $seedDesc = 'Template Berita Acara Hasil Asset Opname dan Tindak Lanjut data DB (Format Terbaru: Tanda Tangan Engineer & Asset Management, Kolom New DB, Lampiran Rincian Perangkat).';
         $seedFiles = [
             ['file' => 'BA_Asset_Opname_Tindak_Lanjut_DB.docx', 'ext' => 'docx', 'type' => 'word'],
             ['file' => 'BA_Asset_Opname_Tindak_Lanjut_DB.pdf',  'ext' => 'pdf',  'type' => 'pdf'],
@@ -171,6 +171,12 @@ try {
         }
 
         $fullPath = __DIR__ . '/../' . ltrim($template['file_path'], '/');
+        if (!file_exists($fullPath)) {
+            $fallback = __DIR__ . '/../database/templates/' . basename($template['file_name']);
+            if (file_exists($fallback)) {
+                @copy($fallback, $fullPath);
+            }
+        }
         if (!file_exists($fullPath)) {
             http_response_code(404);
             die('File template fisik tidak ditemukan di server');

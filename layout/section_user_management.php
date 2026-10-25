@@ -156,13 +156,38 @@
                         </label>
 
                         <label
-                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="user-uac-reports" checked
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.35rem; cursor: pointer;">
+                            <input type="checkbox" id="user-uac-reports" checked onchange="App.onUserUacReportsChange(this.checked)"
                                 style="width: 16px; height: 16px; cursor: pointer;">
                             <div>
                                 <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Reports</span>
                             </div>
                         </label>
+
+                        <!-- Sub-checkboxes: Assigned DEPT for Reports -->
+                        <div id="user-uac-reports-depts-container"
+                            style="margin-left: 1.65rem; margin-bottom: 0.65rem; padding: 0.5rem 0.75rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                                <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.4px;">
+                                    Akses DEPT Reports:
+                                </span>
+                                <span style="font-size: 10.5px; color: #0284c7; cursor: pointer; font-weight: 600;" onclick="App.toggleAllUserUacDepts()">Pilih Semua</span>
+                            </div>
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" class="user-uac-dept-checkbox" value="PMD" checked style="width: 14px; height: 14px;"> PMD
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" class="user-uac-dept-checkbox" value="CRO" checked style="width: 14px; height: 14px;"> CRO
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" class="user-uac-dept-checkbox" value="ERO" checked style="width: 14px; height: 14px;"> ERO
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" class="user-uac-dept-checkbox" value="WRO" checked style="width: 14px; height: 14px;"> WRO
+                                </label>
+                            </div>
+                        </div>
 
                         <label
                             style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">

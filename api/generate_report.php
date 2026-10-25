@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/security.php';
 
 ini_set('display_errors', '0');
@@ -22,14 +23,14 @@ error_reporting(E_ALL);
 sendSecurityHeaders();
 
 if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$action = $_GET['action'] ?? $_POST['action'] ?? 'list';
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
-try {
-    $db = getDbConnection();
+    try {
+        $db = getDbConnection();
 
-    // Ensure generated_reports table exists
-    $db->exec("
+        // Ensure generated_reports table exists
+        $db->exec("
         CREATE TABLE IF NOT EXISTS generated_reports (
             id SERIAL PRIMARY KEY,
             sitecode VARCHAR(100) NOT NULL,
@@ -59,95 +60,179 @@ try {
         CREATE INDEX IF NOT EXISTS idx_gen_reports_status ON generated_reports(status);
     ");
 
-    $reportsDir = __DIR__ . '/../uploads/reports/';
-    if (!is_dir($reportsDir)) {
-        mkdir($reportsDir, 0755, true);
-    }
+        $reportsDir = __DIR__ . '/../uploads/reports/';
+        if (!is_dir($reportsDir)) {
+            mkdir($reportsDir, 0755, true);
+        }
 
-    // Helper: Indonesian day names
-    $dayNames = [
-        'Sunday' => 'Minggu',
-        'Monday' => 'Senin',
-        'Tuesday' => 'Selasa',
-        'Wednesday' => 'Rabu',
-        'Thursday' => 'Kamis',
-        'Friday' => 'Jumat',
-        'Saturday' => 'Sabtu'
-    ];
-
-    // Helper: Indonesian month names
-    $monthNames = [
-        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-    ];
-
-    // ─────────────────────────────────────────────────────────────────
-    // ACTION: list - Get sites list with status & SO metrics
-    // ─────────────────────────────────────────────────────────────────
-    if ($method === 'GET' && $action === 'list') {
-        header('Content-Type: application/json; charset=utf-8');
-
-        $month = (int)($_GET['month'] ?? 9);
-        $year  = (int)($_GET['year'] ?? 2026);
-        $dept  = trim($_GET['dept'] ?? 'all');
-        $subDept = trim($_GET['sub_dept'] ?? 'all');
-        $statusFilter = trim($_GET['status'] ?? 'all');
-        $search = trim($_GET['search'] ?? '');
-        $page = max(1, (int)($_GET['page'] ?? 1));
-        $limitParam = $_GET['limit'] ?? '15';
-        $limit = ($limitParam === 'all') ? 999999 : max(1, (int)$limitParam);
-        $offset = ($page - 1) * $limit;
-
-        $where = ["1=1"];
-        $params = [
-            ':month' => $month,
-            ':year'  => $year
+        // Helper: Indonesian day names
+        $dayNames = [
+            'Sunday' => 'Minggu',
+            'Monday' => 'Senin',
+            'Tuesday' => 'Selasa',
+            'Wednesday' => 'Rabu',
+            'Thursday' => 'Kamis',
+            'Friday' => 'Jumat',
+            'Saturday' => 'Sabtu'
         ];
 
-        if ($dept !== '' && $dept !== 'all') {
-            $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
-            $params[':dept'] = $dept;
-        }
+        // Helper: Indonesian month names
+        $monthNames = [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember'
+        ];
 
-        if ($subDept !== '' && $subDept !== 'all') {
-            $where[] = "UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept)";
-            $params[':sub_dept'] = $subDept;
-        }
+        // Helper: Check if current user has permission for a specific site's department
+        $checkSiteAccess = function (string $sc) use ($db): bool {
+            $currentUser = getCurrentUser();
+            if (!$currentUser || empty($currentUser['permissions']['reports_depts'])) {
+                return true;
+            }
+            $rawAllowed = strtoupper(trim($currentUser['permissions']['reports_depts']));
+            if ($rawAllowed === 'ALL') {
+                return true;
+            }
+            $allowed = array_values(array_filter(array_map('trim', explode(',', $rawAllowed))));
+            $sStmt = $db->prepare("SELECT UPPER(dept) FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
+            $sStmt->execute([':sc' => $sc]);
+            $sDept = $sStmt->fetchColumn();
+            return in_array($sDept, $allowed);
+        };
 
-        if ($statusFilter === 'generated') {
-            $where[] = "(gr.status = 'generated' OR gr.status = 'sent')";
-        } elseif ($statusFilter === 'not_generated' || $statusFilter === 'pending') {
-            $where[] = "gr.id IS NULL";
-        } elseif ($statusFilter === 'sent') {
-            $where[] = "gr.status = 'sent'";
-        }
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: list - Get sites list with status & SO metrics
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'GET' && $action === 'list') {
+            header('Content-Type: application/json; charset=utf-8');
 
-        if ($search !== '') {
-            $where[] = "(
+            $month = (int) ($_GET['month'] ?? 9);
+            $year = (int) ($_GET['year'] ?? 2026);
+            $soType = strtolower(trim($_GET['so_type'] ?? 'monthly'));
+            if ($soType !== 'quarterly') {
+                $soType = 'monthly';
+            }
+            $dept = trim($_GET['dept'] ?? 'all');
+            $subDept = trim($_GET['sub_dept'] ?? 'all');
+            $statusFilter = trim($_GET['status'] ?? 'all');
+            $search = trim($_GET['search'] ?? '');
+            $page = max(1, (int) ($_GET['page'] ?? 1));
+            $limitParam = $_GET['limit'] ?? '15';
+            $limit = ($limitParam === 'all') ? 999999 : max(1, (int) $limitParam);
+            $offset = ($page - 1) * $limit;
+
+            $effectiveGroupSql = "
+                CASE
+                    WHEN UPPER(COALESCE(sr.dept, '')) = 'PMD' THEN 'monthly'
+                    ELSE COALESCE(
+                        (
+                            SELECT sgh.group_type
+                            FROM site_group_history sgh
+                            WHERE UPPER(sgh.sitecode) = UPPER(sr.sitecode)
+                              AND (sgh.effective_year < :year OR (sgh.effective_year = :year AND sgh.effective_month <= :month))
+                            ORDER BY sgh.effective_year DESC, sgh.effective_month DESC, sgh.id DESC
+                            LIMIT 1
+                        ),
+                        CASE
+                            WHEN COALESCE(sr.is_active, TRUE) = FALSE THEN 'inactive'
+                            WHEN COALESCE(sr.is_counted, TRUE) = FALSE THEN 'uncounted'
+                            ELSE COALESCE(NULLIF(sr.group_type, ''), 'monthly')
+                        END
+                    )
+                END
+            ";
+
+            $where = ["($effectiveGroupSql) = :so_type"];
+            $params = [
+                ':month' => $month,
+                ':year' => $year,
+                ':so_type' => $soType
+            ];
+
+            // Check UAC department restriction for current user session
+            $currentUser = getCurrentUser();
+            $userAllowedDepts = null;
+            if ($currentUser && !empty($currentUser['permissions']['reports_depts']) && strtoupper(trim($currentUser['permissions']['reports_depts'])) !== 'ALL') {
+                $rawAllowed = $currentUser['permissions']['reports_depts'];
+                $parsed = array_map('trim', explode(',', $rawAllowed));
+                $userAllowedDepts = array_values(array_filter(array_map('strtoupper', $parsed)));
+            }
+
+            if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
+                if ($dept !== '' && $dept !== 'all') {
+                    if (in_array(strtoupper($dept), $userAllowedDepts)) {
+                        $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
+                        $params[':dept'] = $dept;
+                    } else {
+                        $deptClauses = [];
+                        foreach ($userAllowedDepts as $idx => $ad) {
+                            $paramKey = ":uad_{$idx}";
+                            $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                            $params[$paramKey] = $ad;
+                        }
+                        $where[] = '(' . implode(' OR ', $deptClauses) . ')';
+                    }
+                } else {
+                    $deptClauses = [];
+                    foreach ($userAllowedDepts as $idx => $ad) {
+                        $paramKey = ":uad_{$idx}";
+                        $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                        $params[$paramKey] = $ad;
+                    }
+                    $where[] = '(' . implode(' OR ', $deptClauses) . ')';
+                }
+            } elseif ($dept !== '' && $dept !== 'all') {
+                $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
+                $params[':dept'] = $dept;
+            }
+
+            if ($subDept !== '' && $subDept !== 'all') {
+                $where[] = "UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept)";
+                $params[':sub_dept'] = $subDept;
+            }
+
+            if ($statusFilter === 'generated') {
+                $where[] = "(gr.status = 'generated' OR gr.status = 'sent')";
+            } elseif ($statusFilter === 'not_generated' || $statusFilter === 'pending') {
+                $where[] = "gr.id IS NULL";
+            } elseif ($statusFilter === 'sent') {
+                $where[] = "gr.status = 'sent'";
+            }
+
+            if ($search !== '') {
+                $where[] = "(
                 sr.sitecode ILIKE :search
                 OR sr.name_site ILIKE :search
                 OR sr.dept ILIKE :search
                 OR sr.sub_dept ILIKE :search
                 OR sp.pic ILIKE :search
             )";
-            $params[':search'] = "%$search%";
-        }
+                $params[':search'] = "%$search%";
+            }
 
-        $whereSql = implode(' AND ', $where);
+            $whereSql = implode(' AND ', $where);
 
-        $countSql = "
+            $countSql = "
             SELECT COUNT(DISTINCT sr.sitecode)
             FROM site_regional sr
             LEFT JOIN site_pics sp ON sp.sitecode = sr.sitecode
             LEFT JOIN generated_reports gr ON gr.sitecode = sr.sitecode AND gr.period_month = :month AND gr.period_year = :year
             WHERE $whereSql
         ";
-        $countStmt = $db->prepare($countSql);
-        $countStmt->execute($params);
-        $total = (int)$countStmt->fetchColumn();
+            $countStmt = $db->prepare($countSql);
+            $countStmt->execute($params);
+            $total = (int) $countStmt->fetchColumn();
 
-        $sql = "
+            $sql = "
             SELECT 
                 sr.sitecode,
                 COALESCE(NULLIF(sr.name_site, ''), sr.sitecode) as sitename,
@@ -160,7 +245,8 @@ try {
                 gr.pdf_path,
                 gr.docx_path,
                 gr.generated_at,
-                gr.sent_at
+                gr.sent_at,
+                gr.summary_data->>'keterangan_db' as keterangan_db
             FROM site_regional sr
             LEFT JOIN (
                 SELECT DISTINCT ON (sitecode) sitecode, pic, no_telp
@@ -169,31 +255,96 @@ try {
             ) sp ON sp.sitecode = sr.sitecode
             LEFT JOIN generated_reports gr ON gr.sitecode = sr.sitecode AND gr.period_month = :month AND gr.period_year = :year
             WHERE $whereSql
-            GROUP BY sr.sitecode, sr.name_site, sr.dept, sr.sub_dept, sp.pic, sp.no_telp, gr.id, gr.status, gr.pdf_path, gr.docx_path, gr.generated_at, gr.sent_at
+            GROUP BY sr.sitecode, sr.name_site, sr.dept, sr.sub_dept, sp.pic, sp.no_telp, gr.id, gr.status, gr.pdf_path, gr.docx_path, gr.generated_at, gr.sent_at, gr.summary_data
             ORDER BY sr.dept ASC, sr.sub_dept ASC, sr.sitecode ASC
             LIMIT :limit OFFSET :offset
         ";
 
-        $stmt = $db->prepare($sql);
-        foreach ($params as $k => $v) {
-            $stmt->bindValue($k, $v);
-        }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt = $db->prepare($sql);
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            clearstatcache(true);
+            foreach ($rows as &$row) {
+                $periodMonthName = $monthNames[$month] ?? "Bulan $month";
+                $periodStr = "{$periodMonthName} {$year}";
+                $genDt = null;
+                if (!empty($row['generated_at'])) {
+                    try {
+                        $genDt = new DateTime($row['generated_at']);
+                    } catch (Exception $e) {
+                    }
+                }
+                $filenameBase = buildReportExportName($row['sitecode'], $row['sitename'], $periodStr, $genDt ?: new DateTime());
+                $row['export_filename'] = $filenameBase . '.pdf';
+                $row['pdf_url'] = buildReportDownloadUrl($row['sitecode'], $month, $year);
+                $row['preview_url'] = "api/generate_report.php?action=download&inline=1&sitecode=" . rawurlencode($row['sitecode']) . "&month={$month}&year={$year}";
+            }
+            unset($row);
 
-        // Fetch distinct depts and sub_depts
-        $depts = $db->query("
-            SELECT DISTINCT dept FROM site_regional WHERE dept IS NOT NULL AND TRIM(dept) != '' ORDER BY dept ASC
-        ")->fetchAll(PDO::FETCH_COLUMN);
+            // Fetch distinct depts and sub_depts for current SO Type & user permissions
+            $deptExtra = "";
+            $deptParams = [':year' => $year, ':month' => $month, ':so_type' => $soType];
+            if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
+                $dClauses = [];
+                foreach ($userAllowedDepts as $idx => $ad) {
+                    $paramKey = ":duad_{$idx}";
+                    $dClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                    $deptParams[$paramKey] = $ad;
+                }
+                $deptExtra = " AND (" . implode(' OR ', $dClauses) . ")";
+            }
 
-        $subDepts = $db->query("
-            SELECT DISTINCT sub_dept FROM site_regional WHERE sub_dept IS NOT NULL AND TRIM(sub_dept) != '' ORDER BY sub_dept ASC
-        ")->fetchAll(PDO::FETCH_COLUMN);
+            $deptStmt = $db->prepare("
+                SELECT DISTINCT sr.dept 
+                FROM site_regional sr 
+                WHERE sr.dept IS NOT NULL AND TRIM(sr.dept) != ''
+                  AND ($effectiveGroupSql) = :so_type {$deptExtra}
+                ORDER BY sr.dept ASC
+            ");
+            $deptStmt->execute($deptParams);
+            $depts = $deptStmt->fetchAll(PDO::FETCH_COLUMN);
 
-        // Calculate card counts (Total sites, Generated, Sent, Not Generated)
-        $statStmt = $db->prepare("
+            $subDeptExtra = "";
+            $subDeptParams = [':year' => $year, ':month' => $month, ':so_type' => $soType];
+            if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
+                $sdClauses = [];
+                foreach ($userAllowedDepts as $idx => $ad) {
+                    $paramKey = ":sduad_{$idx}";
+                    $sdClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                    $subDeptParams[$paramKey] = $ad;
+                }
+                $subDeptExtra = " AND (" . implode(' OR ', $sdClauses) . ")";
+            }
+
+            $subDeptStmt = $db->prepare("
+                SELECT DISTINCT sr.sub_dept 
+                FROM site_regional sr 
+                WHERE sr.sub_dept IS NOT NULL AND TRIM(sr.sub_dept) != ''
+                  AND ($effectiveGroupSql) = :so_type {$subDeptExtra}
+                ORDER BY sr.sub_dept ASC
+            ");
+            $subDeptStmt->execute($subDeptParams);
+            $subDepts = $subDeptStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            // Calculate card counts (Total sites, Generated, Sent, Not Generated) for current SO Type & UAC
+            $statDeptClause = "";
+            $statParams = [':month' => $month, ':year' => $year, ':so_type' => $soType];
+            if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
+                $sClauses = [];
+                foreach ($userAllowedDepts as $idx => $ad) {
+                    $paramKey = ":suad_{$idx}";
+                    $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                    $statParams[$paramKey] = $ad;
+                }
+                $statDeptClause = " AND (" . implode(' OR ', $sClauses) . ")";
+            }
+
+            $statStmt = $db->prepare("
             SELECT 
                 COUNT(DISTINCT sr.sitecode) as total_sites,
                 COUNT(DISTINCT CASE WHEN gr.id IS NOT NULL THEN sr.sitecode END) as total_generated,
@@ -202,104 +353,322 @@ try {
                 COUNT(DISTINCT CASE WHEN gr.id IS NULL THEN sr.sitecode END) as total_pending
             FROM site_regional sr
             LEFT JOIN generated_reports gr ON gr.sitecode = sr.sitecode AND gr.period_month = :month AND gr.period_year = :year
+            WHERE ($effectiveGroupSql) = :so_type {$statDeptClause}
         ");
-        $statStmt->execute([':month' => $month, ':year' => $year]);
-        $stats = $statStmt->fetch(PDO::FETCH_ASSOC) ?: [
-            'total_sites' => 0, 'total_generated' => 0, 'total_sent' => 0, 'total_not_generated' => 0, 'total_pending' => 0
-        ];
+            $statStmt->execute($statParams);
+            $stats = $statStmt->fetch(PDO::FETCH_ASSOC) ?: [
+                'total_sites' => 0,
+                'total_generated' => 0,
+                'total_sent' => 0,
+                'total_not_generated' => 0,
+                'total_pending' => 0
+            ];
 
-        echo json_encode([
-            'success' => true,
-            'data' => $rows,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limitParam,
-            'total_pages' => ($limitParam === 'all') ? 1 : (int)ceil($total / $limit),
-            'depts' => $depts,
-            'sub_depts' => $subDepts,
-            'stats' => $stats
-        ]);
-        exit;
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // ACTION: get_report_data - Fetch detailed data used to fill BA
-    // ─────────────────────────────────────────────────────────────────
-    if ($method === 'GET' && ($action === 'data' || $action === 'preview_html')) {
-        $sitecode = trim($_GET['sitecode'] ?? '');
-        $month = (int)($_GET['month'] ?? 9);
-        $year = (int)($_GET['year'] ?? 2026);
-
-        if ($sitecode === '') {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+            echo json_encode([
+                'success' => true,
+                'data' => $rows,
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limitParam,
+                'total_pages' => ($limitParam === 'all') ? 1 : (int) ceil($total / $limit),
+                'so_type' => $soType,
+                'user_allowed_depts' => $userAllowedDepts ?: ['ALL'],
+                'depts' => $depts,
+                'sub_depts' => $subDepts,
+                'stats' => $stats
+            ]);
             exit;
         }
 
-        $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames);
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: get_report_data - Fetch detailed data used to fill BA
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'GET' && ($action === 'data' || $action === 'preview_html')) {
+            $sitecode = trim($_GET['sitecode'] ?? '');
+            $month = (int) ($_GET['month'] ?? 9);
+            $year = (int) ($_GET['year'] ?? 2026);
 
-        if ($action === 'preview_html') {
-            renderHtmlBa($reportData);
+            if ($sitecode === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+
+            if (!$checkSiteAccess($sitecode)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
+                exit;
+            }
+
+            $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames);
+
+            if ($action === 'preview_html') {
+                renderHtmlBa($reportData);
+                exit;
+            }
+
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'data' => $reportData]);
             exit;
         }
 
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => true, 'data' => $reportData]);
-        exit;
-    }
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: download - Stream generated PDF through PHP
+        // (uploads/ is protected by .htaccess "Require all denied", so files
+        //  must never be linked directly)
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'GET' && $action === 'download') {
+            $sitecode = trim($_GET['sitecode'] ?? '');
+            $month = (int) ($_GET['month'] ?? 9);
+            $year = (int) ($_GET['year'] ?? 2026);
+            $disposition = (($_GET['inline'] ?? '') === '1') ? 'inline' : 'attachment';
 
-    // ─────────────────────────────────────────────────────────────────
-    // ACTION: generate - Generates BA report docx and pdf
-    // ─────────────────────────────────────────────────────────────────
-    if ($method === 'POST' && $action === 'generate') {
-        header('Content-Type: application/json; charset=utf-8');
+            if ($sitecode === '') {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
 
-        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
-        $sitecode = trim($input['sitecode'] ?? '');
-        $month = (int)($input['month'] ?? 9);
-        $year = (int)($input['year'] ?? 2026);
+            if (!$checkSiteAccess($sitecode)) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
+                exit;
+            }
 
-        if ($sitecode === '') {
-            echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+            $stmt = $db->prepare("
+            SELECT * FROM generated_reports
+            WHERE sitecode = :sitecode AND period_month = :month AND period_year = :year
+            LIMIT 1
+        ");
+            $stmt->execute([':sitecode' => $sitecode, ':month' => $month, ':year' => $year]);
+            $rep = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $reportsReal = realpath($reportsDir);
+            $cleanSite = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($sitecode));
+            $periodMonthName = $monthNames[$month] ?? "Bulan $month";
+            $periodStr = "{$periodMonthName} {$year}";
+
+            // 1. Check if specific pdf_path from DB exists on disk
+            $pdfAbs = ($rep && !empty($rep['pdf_path'])) ? ($reportsDir . basename($rep['pdf_path'])) : null;
+
+            // 2. If not found or < 1000 bytes, search for existing PDF for this site and period
+            if (!$pdfAbs || !file_exists($pdfAbs) || filesize($pdfAbs) < 1000) {
+                $matchingPdfs = glob($reportsDir . "*{$cleanSite}*" . strtoupper($periodMonthName) . "*{$year}*.pdf");
+                if (!empty($matchingPdfs)) {
+                    usort($matchingPdfs, function ($a, $b) {
+                        return filemtime($b) - filemtime($a);
+                    });
+                    if (filesize($matchingPdfs[0]) > 1000) {
+                        $pdfAbs = $matchingPdfs[0];
+                    }
+                }
+            }
+
+            // 3. If STILL missing or invalid, generate on the fly
+            if (!$pdfAbs || !file_exists($pdfAbs) || filesize($pdfAbs) < 1000) {
+                $summary = $rep ? (json_decode($rep['summary_data'] ?? '{}', true) ?: []) : [];
+                $keteranganDb = $summary['keterangan_db'] ?? null;
+                $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames, $keteranganDb);
+
+                $genDt = null;
+                if ($rep && !empty($rep['generated_at'])) {
+                    try {
+                        $genDt = new DateTime($rep['generated_at']);
+                    } catch (Exception $e) {
+                    }
+                }
+                $filenameBase = buildReportExportName($reportData['sitecode'], $reportData['sitename'], $reportData['periode_so'], $genDt ?: new DateTime());
+                $reportData['export_filename'] = $filenameBase;
+                $docxAbs = $reportsDir . $filenameBase . '.docx';
+                $pdfAbs = $reportsDir . $filenameBase . '.pdf';
+
+                buildDocxFromData($reportData, $docxAbs);
+                convertDocxToPdf($docxAbs, $pdfAbs, $reportData);
+
+                // Record into generated_reports so state is synchronized
+                $summaryJson = json_encode([
+                    'sitecode' => $reportData['sitecode'],
+                    'sitename' => $reportData['sitename'],
+                    'match_qty' => $reportData['match_qty'],
+                    'physic_qty' => $reportData['physic_qty'],
+                    'db_qty' => $reportData['db_qty'],
+                    'pencapaian' => $reportData['pencapaian'],
+                    'total_db' => $reportData['total_db'],
+                    'solved_db' => $reportData['solved_db'],
+                    'unsolved_db' => $reportData['unsolved_db'],
+                    'new_db' => $reportData['new_db'],
+                    'pic_name' => $reportData['pic_name'],
+                    'pic_phone' => $reportData['pic_phone'],
+                    'avp_pic' => $reportData['avp_pic'],
+                    'avp_title' => $reportData['avp_title'],
+                    'fvp_pic' => $reportData['fvp_pic'],
+                    'fvp_title' => $reportData['fvp_title'],
+                    'keterangan_db' => $reportData['keterangan_db'],
+                    'export_filename' => $filenameBase,
+                ]);
+
+                $insStmt = $db->prepare("
+                    INSERT INTO generated_reports (
+                        sitecode, sitename, dept, sub_dept, period_month, period_year,
+                        status, pdf_path, docx_path, pic_name, pic_phone,
+                        avp_name, avp_title, fvp_name, fvp_title, summary_data,
+                        generated_at, updated_at
+                    ) VALUES (
+                        :sitecode, :sitename, :dept, :sub_dept, :month, :year,
+                        'generated', :pdf_path, :docx_path, :pic_name, :pic_phone,
+                        :avp_name, :avp_title, :fvp_name, :fvp_title, :summary_data,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    )
+                    ON CONFLICT (sitecode, period_month, period_year) DO UPDATE SET
+                        status = 'generated',
+                        pdf_path = EXCLUDED.pdf_path,
+                        docx_path = EXCLUDED.docx_path,
+                        pic_name = EXCLUDED.pic_name,
+                        pic_phone = EXCLUDED.pic_phone,
+                        summary_data = EXCLUDED.summary_data,
+                        updated_at = CURRENT_TIMESTAMP
+                ");
+                $insStmt->execute([
+                    ':sitecode' => $reportData['sitecode'],
+                    ':sitename' => $reportData['sitename'],
+                    ':dept' => $reportData['dept'],
+                    ':sub_dept' => $reportData['sub_dept'],
+                    ':month' => $month,
+                    ':year' => $year,
+                    ':pdf_path' => 'uploads/reports/' . $filenameBase . '.pdf',
+                    ':docx_path' => 'uploads/reports/' . $filenameBase . '.docx',
+                    ':pic_name' => $reportData['pic_name'],
+                    ':pic_phone' => $reportData['pic_phone'],
+                    ':avp_name' => $reportData['avp_pic'],
+                    ':avp_title' => $reportData['avp_title'],
+                    ':fvp_name' => $reportData['fvp_pic'],
+                    ':fvp_title' => $reportData['fvp_title'],
+                    ':summary_data' => $summaryJson
+                ]);
+            }
+
+            clearstatcache(true);
+            $pdfReal = ($pdfAbs && is_file($pdfAbs) && filesize($pdfAbs) > 1000) ? realpath($pdfAbs) : false;
+
+            if ($pdfReal === false) {
+                http_response_code(500);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Gagal menghasilkan file PDF. Silakan coba klik Generate / Regenerate kembali.'
+                ]);
+                exit;
+            }
+
+            $downloadName = basename($pdfReal);
+            if (stripos($downloadName, 'BERITA ACARA TINDAK LANJUT DB-') === 0) {
+                $downloadName = 'Berita Acara Tindak Lanjut DB-' . substr($downloadName, strlen('BERITA ACARA TINDAK LANJUT DB-'));
+            }
+            $cleanDownloadName = str_replace(['"', "'", ',', ';'], '', $downloadName);
+            if (!preg_match('/\.pdf$/i', $cleanDownloadName)) {
+                $cleanDownloadName .= '.pdf';
+            }
+
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            header('Content-Type: application/pdf');
+            header('Content-Length: ' . filesize($pdfReal));
+            header('Content-Disposition: ' . $disposition . '; filename="' . $cleanDownloadName . '"; filename*=UTF-8\'\'' . rawurlencode($cleanDownloadName));
+            header('Content-Transfer-Encoding: binary');
+            header('Accept-Ranges: bytes');
+            header('Cache-Control: public, must-revalidate, max-age=0');
+            header('Pragma: public');
+            readfile($pdfReal);
             exit;
         }
 
-        $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames);
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: generate - Generates BA report docx and pdf
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'generate') {
+            header('Content-Type: application/json; charset=utf-8');
 
-        // Generate files
-        $safeSite = preg_replace('/[^a-zA-Z0-9_-]/', '_', $sitecode);
-        $filenameBase = "BA_Asset_Opname_{$safeSite}_{$year}_{$month}";
-        $docxFilename = "{$filenameBase}.docx";
-        $pdfFilename = "{$filenameBase}.pdf";
-        $docxPath = $reportsDir . $docxFilename;
-        $pdfPath = $reportsDir . $pdfFilename;
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $sitecode = trim($input['sitecode'] ?? '');
+            $month = (int) ($input['month'] ?? 9);
+            $year = (int) ($input['year'] ?? 2026);
+            $keteranganDb = trim(preg_replace('/\s+/u', ' ', (string) ($input['keterangan_db'] ?? '')));
+            $keteranganDb = rtrim($keteranganDb, '. ');
 
-        // Build docx using WordprocessingML template builder
-        buildDocxFromData($reportData, $docxPath);
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
+                exit;
+            }
+            if ($keteranganDb === '') {
+                echo json_encode(['success' => false, 'message' => 'Keterangan DB wajib diisi']);
+                exit;
+            }
+            if (mb_strlen($keteranganDb) > 500) {
+                echo json_encode(['success' => false, 'message' => 'Keterangan DB maksimal 500 karakter']);
+                exit;
+            }
 
-        // Convert to PDF using Word COM if available, or HTML headless browser
-        $pdfGenerated = convertDocxToPdf($docxPath, $pdfPath, $reportData);
+            $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames, $keteranganDb);
 
-        // Update database log
-        $summaryJson = json_encode([
-            'sitecode' => $reportData['sitecode'],
-            'sitename' => $reportData['sitename'],
-            'match_qty' => $reportData['match_qty'],
-            'physic_qty' => $reportData['physic_qty'],
-            'db_qty' => $reportData['db_qty'],
-            'pencapaian' => $reportData['pencapaian'],
-            'total_db' => $reportData['total_db'],
-            'solved_db' => $reportData['solved_db'],
-            'unsolved_db' => $reportData['unsolved_db'],
-            'pic_name' => $reportData['pic_name'],
-            'pic_phone' => $reportData['pic_phone'],
-            'avp_pic' => $reportData['avp_pic'],
-            'avp_title' => $reportData['avp_title'],
-            'fvp_pic' => $reportData['fvp_pic'],
-            'fvp_title' => $reportData['fvp_title'],
-        ]);
+            // Generate files: BERITA ACARA TINDAK LANJUT DB-SITECODE_NAMESITE_PERIODE SO_ddmmYYYYHHii
+            $filenameBase = buildReportExportName($reportData['sitecode'], $reportData['sitename'], $reportData['periode_so'], new DateTime());
+            $reportData['export_filename'] = $filenameBase;
+            $docxFilename = "{$filenameBase}.docx";
+            $pdfFilename = "{$filenameBase}.pdf";
+            $docxPath = $reportsDir . $docxFilename;
+            $pdfPath = $reportsDir . $pdfFilename;
 
-        $insSql = "
+            // Remove previously generated files for this site/period (timestamped names would otherwise pile up)
+            $oldStmt = $db->prepare("SELECT pdf_path, docx_path FROM generated_reports WHERE sitecode = :sc AND period_month = :m AND period_year = :y");
+            $oldStmt->execute([':sc' => $reportData['sitecode'], ':m' => $month, ':y' => $year]);
+            if ($old = $oldStmt->fetch(PDO::FETCH_ASSOC)) {
+                foreach (['pdf_path', 'docx_path'] as $col) {
+                    if (!empty($old[$col])) {
+                        $oldAbs = $reportsDir . basename($old[$col]);
+                        if (is_file($oldAbs) && basename($oldAbs) !== $pdfFilename && basename($oldAbs) !== $docxFilename) {
+                            @unlink($oldAbs);
+                        }
+                    }
+                }
+            }
+
+            // Build docx using WordprocessingML template builder
+            buildDocxFromData($reportData, $docxPath);
+
+            // Convert to PDF using Word COM if available, or HTML headless browser
+            $pdfGenerated = convertDocxToPdf($docxPath, $pdfPath, $reportData);
+
+            // Update database log
+            $summaryJson = json_encode([
+                'sitecode' => $reportData['sitecode'],
+                'sitename' => $reportData['sitename'],
+                'match_qty' => $reportData['match_qty'],
+                'physic_qty' => $reportData['physic_qty'],
+                'db_qty' => $reportData['db_qty'],
+                'pencapaian' => $reportData['pencapaian'],
+                'total_db' => $reportData['total_db'],
+                'solved_db' => $reportData['solved_db'],
+                'unsolved_db' => $reportData['unsolved_db'],
+                'new_db' => $reportData['new_db'],
+                'pic_name' => $reportData['pic_name'],
+                'pic_phone' => $reportData['pic_phone'],
+                'avp_pic' => $reportData['avp_pic'],
+                'avp_title' => $reportData['avp_title'],
+                'fvp_pic' => $reportData['fvp_pic'],
+                'fvp_title' => $reportData['fvp_title'],
+                'keterangan_db' => $keteranganDb,
+                'export_filename' => $filenameBase,
+            ]);
+
+            $insSql = "
             INSERT INTO generated_reports (
                 sitecode, sitename, dept, sub_dept, period_month, period_year,
                 status, pdf_path, docx_path, pic_name, pic_phone,
@@ -326,123 +695,188 @@ try {
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id
         ";
-        $insStmt = $db->prepare($insSql);
-        $insStmt->execute([
-            ':sitecode' => $reportData['sitecode'],
-            ':sitename' => $reportData['sitename'],
-            ':dept' => $reportData['dept'],
-            ':sub_dept' => $reportData['sub_dept'],
-            ':month' => $month,
-            ':year' => $year,
-            ':pdf_path' => 'uploads/reports/' . $pdfFilename,
-            ':docx_path' => 'uploads/reports/' . $docxFilename,
-            ':pic_name' => $reportData['pic_name'],
-            ':pic_phone' => $reportData['pic_phone'],
-            ':avp_name' => $reportData['avp_pic'],
-            ':avp_title' => $reportData['avp_title'],
-            ':fvp_name' => $reportData['fvp_pic'],
-            ':fvp_title' => $reportData['fvp_title'],
-            ':summary_data' => $summaryJson
-        ]);
+            $insStmt = $db->prepare($insSql);
+            $insStmt->execute([
+                ':sitecode' => $reportData['sitecode'],
+                ':sitename' => $reportData['sitename'],
+                ':dept' => $reportData['dept'],
+                ':sub_dept' => $reportData['sub_dept'],
+                ':month' => $month,
+                ':year' => $year,
+                ':pdf_path' => 'uploads/reports/' . $pdfFilename,
+                ':docx_path' => 'uploads/reports/' . $docxFilename,
+                ':pic_name' => $reportData['pic_name'],
+                ':pic_phone' => $reportData['pic_phone'],
+                ':avp_name' => $reportData['avp_pic'],
+                ':avp_title' => $reportData['avp_title'],
+                ':fvp_name' => $reportData['fvp_pic'],
+                ':fvp_title' => $reportData['fvp_title'],
+                ':summary_data' => $summaryJson
+            ]);
 
-        echo json_encode([
-            'success' => true,
-            'message' => 'Berita Acara berhasil di-generate!',
-            'sitecode' => $reportData['sitecode'],
-            'sitename' => $reportData['sitename'],
-            'pdf_url' => 'uploads/reports/' . $pdfFilename,
-            'docx_url' => 'uploads/reports/' . $docxFilename,
-            'pic_name' => $reportData['pic_name'],
-            'pic_phone' => $reportData['pic_phone'],
-            'status' => 'generated'
-        ]);
-        exit;
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // ACTION: send_whatsapp - Prepare WhatsApp link & update status to sent
-    // ─────────────────────────────────────────────────────────────────
-    if ($method === 'POST' && $action === 'send') {
-        header('Content-Type: application/json; charset=utf-8');
-
-        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
-        $sitecode = trim($input['sitecode'] ?? '');
-        $month = (int)($input['month'] ?? 9);
-        $year = (int)($input['year'] ?? 2026);
-
-        if ($sitecode === '') {
-            echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Berita Acara berhasil di-generate!',
+                'sitecode' => $reportData['sitecode'],
+                'sitename' => $reportData['sitename'],
+                'pdf_generated' => $pdfGenerated,
+                'pdf_url' => buildReportDownloadUrl($reportData['sitecode'], $month, $year),
+                'export_filename' => $pdfFilename,
+                'pdf_filename' => $pdfFilename,
+                'pic_name' => $reportData['pic_name'],
+                'pic_phone' => $reportData['pic_phone'],
+                'status' => 'generated'
+            ]);
             exit;
         }
 
-        // Fetch report log
-        $stmt = $db->prepare("
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: send_whatsapp - Prepare WhatsApp link & update status to sent
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'send') {
+            header('Content-Type: application/json; charset=utf-8');
+
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $sitecode = trim($input['sitecode'] ?? '');
+            $month = (int) ($input['month'] ?? 9);
+            $year = (int) ($input['year'] ?? 2026);
+
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
+                exit;
+            }
+
+            // Fetch report log
+            $stmt = $db->prepare("
             SELECT * FROM generated_reports 
             WHERE sitecode = :sitecode AND period_month = :month AND period_year = :year
         ");
-        $stmt->execute([':sitecode' => $sitecode, ':month' => $month, ':year' => $year]);
-        $rep = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt->execute([':sitecode' => $sitecode, ':month' => $month, ':year' => $year]);
+            $rep = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$rep) {
-            echo json_encode(['success' => false, 'message' => 'Laporan belum di-generate']);
-            exit;
-        }
+            if (!$rep) {
+                echo json_encode(['success' => false, 'message' => 'Laporan belum di-generate']);
+                exit;
+            }
 
-        // Clean phone number for WhatsApp
-        $rawPhone = $rep['pic_phone'] ?? '';
-        $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
-        if (str_starts_with($cleanPhone, '0')) {
-            $cleanPhone = '62' . substr($cleanPhone, 1);
-        }
+            // Clean phone number for WhatsApp
+            $rawPhone = $rep['pic_phone'] ?? '';
+            $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+            if (str_starts_with($cleanPhone, '0')) {
+                $cleanPhone = '62' . substr($cleanPhone, 1);
+            }
 
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $baseUrl = $protocol . $host . rtrim(dirname(dirname($_SERVER['PHP_SELF'])), '/\\');
-        $pdfFullUrl = $baseUrl . '/' . ltrim($rep['pdf_path'], '/');
+            // Ensure physical PDF file exists on disk
+            $pdfBasename = basename($rep['pdf_path'] ?? '');
+            $pdfAbsFile = $reportsDir . $pdfBasename;
+            clearstatcache(true);
+            if (empty($pdfBasename) || !file_exists($pdfAbsFile) || filesize($pdfAbsFile) < 1000) {
+                $summary = json_decode($rep['summary_data'] ?? '{}', true) ?: [];
+                $keteranganDb = $summary['keterangan_db'] ?? null;
+                $reportData = fetchReportBundle($db, $sitecode, $month, $year, $dayNames, $monthNames, $keteranganDb);
+                $filenameBase = buildReportExportName($reportData['sitecode'], $reportData['sitename'], $reportData['periode_so'], new DateTime());
+                $docxAbs = $reportsDir . $filenameBase . '.docx';
+                $pdfAbsFile = $reportsDir . $filenameBase . '.pdf';
+                buildDocxFromData($reportData, $docxAbs);
+                convertDocxToPdf($docxAbs, $pdfAbsFile, $reportData);
+                $pdfBasename = $filenameBase . '.pdf';
+                $db->prepare("UPDATE generated_reports SET pdf_path = :p, docx_path = :d, updated_at = CURRENT_TIMESTAMP WHERE id = :id")->execute([
+                    ':p' => 'uploads/reports/' . $pdfBasename,
+                    ':d' => 'uploads/reports/' . $filenameBase . '.docx',
+                    ':id' => $rep['id']
+                ]);
+            }
 
-        $monthName = $monthNames[$month] ?? "Bulan $month";
-        $message = "Halo Bapak/Ibu " . ($rep['pic_name'] ?: 'PIC') . ",\n\n"
-            . "Berikut adalah dokumen Berita Acara Hasil Asset Opname dan Tindak Lanjut Data DB untuk Site *{$rep['sitecode']} - {$rep['sitename']}* Periode *{$monthName} {$year}*:\n\n"
-            . "📥 Download Dokumen BA (PDF):\n" . $pdfFullUrl . "\n\n"
-            . "Mohon untuk ditinjau dan ditandatangani. Terima kasih.\n"
-            . "_Dashboard Asset Management - Lintasarta_";
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $directPdfUrl = 'uploads/reports/' . rawurlencode($pdfBasename);
+            $fullPdfUrl = $protocol . $host . '/' . ltrim($directPdfUrl, '/');
+            $monthName = $monthNames[$month] ?? "Bulan $month";
 
-        $waUrl = "https://wa.me/{$cleanPhone}?text=" . rawurlencode($message);
+            $message = "Dear Rekan Outlet - " . ($rep['pic_name'] ?: 'PIC') . ",\n\n"
+                . "Berikut terlampir dokumen Berita Acara Hasil Asset Opname dan Tindak Lanjut Data DB untuk Site *{$rep['sitecode']} - {$rep['sitename']}* Periode *{$monthName} {$year}*.\n"
+                . "Mohon untuk ditinjau dan wajib ditandatangani secara circular melalui email. Terima kasih.\n\n"
+                . "Regards,\n"
+                . "_Team Asset Management_";
 
-        // Update status to 'sent'
-        $upd = $db->prepare("
+            $waUrl = "https://wa.me/{$cleanPhone}?text=" . rawurlencode($message);
+
+            // Update status to 'sent'
+            $upd = $db->prepare("
             UPDATE generated_reports 
             SET status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ");
-        $upd->execute([':id' => $rep['id']]);
+            $upd->execute([':id' => $rep['id']]);
 
+            echo json_encode([
+                'success' => true,
+                'message' => 'Status berhasil diubah ke Sent!',
+                'wa_url' => $waUrl,
+                'phone' => $cleanPhone,
+                'pic_name' => $rep['pic_name'],
+                'pdf_url' => $directPdfUrl,
+                'full_pdf_url' => $fullPdfUrl,
+                'pdf_filename' => $pdfBasename,
+                'message_text' => $message,
+                'status' => 'sent'
+            ]);
+            exit;
+        }
+
+    } catch (Exception $e) {
+        http_response_code(500);
         echo json_encode([
-            'success' => true,
-            'message' => 'Status berhasil diubah ke Sent!',
-            'wa_url' => $waUrl,
-            'phone' => $cleanPhone,
-            'pic_name' => $rep['pic_name'],
-            'pdf_url' => $rep['pdf_path'],
-            'status' => 'sent'
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
         ]);
         exit;
     }
-
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error: ' . $e->getMessage()
-    ]);
-    exit;
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: Standardized filename and secure download URL
+// ─────────────────────────────────────────────────────────────────────
+function buildReportExportName(string $sitecode, string $sitename, string $periodeSo, ?DateTime $dt = null): string
+{
+    $dt = $dt ?: new DateTime();
+    $cleanSite = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($sitecode));
+    $cleanName = strtoupper(trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $sitename)));
+    $cleanName = preg_replace('/\s+/', ' ', $cleanName);
+    $cleanPeriod = strtoupper(trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $periodeSo)));
+    $cleanPeriod = preg_replace('/\s+/', ' ', $cleanPeriod);
+    $timeStr = $dt->format('dmYHi');
+    return "Berita Acara Tindak Lanjut DB-{$cleanSite}_{$cleanName}_{$cleanPeriod}_{$timeStr}";
+}
+
+function buildReportDownloadUrl(string $sitecode, int $month, int $year): string
+{
+    return "api/generate_report.php?action=download&sitecode=" . rawurlencode($sitecode) . "&month={$month}&year={$year}";
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Fetch all data needed to bundle the BA report
 // ─────────────────────────────────────────────────────────────────────
-function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, array $dayNames, array $monthNames): array {
+function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, array $dayNames, array $monthNames, ?string $keteranganDb = null): array
+{
+    if ($keteranganDb === null || trim($keteranganDb) === '') {
+        try {
+            $savedStmt = $db->prepare("SELECT summary_data->>'keterangan_db' FROM generated_reports WHERE sitecode = :sc AND period_month = :m AND period_year = :y LIMIT 1");
+            $savedStmt->execute([':sc' => $sitecode, ':m' => $month, ':y' => $year]);
+            $savedKet = $savedStmt->fetchColumn();
+            if ($savedKet) {
+                $keteranganDb = trim($savedKet);
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
+    }
+    $keteranganDb = ($keteranganDb !== null && trim($keteranganDb) !== '') ? trim($keteranganDb) : 'tidak ada inputan flasma/prisma';
+
     // 1. Site details from site_regional
     $siteStmt = $db->prepare("
         SELECT sr.sitecode, sr.name_site, sr.dept, sr.sub_dept
@@ -468,7 +902,8 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     $picRow = $picStmt->fetch(PDO::FETCH_ASSOC);
     $picName = trim($picRow['pic'] ?? '');
     $picPhone = trim($picRow['no_telp'] ?? '');
-    if ($picName === '') $picName = 'Panggah Kriesna Mukti'; // fallback sample if not set
+    if ($picName === '')
+        $picName = 'Panggah Kriesna Mukti'; // fallback sample if not set
 
     // 3. Circular Sign PICs:
     // Rule:
@@ -522,7 +957,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     $engDay = $now->format('l');
     $dayIndo = $dayNames[$engDay] ?? $engDay;
     $dateIndo = $now->format('j');
-    $monthIndo = $monthNames[(int)$now->format('n')] ?? $now->format('F');
+    $monthIndo = $monthNames[(int) $now->format('n')] ?? $now->format('F');
     $yearIndo = $now->format('Y');
 
     // Periode SO
@@ -545,49 +980,140 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     ]);
     $rec = $reconcilStmt->fetch(PDO::FETCH_ASSOC);
 
-    $matchQty = (int)($rec['match_physic_qty'] ?? 0);
-    $physicQty = (int)($rec['physic_physic_qty'] ?? 0);
-    $dbQty = (int)($rec['db_physic_qty'] ?? 0);
+    $matchQty = (int) ($rec['match_physic_qty'] ?? 0);
+    $physicQty = (int) ($rec['physic_physic_qty'] ?? 0);
+    $dbQty = (int) ($rec['db_physic_qty'] ?? 0);
     $pencapaian = $rec['total_physic_pct'] ?? '100%';
     if (is_numeric($pencapaian)) {
-        $pencapaian = round((float)$pencapaian, 2) . '%';
+        $pencapaian = round((float) $pencapaian, 2) . '%';
     }
 
-    // 6. Rekap DB followup status (Total DB, Solved, Unsolved)
+    // 6. Rekap DB followup status (Total DB, Solved, Unsolved) & Lampiran Rincian Perangkat
+    // Exactly matches Rekapitulasi Status Penyelesaian DB logic (rekap_db_status.php)
+    $isQuarterly = false;
+    $groupStmt = $db->prepare("SELECT group_type FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
+    $groupStmt->execute([':sc' => $sitecode]);
+    $gType = strtolower(trim((string) $groupStmt->fetchColumn()));
+    if ($gType === 'quarterly') {
+        $isQuarterly = true;
+    }
+
+    if ($isQuarterly) {
+        if ($month <= 3) {
+            $prevMonth = 12;
+            $prevYear = $year - 1;
+        } elseif ($month <= 6) {
+            $prevMonth = 3;
+            $prevYear = $year;
+        } elseif ($month <= 9) {
+            $prevMonth = 6;
+            $prevYear = $year;
+        } else {
+            $prevMonth = 9;
+            $prevYear = $year;
+        }
+    } else {
+        if ($month === 1) {
+            $prevMonth = 12;
+            $prevYear = $year - 1;
+        } else {
+            $prevMonth = $month - 1;
+            $prevYear = $year;
+        }
+    }
+
+    $currMonthLabel = ($monthNames[$month] ?? "Bulan $month") . " " . $year;
+    $prevMonthLabel = ($monthNames[$prevMonth] ?? "Bulan $prevMonth") . " " . $prevYear;
+
+    $devices = [];
     $totalDb = $dbQty;
     $solvedDb = 0;
     $unsolvedDb = $dbQty;
+    $newDb = 0;
 
-    // Check if rekap_db_master has detailed rows for this site
-    $dbMasterStmt = $db->prepare("
-        SELECT reg_no, name_item, status_desc, is_solved
-        FROM rekap_db_master
-        WHERE sitecode ILIKE :sitecode
-          AND period_month = :month
-          AND period_year = :year
-        ORDER BY id ASC
-        LIMIT 15
-    ");
-    $devices = [];
     try {
-        $dbMasterStmt->execute([
-            ':sitecode' => "%$sitecode%",
-            ':month' => $month,
-            ':year' => $year
+        $sqlRdb = "
+            WITH prev AS (
+                SELECT DISTINCT ON (TRIM(r.reg_no)) 
+                    r.sitecode, TRIM(r.reg_no) as reg_no, r.name, r.sn, r.nbv
+                FROM rekap_db_master r
+                WHERE r.period_month = :prev_m AND r.period_year = :prev_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
+                  AND UPPER(TRIM(r.sitecode)) = UPPER(TRIM(:sitecode))
+                ORDER BY TRIM(r.reg_no), r.id
+            ),
+            curr AS (
+                SELECT DISTINCT ON (TRIM(r.reg_no)) 
+                    r.sitecode, TRIM(r.reg_no) as reg_no, r.name, r.sn, r.nbv
+                FROM rekap_db_master r
+                WHERE r.period_month = :curr_m AND r.period_year = :curr_y AND r.reg_no IS NOT NULL AND TRIM(r.reg_no) != ''
+                  AND UPPER(TRIM(r.sitecode)) = UPPER(TRIM(:sitecode))
+                ORDER BY TRIM(r.reg_no), r.id
+            ),
+            combined AS (
+                SELECT 
+                    COALESCE(c.sitecode, p.sitecode) as sitecode,
+                    COALESCE(c.reg_no, p.reg_no) as reg_no,
+                    COALESCE(c.name, p.name) as name,
+                    COALESCE(c.sn, p.sn) as sn,
+                    COALESCE(c.nbv, p.nbv, 0) as nbv,
+                    CASE 
+                        WHEN p.reg_no IS NOT NULL AND c.reg_no IS NULL THEN 'solved'
+                        WHEN p.reg_no IS NOT NULL AND c.reg_no IS NOT NULL THEN 'unsolved'
+                        ELSE 'new_db'
+                    END as status
+                FROM prev p
+                FULL OUTER JOIN curr c ON p.reg_no = c.reg_no
+            )
+            SELECT reg_no, name, sn, nbv, status
+            FROM combined
+            ORDER BY status ASC, reg_no ASC
+        ";
+
+        $rdbStmt = $db->prepare($sqlRdb);
+        $rdbStmt->execute([
+            ':prev_m' => $prevMonth,
+            ':prev_y' => $prevYear,
+            ':curr_m' => $month,
+            ':curr_y' => $year,
+            ':sitecode' => $sitecode
         ]);
-        $deviceRows = $dbMasterStmt->fetchAll(PDO::FETCH_ASSOC);
+        $deviceRows = $rdbStmt->fetchAll(PDO::FETCH_ASSOC);
+
         if (!empty($deviceRows)) {
             $totalDb = count($deviceRows);
             $solvedDb = 0;
+            $unsolvedDb = 0;
+            $newDb = 0;
+
             foreach ($deviceRows as $dr) {
-                if (!empty($dr['is_solved'])) $solvedDb++;
+                $st = strtolower(trim($dr['status'] ?? ''));
+                if ($st === 'solved') {
+                    $solvedDb++;
+                    $statusLabel = 'SOLVED';
+                    $keterangan = "Ada di {$prevMonthLabel}, DB solved di {$currMonthLabel}";
+                } elseif ($st === 'unsolved') {
+                    $unsolvedDb++;
+                    $statusLabel = 'UNSOLVED';
+                    $keterangan = "Belum solved (masih tercatat di {$currMonthLabel})";
+                } else {
+                    $newDb++;
+                    $statusLabel = 'NEW DB';
+                    $keterangan = "Temuan DB baru di {$currMonthLabel}";
+                }
+
+                $nbv = (float) ($dr['nbv'] ?? 0);
+                $nbvFormatted = 'Rp ' . number_format($nbv, 2, ',', '.');
+
                 $devices[] = [
-                    'reg_no' => $dr['reg_no'] ?? '-',
-                    'name' => $dr['name_item'] ?? '-',
-                    'followup' => !empty($dr['is_solved']) ? 'Done' : ($dr['status_desc'] ?? 'Unsolved')
+                    'reg_no' => trim($dr['reg_no'] ?? '-') ?: '-',
+                    'name' => trim($dr['name'] ?? '-') ?: '-',
+                    'sn' => trim($dr['sn'] ?? '-') ?: '-',
+                    'nbv' => $nbv,
+                    'nbv_formatted' => $nbvFormatted,
+                    'status' => $statusLabel,
+                    'keterangan' => $keterangan
                 ];
             }
-            $unsolvedDb = max(0, $totalDb - $solvedDb);
         }
     } catch (Exception $e) {
         // Table may not have all columns; fall back gracefully
@@ -614,6 +1140,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
         'total_db' => $totalDb,
         'solved_db' => $solvedDb,
         'unsolved_db' => $unsolvedDb,
+        'new_db' => $newDb,
         // Signatures
         'pic_name' => $picName,
         'pic_phone' => $picPhone,
@@ -621,6 +1148,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
         'avp_pic' => $avpPic,
         'fvp_title' => $fvpTitle,
         'fvp_pic' => $fvpPic,
+        'keterangan_db' => $keteranganDb,
         // Devices
         'devices' => $devices
     ];
@@ -629,14 +1157,102 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Convert DOCX to PDF
 // ─────────────────────────────────────────────────────────────────────
-function convertDocxToPdf(string $docxPath, string $pdfPath, array $reportData): bool {
+function convertDocxToPdf(string $docxPath, string $pdfPath, array $reportData): bool
+{
     $dir = dirname($pdfPath);
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    if (!is_dir($dir))
+        mkdir($dir, 0755, true);
 
-    $winDocx = str_replace('/', '\\', realpath($docxPath) ?: $docxPath);
-    $winPdf = str_replace('/', '\\', $pdfPath);
+    $isWindows = (PHP_OS_FAMILY === 'Windows');
+    $winDocx = $isWindows ? str_replace('/', '\\', realpath($docxPath) ?: $docxPath) : (realpath($docxPath) ?: $docxPath);
+    // Only convert slashes on Windows; on Linux this produced an invalid path like "\var\www\..."
+    $winPdf = $isWindows ? str_replace('/', '\\', $pdfPath) : $pdfPath;
 
-    // 1. Try Word COM via PowerShell on Windows (Pixel-perfect 2-page Word export)
+    // Profile cache dir to avoid Edge/Chrome profile locks
+    $userDataDir = $dir . '/.browser_profile';
+    if (!is_dir($userDataDir))
+        @mkdir($userDataDir, 0777, true);
+
+    // 1. Try Chrome / Edge / Chromium headless printing first (pixel-perfect 2-page PDF)
+    $browserPaths = [
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/snap/bin/chromium'
+    ];
+
+    $htmlTemp = dirname($docxPath) . '/' . basename($docxPath, '.docx') . '.temp.html';
+    file_put_contents($htmlTemp, getBaHtmlString($reportData));
+    $htmlReal = str_replace('\\', '/', realpath($htmlTemp) ?: $htmlTemp);
+    $htmlUri = 'file://' . (str_starts_with($htmlReal, '/') ? '' : '/') . $htmlReal;
+
+    // On Linux (Docker, www-data), Chromium needs a writable HOME for its config/crash dirs
+    $envPrefix = $isWindows ? '' : 'HOME=/tmp XDG_CONFIG_HOME=/tmp XDG_CACHE_HOME=/tmp ';
+
+    $foundBrowser = false;
+    $lastOutput = [];
+    foreach ($browserPaths as $bin) {
+        if (file_exists($bin)) {
+            $foundBrowser = true;
+            foreach (['--headless=new', '--headless'] as $headlessFlag) {
+                $cmd = sprintf(
+                    '%s"%s" %s --disable-gpu --no-sandbox --disable-dev-shm-usage --no-first-run --disable-extensions --disable-crash-reporter --user-data-dir="%s" --no-pdf-header-footer --print-to-pdf-no-header --run-all-compositor-stages-before-draw --print-to-pdf="%s" "%s" 2>&1',
+                    $envPrefix,
+                    $bin,
+                    $headlessFlag,
+                    $userDataDir,
+                    $winPdf,
+                    $htmlUri
+                );
+                $lastOutput = [];
+                @exec($cmd, $lastOutput);
+                clearstatcache(true);
+                if (file_exists($pdfPath) && filesize($pdfPath) > 1000) {
+                    @unlink($htmlTemp);
+                    return true;
+                }
+            }
+        }
+    }
+    @unlink($htmlTemp);
+    clearstatcache(true);
+    if (!$foundBrowser) {
+        error_log('convertDocxToPdf: no Chromium/Chrome/Edge binary found on this server (install "chromium" in the Docker image).');
+    } else {
+        error_log('convertDocxToPdf: headless browser failed: ' . implode(' | ', array_slice($lastOutput, -5)));
+    }
+
+    // 2. Fallback: LibreOffice / soffice (cross-platform enterprise converter)
+    $libreBins = [
+        'soffice',
+        'libreoffice',
+        'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+        'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe'
+    ];
+    foreach ($libreBins as $lbin) {
+        $checkCmd = (PHP_OS_FAMILY === 'Windows') ? "where $lbin 2>nul" : "which $lbin 2>/dev/null";
+        $hasBin = (file_exists($lbin) || @exec($checkCmd));
+        if ($hasBin) {
+            $loCmd = sprintf(
+                '"%s" --headless --convert-to pdf "%s" --outdir "%s" 2>&1',
+                $lbin,
+                $winDocx,
+                $dir
+            );
+            @exec($loCmd);
+            clearstatcache(true);
+            if (file_exists($pdfPath) && filesize($pdfPath) > 1000) {
+                return true;
+            }
+        }
+    }
+
+    // 3. Fallback: Word COM via PowerShell on Windows if headless browser is not found
     if (PHP_OS_FAMILY === 'Windows') {
         $psCmd = sprintf(
             'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$w=New-Object -ComObject Word.Application;$w.Visible=$false;$w.DisplayAlerts=0;try{$d=$w.Documents.Open(\'%s\',$false,$true);$d.ExportAsFixedFormat(\'%s\',17);$d.Close($false)}finally{$w.Quit();[System.Runtime.InteropServices.Marshal]::ReleaseComObject($w)|Out-Null}" 2>&1',
@@ -644,64 +1260,46 @@ function convertDocxToPdf(string $docxPath, string $pdfPath, array $reportData):
             addslashes($winPdf)
         );
         @exec($psCmd);
+        clearstatcache(true);
         if (file_exists($pdfPath) && filesize($pdfPath) > 1000) {
             return true;
         }
     }
 
-    // 2. Try Chrome / Edge headless printing with --no-pdf-header-footer
-    $chromePaths = [
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
-    ];
-
-    $htmlTemp = dirname($docxPath) . '/' . basename($docxPath, '.docx') . '.temp.html';
-    file_put_contents($htmlTemp, getBaHtmlString($reportData));
-
-    foreach ($chromePaths as $bin) {
-        if (file_exists($bin)) {
-            $cmd = sprintf(
-                '"%s" --headless --disable-gpu --no-pdf-header-footer --run-all-compositor-stages-before-draw --print-to-pdf="%s" "%s" 2>&1',
-                $bin,
-                $pdfPath,
-                $htmlTemp
-            );
-            @exec($cmd);
-            if (file_exists($pdfPath) && filesize($pdfPath) > 1000) {
-                @unlink($htmlTemp);
-                return true;
-            }
-        }
-    }
-
-    @unlink($htmlTemp);
     return false;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Build DOCX using WordprocessingML
 // ─────────────────────────────────────────────────────────────────────
-function buildDocxFromData(array $d, string $targetDocx): void {
+function buildDocxFromData(array $d, string $targetDocx): void
+{
     $dir = dirname($targetDocx);
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    if (!is_dir($dir))
+        mkdir($dir, 0755, true);
 
     $FONT = 'Arial';
-    $x = function ($s) { return htmlspecialchars($s ?? '', ENT_XML1 | ENT_QUOTES, 'UTF-8'); };
+    $x = function ($s) {
+        return htmlspecialchars($s ?? '', ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    };
 
     $r = function ($text, $o = []) use ($FONT, $x) {
         $rpr = '<w:rFonts w:ascii="' . $FONT . '" w:hAnsi="' . $FONT . '" w:cs="' . $FONT . '"/>';
-        if (!empty($o['b'])) $rpr .= '<w:b/>';
-        if (!empty($o['u'])) $rpr .= '<w:u w:val="single"/>';
-        if (!empty($o['color'])) $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
+        if (!empty($o['b']))
+            $rpr .= '<w:b/>';
+        if (!empty($o['u']))
+            $rpr .= '<w:u w:val="single"/>';
+        if (!empty($o['color']))
+            $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
         $sz = $o['sz'] ?? 18;
         $rpr .= '<w:sz w:val="' . $sz . '"/><w:szCs w:val="' . $sz . '"/>';
         $parts = explode("\t", $text);
         $out = '';
         foreach ($parts as $i => $p) {
-            if ($i > 0) $out .= '<w:tab/>';
-            if ($p !== '') $out .= '<w:t xml:space="preserve">' . $x($p) . '</w:t>';
+            if ($i > 0)
+                $out .= '<w:tab/>';
+            if ($p !== '')
+                $out .= '<w:t xml:space="preserve">' . $x($p) . '</w:t>';
         }
         return '<w:r><w:rPr>' . $rpr . '</w:rPr>' . $out . '</w:r>';
     };
@@ -710,17 +1308,21 @@ function buildDocxFromData(array $d, string $targetDocx): void {
         $ppr = '';
         if (!empty($o['tabs'])) {
             $ppr .= '<w:tabs>';
-            foreach ($o['tabs'] as $t) $ppr .= '<w:tab w:val="left" w:pos="' . $t . '"/>';
+            foreach ($o['tabs'] as $t)
+                $ppr .= '<w:tab w:val="left" w:pos="' . $t . '"/>';
             $ppr .= '</w:tabs>';
         }
         $before = $o['before'] ?? 0;
-        $after  = $o['after'] ?? 0;
-        $line   = $o['line'] ?? 264;
+        $after = $o['after'] ?? 0;
+        $line = $o['line'] ?? 264;
         $ppr .= '<w:spacing w:before="' . $before . '" w:after="' . $after . '" w:line="' . $line . '" w:lineRule="auto"/>';
-        if (isset($o['ind'])) $ppr .= '<w:ind w:left="' . $o['ind'] . '"' . (isset($o['indR']) ? ' w:right="' . $o['indR'] . '"' : '') . '/>';
+        if (isset($o['ind']))
+            $ppr .= '<w:ind w:left="' . $o['ind'] . '"' . (isset($o['indR']) ? ' w:right="' . $o['indR'] . '"' : '') . '/>';
         $ppr .= '<w:jc w:val="' . ($o['jc'] ?? 'left') . '"/>';
-        if (!empty($o['pageBreakBefore'])) $ppr .= '<w:pageBreakBefore/>';
-        if (is_string($runs)) $runs = [$runs];
+        if (!empty($o['pageBreakBefore']))
+            $ppr .= '<w:pageBreakBefore/>';
+        if (is_string($runs))
+            $runs = [$runs];
         return '<w:p><w:pPr>' . $ppr . '</w:pPr>' . implode('', $runs) . '</w:p>';
     };
 
@@ -745,31 +1347,39 @@ function buildDocxFromData(array $d, string $targetDocx): void {
             . '<w:tblLayout w:type="fixed"/>'
             . '<w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="70" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar>'
             . '</w:tblPr><w:tblGrid>';
-        foreach ($widths as $w) $xml .= '<w:gridCol w:w="' . $w . '"/>';
+        foreach ($widths as $w)
+            $xml .= '<w:gridCol w:w="' . $w . '"/>';
         return $xml . '</w:tblGrid>' . implode('', $rowsXml) . '</w:tbl>';
     };
 
     $tr = function ($cellsXml, $o = []) {
         $trpr = '';
-        if (!empty($o['h'])) $trpr .= '<w:trHeight w:val="' . $o['h'] . '" w:hRule="' . ($o['hRule'] ?? 'atLeast') . '"/>';
-        if (!empty($o['header'])) $trpr .= '<w:tblHeader/>';
+        if (!empty($o['h']))
+            $trpr .= '<w:trHeight w:val="' . $o['h'] . '" w:hRule="' . ($o['hRule'] ?? 'atLeast') . '"/>';
+        if (!empty($o['header']))
+            $trpr .= '<w:tblHeader/>';
         $trpr .= '<w:cantSplit/>';
         return '<w:tr><w:trPr>' . $trpr . '</w:trPr>' . implode('', $cellsXml) . '</w:tr>';
     };
 
     $tc = function ($w, $content, $o = []) use ($p) {
         $tcpr = '<w:tcW w:w="' . $w . '" w:type="dxa"/>';
-        if (!empty($o['span'])) $tcpr .= '<w:gridSpan w:val="' . $o['span'] . '"/>';
-        if (!empty($o['vMerge'])) $tcpr .= $o['vMerge'] === 'restart' ? '<w:vMerge w:val="restart"/>' : '<w:vMerge/>';
-        if (!empty($o['fill'])) $tcpr .= '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>';
+        if (!empty($o['span']))
+            $tcpr .= '<w:gridSpan w:val="' . $o['span'] . '"/>';
+        if (!empty($o['vMerge']))
+            $tcpr .= $o['vMerge'] === 'restart' ? '<w:vMerge w:val="restart"/>' : '<w:vMerge/>';
+        if (!empty($o['fill']))
+            $tcpr .= '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>';
         $tcpr .= '<w:vAlign w:val="' . ($o['vAlign'] ?? 'center') . '"/>';
-        if (is_string($content)) $content = [$content];
-        if (empty($content)) $content = [$p('')];
+        if (is_string($content))
+            $content = [$content];
+        if (empty($content))
+            $content = [$p('')];
         return '<w:tc><w:tcPr>' . $tcpr . '</w:tcPr>' . implode('', $content) . '</w:tc>';
     };
 
     $ctc = function ($w, $text, $o = []) use ($tc, $p, $r) {
-        $lines = explode("\n", (string)$text);
+        $lines = explode("\n", (string) $text);
         $ps = [];
         foreach ($lines as $l) {
             $ps[] = $p($r($l, ['b' => $o['b'] ?? false, 'sz' => $o['sz'] ?? 17]), ['jc' => $o['jc'] ?? 'center', 'line' => 240]);
@@ -777,8 +1387,12 @@ function buildDocxFromData(array $d, string $targetDocx): void {
         return $tc($w, $ps, $o);
     };
 
-    $pageW = 11906; $pageH = 16838;
-    $marL = 1134; $marR = 1134; $marT = 567; $marB = 851;
+    $pageW = 11906;
+    $pageH = 16838;
+    $marL = 1134;
+    $marR = 1134;
+    $marT = 567;
+    $marB = 851;
 
     // Header (Lintasarta top table)
     $hW = [2750, 3900, 2988];
@@ -824,25 +1438,29 @@ function buildDocxFromData(array $d, string $targetDocx): void {
     $t1W = [1330, 1900, 1500, 950, 950, 950, 1320];
     $body[] = $tbl($t1W, [
         $tr([$ctc($t1W[0], 'Site ID', ['fill' => $H]), $ctc($t1W[1], 'SiteName', ['fill' => $H]), $ctc($t1W[2], 'Periode SO', ['fill' => $H]), $ctc($t1W[3], 'Match', ['fill' => $H]), $ctc($t1W[4], 'Fisik', ['fill' => $H]), $ctc($t1W[5], 'DB', ['fill' => $H]), $ctc($t1W[6], 'Pencapaian', ['fill' => $H])], ['h' => 300]),
-        $tr([$ctc($t1W[0], $d['sitecode']), $ctc($t1W[1], $d['sitename']), $ctc($t1W[2], $d['periode_so']), $ctc($t1W[3], (string)$d['match_qty']), $ctc($t1W[4], (string)$d['physic_qty']), $ctc($t1W[5], (string)$d['db_qty']), $ctc($t1W[6], (string)$d['pencapaian'])], ['h' => 480]),
+        $tr([$ctc($t1W[0], $d['sitecode']), $ctc($t1W[1], $d['sitename']), $ctc($t1W[2], $d['periode_so']), $ctc($t1W[3], (string) $d['match_qty']), $ctc($t1W[4], (string) $d['physic_qty']), $ctc($t1W[5], (string) $d['db_qty']), $ctc($t1W[6], (string) $d['pencapaian'])], ['h' => 480]),
     ]);
 
     $body[] = $p($r('Tindak lanjut data DB:'), ['ind' => 200, 'before' => 300, 'after' => 20]);
-    $t2W = [1330, 1900, 1500, 1300, 1300, 1570];
+    $t2W = [1330, 1900, 1500, 1050, 1050, 1050, 1070];
     $body[] = $tbl($t2W, [
-        $tr([$ctc($t2W[0], 'Site ID', ['fill' => $H]), $ctc($t2W[1], 'Site Name', ['fill' => $H]), $ctc($t2W[2], 'Periode SO', ['fill' => $H]), $ctc($t2W[3], 'Total DB', ['fill' => $H]), $ctc($t2W[4], 'Solved DB', ['fill' => $H]), $ctc($t2W[5], 'Unsolved DB', ['fill' => $H])], ['h' => 520]),
-        $tr([$ctc($t2W[0], $d['sitecode']), $ctc($t2W[1], $d['sitename']), $ctc($t2W[2], $d['periode_so']), $ctc($t2W[3], (string)$d['total_db']), $ctc($t2W[4], (string)$d['solved_db']), $ctc($t2W[5], (string)$d['unsolved_db'])], ['h' => 420]),
+        $tr([$ctc($t2W[0], 'Site ID', ['fill' => $H]), $ctc($t2W[1], 'Site Name', ['fill' => $H]), $ctc($t2W[2], 'Periode SO', ['fill' => $H]), $ctc($t2W[3], 'Total DB', ['fill' => $H]), $ctc($t2W[4], 'Solved DB', ['fill' => $H]), $ctc($t2W[5], 'Unsolved DB', ['fill' => $H]), $ctc($t2W[6], 'New DB', ['fill' => $H])], ['h' => 520]),
+        $tr([$ctc($t2W[0], $d['sitecode']), $ctc($t2W[1], $d['sitename']), $ctc($t2W[2], $d['periode_so']), $ctc($t2W[3], (string) $d['total_db']), $ctc($t2W[4], (string) $d['solved_db']), $ctc($t2W[5], (string) $d['unsolved_db']), $ctc($t2W[6], (string) $d['new_db'])], ['h' => 420]),
     ]);
 
     $body[] = $p($r('Selanjutnya akan dilakukan update secara Aplikasi dengan menyesuaikan kondisi terkini untuk data yang sudah terverifikasi. Demikian BA ini kami buat untuk menjadi perhatian bersama.'), ['ind' => 200, 'indR' => 200, 'before' => 300, 'line' => 300]);
-    $body[] = $p($r('Adapun data DB ini terjadi karena tidak ada inputan flasma/prisma.'), ['ind' => 200, 'line' => 300, 'after' => 360]);
+    $body[] = $p($r('Adapun data DB ini terjadi karena ' . ($d['keterangan_db'] ?? 'tidak ada inputan flasma/prisma') . '.'), ['ind' => 200, 'line' => 300, 'after' => 360]);
 
     // Signatures:
     // Kami yang membuat:
     $sW = [2980, 2980, 2980];
     $sigOpts = ['borders' => ['top', 'left', 'bottom', 'right', 'insideV']];
-    $name = function ($w, $text) use ($ctc) { return $ctc($w, $text, ['vAlign' => 'bottom', 'sz' => 16]); };
-    $title = function ($w, $text) use ($ctc) { return $ctc($w, $text, ['vAlign' => 'top', 'sz' => 16]); };
+    $name = function ($w, $text) use ($ctc) {
+        return $ctc($w, $text, ['vAlign' => 'bottom', 'sz' => 16]);
+    };
+    $title = function ($w, $text) use ($ctc) {
+        return $ctc($w, $text, ['vAlign' => 'top', 'sz' => 16]);
+    };
 
     $body[] = $p($r('Kami yang membuat :'), ['jc' => 'center', 'after' => 30]);
 
@@ -880,36 +1498,64 @@ function buildDocxFromData(array $d, string $targetDocx): void {
     // Mengetahui
     $body[] = $p($r('Mengetahui:', ['b' => true, 'u' => true]), ['jc' => 'center', 'before' => 360, 'after' => 0]);
     $body[] = $tbl($sW, [
-        $tr([$title($sW[0], 'Lead-Asset Management'), $title($sW[1], "Associate Vice President\nHead-Asset Management"), $title($sW[2], "PTH\nHead-Asset And Warehouse\nManagement")], ['h' => 400]),
+        $tr([$title($sW[0], 'Engineer-Asset Management'), $title($sW[1], "Associate Vice President\nHead-Asset Management"), $title($sW[2], "PTH\nHead-Asset And Warehouse\nManagement")], ['h' => 400]),
         $tr([$tc($sW[0], $p('')), $tc($sW[1], $p('')), $tc($sW[2], $p(''))], ['h' => 640]),
-        $tr([$name($sW[0], '(                               )'), $name($sW[1], '( Indra Vivaldi )'), $name($sW[2], '(Hudi Wahyu Utomo )')], ['h' => 360]),
+        $tr([$name($sW[0], '( Andhika Septa Prawira )'), $name($sW[1], '( Indra Vivaldi )'), $name($sW[2], '(Hudi Wahyu Utomo )')], ['h' => 360]),
     ], $sigOpts);
 
     // Page 2: Lampiran Rincian Perangkat
-    $body[] = $p($r('Lampiran Rincian Perangkat :', ['b' => true]), ['ind' => 400, 'pageBreakBefore' => true, 'before' => 240, 'after' => 280]);
-    $t3W = [620, 2400, 5118, 1500];
+    $body[] = $p($r('Lampiran Rincian Perangkat :', ['b' => true]), ['ind' => 200, 'pageBreakBefore' => true, 'before' => 240, 'after' => 280]);
+    // Widths: total 9638 dxa: NO(500), REG NO(1600), NAME(2400), SN(1400), NBV(1300), Status(1000), Keterangan(1438)
+    $t3W = [500, 1600, 2400, 1400, 1300, 1000, 1438];
     $t3Rows = [
-        $tr([$ctc($t3W[0], 'NO', ['fill' => $H, 'b' => true, 'sz' => 16]), $ctc($t3W[1], 'REGNO', ['fill' => $H, 'b' => true, 'sz' => 16]), $ctc($t3W[2], 'NAME', ['fill' => $H, 'b' => true, 'sz' => 16]), $ctc($t3W[3], 'FOLLOWUP', ['fill' => $H, 'b' => true, 'sz' => 16])], ['h' => 280, 'header' => true]),
+        $tr([
+            $ctc($t3W[0], 'NO', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[1], 'REG NO', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[2], 'NAME', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[3], 'SN', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[4], 'NBV', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[5], 'Status', ['fill' => $H, 'b' => true, 'sz' => 15]),
+            $ctc($t3W[6], 'Keterangan', ['fill' => $H, 'b' => true, 'sz' => 15])
+        ], ['h' => 280, 'header' => true]),
     ];
 
     if (!empty($d['devices'])) {
         $no = 1;
         foreach ($d['devices'] as $dev) {
             $t3Rows[] = $tr([
-                $ctc($t3W[0], (string)$no++, ['sz' => 16]),
-                $ctc($t3W[1], $dev['reg_no'], ['sz' => 16, 'jc' => 'left']),
-                $ctc($t3W[2], $dev['name'], ['sz' => 16, 'jc' => 'left']),
-                $ctc($t3W[3], $dev['followup'], ['sz' => 16])
+                $ctc($t3W[0], (string) $no++, ['sz' => 14]),
+                $ctc($t3W[1], $dev['reg_no'], ['sz' => 14]),
+                $ctc($t3W[2], $dev['name'], ['sz' => 14, 'jc' => 'left']),
+                $ctc($t3W[3], $dev['sn'], ['sz' => 14]),
+                $ctc($t3W[4], $dev['nbv_formatted'], ['sz' => 14, 'jc' => 'right']),
+                $ctc($t3W[5], $dev['status'], ['sz' => 14, 'b' => true]),
+                $ctc($t3W[6], $dev['keterangan'], ['sz' => 13, 'jc' => 'left'])
             ], ['h' => 280]);
         }
     } else {
-        $t3Rows[] = $tr([$ctc($t3W[0], '1', ['sz' => 16]), $ctc($t3W[1], '-', ['sz' => 16, 'jc' => 'left']), $ctc($t3W[2], 'Tidak ada perangkat yang ditindaklanjuti', ['sz' => 16, 'jc' => 'left']), $ctc($t3W[3], 'N/A', ['sz' => 16])], ['h' => 280]);
+        $t3Rows[] = $tr([
+            $ctc($t3W[0], '1', ['sz' => 14]),
+            $ctc($t3W[1], '-', ['sz' => 14]),
+            $ctc($t3W[2], 'Tidak ada perangkat dalam rekapitulasi status DB', ['sz' => 14, 'jc' => 'left']),
+            $ctc($t3W[3], '-', ['sz' => 14]),
+            $ctc($t3W[4], 'Rp 0,00', ['sz' => 14, 'jc' => 'right']),
+            $ctc($t3W[5], '-', ['sz' => 14]),
+            $ctc($t3W[6], '-', ['sz' => 14, 'jc' => 'left'])
+        ], ['h' => 280]);
     }
 
     // Pad remaining rows up to at least 7 rows
     $rowCount = count($t3Rows);
     for ($i = $rowCount; $i < 8; $i++) {
-        $t3Rows[] = $tr([$ctc($t3W[0], '', ['sz' => 16]), $ctc($t3W[1], '', ['sz' => 16]), $ctc($t3W[2], '', ['sz' => 16]), $ctc($t3W[3], '', ['sz' => 16])], ['h' => 280]);
+        $t3Rows[] = $tr([
+            $ctc($t3W[0], '', ['sz' => 14]),
+            $ctc($t3W[1], '', ['sz' => 14]),
+            $ctc($t3W[2], '', ['sz' => 14]),
+            $ctc($t3W[3], '', ['sz' => 14]),
+            $ctc($t3W[4], '', ['sz' => 14]),
+            $ctc($t3W[5], '', ['sz' => 14]),
+            $ctc($t3W[6], '', ['sz' => 14])
+        ], ['h' => 280]);
     }
     $body[] = $tbl($t3W, $t3Rows);
     $body[] = $p('');
@@ -986,7 +1632,8 @@ function buildDocxFromData(array $d, string $targetDocx): void {
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Generate HTML string for preview & headless print
 // ─────────────────────────────────────────────────────────────────────
-function getBaHtmlString(array $d): string {
+function getBaHtmlString(array $d): string
+{
     $logoDataUri = '';
     $logoPath = __DIR__ . '/../img/Lintasarta.png';
     if (file_exists($logoPath)) {
@@ -1011,32 +1658,64 @@ function getBaHtmlString(array $d): string {
     if (!empty($d['devices'])) {
         $no = 1;
         foreach ($d['devices'] as $dev) {
+            $badgeColor = '#15803d';
+            $badgeBg = '#dcfce7';
+            if ($dev['status'] === 'UNSOLVED') {
+                $badgeColor = '#b91c1c';
+                $badgeBg = '#fee2e2';
+            } elseif ($dev['status'] === 'NEW DB') {
+                $badgeColor = '#1d4ed8';
+                $badgeBg = '#dbeafe';
+            }
+            $statusBadge = "<span style='display:inline-block;padding:2px 4px;border-radius:3px;font-weight:bold;font-size:7pt;background:{$badgeBg};color:{$badgeColor};'>{$dev['status']}</span>";
+
             $deviceRowsHtml .= "<tr>"
-                . "<td style='text-align:center;padding:5px;border:1px solid #000;font-size:11px;'>" . ($no++) . "</td>"
-                . "<td style='padding:5px;border:1px solid #000;font-size:11px;'>" . htmlspecialchars($dev['reg_no']) . "</td>"
-                . "<td style='padding:5px;border:1px solid #000;font-size:11px;'>" . htmlspecialchars($dev['name']) . "</td>"
-                . "<td style='text-align:center;padding:5px;border:1px solid #000;font-size:11px;'>" . htmlspecialchars($dev['followup']) . "</td>"
+                . "<td style='text-align:center;padding:3px 2px;border:1px solid #000;font-size:7.5pt;'>" . ($no++) . "</td>"
+                . "<td style='text-align:center;padding:3px 3px;border:1px solid #000;font-size:7.5pt;font-weight:600;font-family:monospace;word-break:break-all;'>" . htmlspecialchars($dev['reg_no']) . "</td>"
+                . "<td style='text-align:left;padding:3px 4px;border:1px solid #000;font-size:7.5pt;word-break:break-word;'>" . htmlspecialchars($dev['name']) . "</td>"
+                . "<td style='text-align:center;padding:3px 3px;border:1px solid #000;font-size:7.5pt;word-break:break-all;'>" . htmlspecialchars($dev['sn']) . "</td>"
+                . "<td style='text-align:right;padding:3px 3px;border:1px solid #000;font-size:7.5pt;font-weight:600;white-space:nowrap;'>" . htmlspecialchars($dev['nbv_formatted']) . "</td>"
+                . "<td style='text-align:center;padding:3px 2px;border:1px solid #000;font-size:7.5pt;'>" . $statusBadge . "</td>"
+                . "<td style='text-align:left;padding:3px 4px;border:1px solid #000;font-size:7pt;word-break:break-word;'>" . htmlspecialchars($dev['keterangan']) . "</td>"
                 . "</tr>";
         }
     } else {
         $deviceRowsHtml = "<tr>"
-            . "<td style='text-align:center;padding:5px;border:1px solid #000;font-size:11px;'>1</td>"
-            . "<td style='padding:5px;border:1px solid #000;font-size:11px;'>-</td>"
-            . "<td style='padding:5px;border:1px solid #000;font-size:11px;'>Tidak ada perangkat yang ditindaklanjuti</td>"
-            . "<td style='text-align:center;padding:5px;border:1px solid #000;font-size:11px;'>N/A</td>"
+            . "<td style='text-align:center;padding:4px;border:1px solid #000;font-size:7.5pt;'>1</td>"
+            . "<td style='text-align:center;padding:4px;border:1px solid #000;font-size:7.5pt;'>-</td>"
+            . "<td style='text-align:left;padding:4px;border:1px solid #000;font-size:7.5pt;'>Tidak ada perangkat dalam rekapitulasi status DB</td>"
+            . "<td style='text-align:center;padding:4px;border:1px solid #000;font-size:7.5pt;'>-</td>"
+            . "<td style='text-align:right;padding:4px;border:1px solid #000;font-size:7.5pt;'>Rp 0,00</td>"
+            . "<td style='text-align:center;padding:4px;border:1px solid #000;font-size:7.5pt;'>-</td>"
+            . "<td style='text-align:left;padding:4px;border:1px solid #000;font-size:7.5pt;'>-</td>"
             . "</tr>";
     }
+
+    $keteranganDbText = htmlspecialchars($d['keterangan_db'] ?? 'tidak ada inputan flasma/prisma');
 
     return <<<HTML
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>Berita Acara - {$d['sitecode']}</title>
+<title>{$d['export_filename']}</title>
 <style>
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
     @page {
         size: A4 portrait;
-        margin: 10mm 15mm 10mm 15mm;
+        margin: 0;
+    }
+    @media print {
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
     }
     body {
         font-family: Arial, sans-serif;
@@ -1046,40 +1725,47 @@ function getBaHtmlString(array $d): string {
         font-size: 10pt;
         line-height: 1.3;
         background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
     .page-container {
         width: 100%;
-        max-width: 800px;
-        margin: 0 auto;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
     .page {
         page-break-after: always;
         box-sizing: border-box;
-        padding-top: 2px;
+        width: 100%;
+        padding: 10mm 12mm 10mm 12mm;
     }
     .header-tbl {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 14px;
+        margin-bottom: 12px;
         border: 1px solid #000;
+        table-layout: fixed;
     }
     .header-tbl td {
         border: 1px solid #000;
-        padding: 4px 8px;
+        padding: 4px 6px;
         vertical-align: middle;
+        box-sizing: border-box;
     }
     .title-cell {
         text-align: center;
         font-weight: bold;
-        font-size: 14pt;
+        font-size: 13.5pt;
         line-height: 1.25;
     }
     .logo-cell {
         text-align: center;
-        width: 32%;
+        width: 30%;
     }
     .logo-cell img {
-        max-width: 170px;
+        max-width: 160px;
         height: auto;
     }
     .meta-tbl td {
@@ -1088,14 +1774,18 @@ function getBaHtmlString(array $d): string {
     .data-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 8px 0 16px 0;
+        margin: 8px 0 14px 0;
         border: 1px solid #000;
+        table-layout: fixed;
     }
     .data-table th, .data-table td {
         border: 1px solid #000;
-        padding: 6px 8px;
+        padding: 5px 6px;
         text-align: center;
-        font-size: 10.5pt;
+        font-size: 9.5pt;
+        box-sizing: border-box;
+        overflow-wrap: break-word;
+        word-break: break-word;
     }
     .data-table th {
         background-color: #D9D9D9;
@@ -1204,6 +1894,7 @@ function getBaHtmlString(array $d): string {
                     <th>Total DB</th>
                     <th>Solved DB</th>
                     <th>Unsolved DB</th>
+                    <th>New DB</th>
                 </tr>
             </thead>
             <tbody>
@@ -1214,6 +1905,7 @@ function getBaHtmlString(array $d): string {
                     <td>{$d['total_db']}</td>
                     <td>{$d['solved_db']}</td>
                     <td>{$d['unsolved_db']}</td>
+                    <td>{$d['new_db']}</td>
                 </tr>
             </tbody>
         </table>
@@ -1223,7 +1915,7 @@ function getBaHtmlString(array $d): string {
             Selanjutnya akan dilakukan update secara Aplikasi dengan menyesuaikan kondisi terkini untuk data yang sudah terverifikasi. Demikian BA ini kami buat untuk menjadi perhatian bersama.
         </p>
         <p style="margin: 0 0 16px 0; font-size: 10.5pt;">
-            Adapun data DB ini terjadi karena tidak ada inputan flasma/prisma.
+            Adapun data DB ini terjadi karena {$keteranganDbText}.
         </p>
 
         <!-- Signatures: Kami yang membuat -->
@@ -1252,7 +1944,7 @@ function getBaHtmlString(array $d): string {
         </div>
         <table class="sig-table">
             <tr>
-                <td class="sig-title">Lead-Asset Management</td>
+                <td class="sig-title">Engineer-Asset Management</td>
                 <td class="sig-title">Associate Vice President<br><span style="font-size:11px;font-weight:normal;">Head-Asset Management</span></td>
                 <td class="sig-title">PTH<br><span style="font-size:11px;font-weight:normal;">Head-Asset And Warehouse Management</span></td>
             </tr>
@@ -1262,7 +1954,7 @@ function getBaHtmlString(array $d): string {
                 <td class="sig-space"></td>
             </tr>
             <tr>
-                <td class="sig-name">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</td>
+                <td class="sig-name">( Andhika Septa Prawira )</td>
                 <td class="sig-name">( Indra Vivaldi )</td>
                 <td class="sig-name">( Hudi Wahyu Utomo )</td>
             </tr>
@@ -1294,13 +1986,16 @@ function getBaHtmlString(array $d): string {
             Lampiran Rincian Perangkat :
         </div>
 
-        <table class="data-table" style="margin-top: 8px;">
+        <table class="data-table" style="margin-top: 8px; font-size: 7.5pt; width: 100%; table-layout: fixed; border-collapse: collapse;">
             <thead>
                 <tr>
-                    <th style="width: 8%;">NO</th>
-                    <th style="width: 25%;">REGNO</th>
-                    <th style="width: 47%;">NAME</th>
-                    <th style="width: 20%;">FOLLOWUP</th>
+                    <th style="width: 5%; padding: 4px 2px;">NO</th>
+                    <th style="width: 18%; padding: 4px 3px;">REG NO</th>
+                    <th style="width: 25%; padding: 4px 4px;">NAME</th>
+                    <th style="width: 13%; padding: 4px 3px;">SN</th>
+                    <th style="width: 14%; padding: 4px 3px;">NBV</th>
+                    <th style="width: 10%; padding: 4px 2px;">Status</th>
+                    <th style="width: 15%; padding: 4px 4px;">Keterangan</th>
                 </tr>
             </thead>
             <tbody>
@@ -1318,7 +2013,8 @@ HTML;
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Render HTML for browser preview
 // ─────────────────────────────────────────────────────────────────────
-function renderHtmlBa(array $d): void {
+function renderHtmlBa(array $d): void
+{
     header('Content-Type: text/html; charset=utf-8');
     echo getBaHtmlString($d);
 }

@@ -52,6 +52,7 @@ $monthNames = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
     <title>Amora - Asset Management Opname Report Analytics</title>
+    <link rel="icon" href="data:,">
 
     <!-- Google Fonts: Inter (Enterprise Corporate Typography) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,7 +62,7 @@ $monthNames = [
         rel="stylesheet">
 
     <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- Clean Corporate App CSS -->
     <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">

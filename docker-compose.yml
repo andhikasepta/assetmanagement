@@ -21,7 +21,7 @@ services:
       DB_PASSWORD: S3pt4@
       REDIS_HOST: 103.123.100.11
       REDIS_PORT: 6379
-      REDIS_PASSWORD: password_redis_rahasia
+      REDIS_PASSWORD: "S3pt4@##!@#"
       APACHE_ALLOW_OVERRIDE: "All"
       SESSION_TTL: 1200
       SESSION_EXPIRY: 1200
