@@ -162,14 +162,15 @@ try {
     if ($category === 'all') {
         // No dept filter for all category
     } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
-        $whereParts[] = "dept = 'PMD'";
+        $whereParts[] = "(dept = 'PMD' OR dept IN ('DNO', 'DSO') OR COALESCE(divisi, '') = 'PMD' OR category = 'monthly_pmd')";
     } else {
-        $whereParts[] = "dept != 'PMD'";
+        $whereParts[] = "(dept != 'PMD' AND dept NOT IN ('DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd')";
     }
 
     $whereSql = "WHERE " . implode(' AND ', $whereParts);
     $siteStmt = $db->query("
         SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+               COALESCE(divisi, '') as divisi,
                COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
         FROM site_regional
         $whereSql
@@ -193,7 +194,7 @@ try {
     $sites = [];
     foreach ($rawSites as $s) {
         $sc = strtoupper(trim($s['sitecode'] ?? ''));
-        $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+        $isPmd = (in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'], true) || strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || ($s['category'] ?? '') === 'monthly_pmd');
 
         if ($isPmd) {
             $effGroup = 'monthly';
@@ -376,7 +377,25 @@ try {
     foreach ($sites as $s) {
         $sc = trim($s['sitecode'] ?? '');
         $name = trim($s['name_site'] ?? '-');
-        $subDept = trim($s['sub_dept'] ?? '-');
+        $dept = trim($s['dept'] ?? '');
+        $subDept = trim($s['sub_dept'] ?? '');
+
+        if ($dept === '' || $dept === '-') {
+            $infoVal = trim($s['info'] ?? '');
+            if (in_array($infoVal, ['IT Coorporate', 'IT Corporate'], true)) {
+                $dept = 'IT Corporate';
+                $subDept = 'IT Corporate';
+            } elseif (stripos($name, 'TEKNO') !== false || $infoVal === 'Under Warehouse') {
+                $dept = 'Warehouse Tekno';
+                $subDept = 'Warehouse Tekno';
+            } else {
+                $dept = '-';
+                $subDept = '-';
+            }
+        }
+        if ($subDept === '' || $subDept === '-') {
+            $subDept = $dept;
+        }
 
         $p0 = $getSitePct($sc, $m0Info['year'], $m0Info['month']);
         $p1 = $getSitePct($sc, $m1Info['year'], $m1Info['month']);
@@ -393,6 +412,7 @@ try {
         $ratingList[] = [
             'sitecode'  => $sc,
             'name_site' => $name,
+            'dept'      => $dept,
             'sub_dept'  => $subDept,
             'pct'       => $p3 !== null ? round($p3, 2) : null,
             'rating'    => $rating,
@@ -416,6 +436,7 @@ try {
         $execList[] = [
             'sitecode'         => $sc,
             'name_site'        => $name,
+            'dept'             => $dept,
             'sub_dept'         => $subDept,
             'pct'              => $p3 !== null ? round($p3, 2) : null,
             'execution_status' => $execStatus,

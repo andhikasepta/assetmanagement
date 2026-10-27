@@ -22,11 +22,12 @@ try {
         LIMIT 1
     ");
     $latestWeeklyPeriod = $wkLatestStmt ? $wkLatestStmt->fetch(PDO::FETCH_ASSOC) : null;
-} catch (Throwable $e) {}
+} catch (Throwable $e) {
+}
 
-$defaultWeeklyYear  = !empty($latestWeeklyPeriod['period_year'])  ? (int)$latestWeeklyPeriod['period_year']  : (int)date('Y');
-$defaultWeeklyMonth = !empty($latestWeeklyPeriod['period_month']) ? (int)$latestWeeklyPeriod['period_month'] : (int)date('n');
-$defaultWeeklyWeek  = !empty($latestWeeklyPeriod['period_week'])  ? (int)$latestWeeklyPeriod['period_week']  : 1;
+$defaultWeeklyYear = !empty($latestWeeklyPeriod['period_year']) ? (int) $latestWeeklyPeriod['period_year'] : (int) date('Y');
+$defaultWeeklyMonth = !empty($latestWeeklyPeriod['period_month']) ? (int) $latestWeeklyPeriod['period_month'] : (int) date('n');
+$defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestWeeklyPeriod['period_week'] : 1;
 ?>
 <section id="page-weekly-summary" class="page-section" style="display: none;">
 
@@ -359,9 +360,32 @@ $defaultWeeklyWeek  = !empty($latestWeeklyPeriod['period_week'])  ? (int)$latest
     <!-- SECTION 2: SCORE CARD SUMMARY (WEEKLY)                              -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <div class="card" id="weekly-card-scorecard-summary" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div class="card-header"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
             <div>
                 <h2 class="card-title" style="margin: 0;">Score Card Summary (Weekly)</h2>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <!-- Dept Filter -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;"
+                    id="weekly-scorecard-dept-filter-container">
+                    <label for="weekly-scorecard-dept-filter" id="label-weekly-scorecard-dept-filter"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
+                    <select id="weekly-scorecard-dept-filter" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.onWeeklyScorecardDeptFilterChange()">
+                        <option value="all" selected>Semua DEPT</option>
+                    </select>
+                </div>
+                <!-- Subdept Filter -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;"
+                    id="weekly-scorecard-subdept-filter-container">
+                    <label for="weekly-scorecard-subdept-filter" id="label-weekly-scorecard-subdept-filter"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                    <select id="weekly-scorecard-subdept-filter" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.onWeeklyScorecardSubDeptFilterChange()">
+                        <option value="all" selected>Semua Sub Dept</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -733,8 +757,6 @@ $defaultWeeklyWeek  = !empty($latestWeeklyPeriod['period_week'])  ? (int)$latest
                             <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;"
                                 id="weekly-pie-title">
                                 Status Pencapaian (Weekly)</h3>
-                            <p style="font-size: 11px; color: #64748b; margin: 0;" id="weekly-pie-subtitle">
-                                Tercapai vs Tidak Tercapai</p>
                         </div>
                         <div class="so-pie-canvas-box">
                             <canvas id="chart-weekly-report-pie"></canvas>

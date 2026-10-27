@@ -145,7 +145,7 @@ try {
                 $month = $m ?: 12;
 
                 $sites = $db->query("
-                    SELECT sitecode, dept, 
+                    SELECT sitecode, dept, COALESCE(divisi, '') as divisi,
                            COALESCE(NULLIF(group_type, ''), 'monthly') as group_type, 
                            COALESCE(is_active, TRUE) as is_active, 
                            COALESCE(is_counted, TRUE) as is_counted,
@@ -167,7 +167,7 @@ try {
                         $map[$sc] = 'uncounted';
                     } elseif (!$isCountedWeekly) {
                         $map[$sc] = 'uncounted_weekly';
-                    } elseif (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+                    } elseif (strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'])) {
                         $map[$sc] = 'monthly';
                         $pmdSites[$sc] = true;
                     } else {
@@ -233,6 +233,7 @@ try {
                 // Fetch sites
                 $sitesStmt = $db->query("
                     SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, 
+                           COALESCE(divisi, '') as divisi,
                            COALESCE(is_active, TRUE) as is_active, 
                            COALESCE(is_counted, TRUE) as is_counted,
                            COALESCE(is_counted_weekly, TRUE) as is_counted_weekly 
@@ -279,7 +280,10 @@ try {
                 foreach ($allSites as $s) {
                     $sc = strtoupper(trim($s['sitecode'] ?? ''));
                     $effType = $effectiveMap[$sc] ?? 'monthly';
-                    $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                    $div = strtoupper(trim($s['divisi'] ?? ''));
+                    $dept = strtoupper(trim($s['dept'] ?? ''));
+                    $subDept = strtoupper(trim($s['sub_dept'] ?? ''));
+                    $isPmd = ($div === 'PMD' || in_array($dept, ['PMD', 'DNO', 'DSO']));
                     $isActive = filter_var($s['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN);
                     $isCounted = filter_var($s['is_counted'] ?? true, FILTER_VALIDATE_BOOLEAN);
                     $isCountedWeekly = filter_var($s['is_counted_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN);
@@ -303,11 +307,23 @@ try {
 
                     $catTotalSites++;
                     $sc = strtoupper(trim($s['sitecode'] ?? ''));
-                    $dept = strtoupper(trim($s['dept'] ?? ''));
-                    $subDept = strtoupper(trim($s['sub_dept'] ?? ''));
+                    $isPmdSite = $isPmd;
 
-                    if (isset($deptStats[$dept])) $deptStats[$dept]['total']++;
-                    if (isset($subDeptStats[$subDept])) $subDeptStats[$subDept]['total']++;
+                    if ($isPmdSite) {
+                        if (isset($deptStats['PMD'])) $deptStats['PMD']['total']++;
+                    } elseif (isset($deptStats[$dept])) {
+                        $deptStats[$dept]['total']++;
+                    }
+
+                    if ($dept === 'DNO' || $dept === 'DSO') {
+                        if (isset($subDeptStats[$dept])) $subDeptStats[$dept]['total']++;
+                    }
+                    if ($subDept !== '') {
+                        if (!isset($subDeptStats[$subDept])) {
+                            $subDeptStats[$subDept] = ['sum' => 0.0, 'count' => 0, 'total' => 0];
+                        }
+                        $subDeptStats[$subDept]['total']++;
+                    }
 
                     $matchedRecs = [];
                     if ($sc !== '') {
@@ -370,11 +386,25 @@ try {
                         $catSum += $pct;
                         $catCount++;
 
-                        if (isset($deptStats[$dept])) {
+                        if ($isPmdSite) {
+                            if (isset($deptStats['PMD'])) {
+                                $deptStats['PMD']['sum'] += $pct;
+                                $deptStats['PMD']['count']++;
+                            }
+                        } elseif (isset($deptStats[$dept])) {
                             $deptStats[$dept]['sum'] += $pct;
                             $deptStats[$dept]['count']++;
                         }
-                        if (isset($subDeptStats[$subDept])) {
+
+                        if (($dept === 'DNO' || $dept === 'DSO') && isset($subDeptStats[$dept])) {
+                            $subDeptStats[$dept]['sum'] += $pct;
+                            $subDeptStats[$dept]['count']++;
+                        }
+
+                        if ($subDept !== '') {
+                            if (!isset($subDeptStats[$subDept])) {
+                                $subDeptStats[$subDept] = ['sum' => 0.0, 'count' => 0, 'total' => 0];
+                            }
                             $subDeptStats[$subDept]['sum'] += $pct;
                             $subDeptStats[$subDept]['count']++;
                         }

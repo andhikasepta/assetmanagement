@@ -51,6 +51,10 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             summary_data JSONB,
             generated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             sent_at TIMESTAMP WITHOUT TIME ZONE,
+            uploaded_file_path VARCHAR(500),
+            uploaded_at TIMESTAMP WITHOUT TIME ZONE,
+            verified_at TIMESTAMP WITHOUT TIME ZONE,
+            verified_by VARCHAR(150),
             created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT uq_site_period UNIQUE (sitecode, period_month, period_year)
@@ -58,11 +62,19 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
         CREATE INDEX IF NOT EXISTS idx_gen_reports_sitecode ON generated_reports(sitecode);
         CREATE INDEX IF NOT EXISTS idx_gen_reports_period ON generated_reports(period_month, period_year);
         CREATE INDEX IF NOT EXISTS idx_gen_reports_status ON generated_reports(status);
+        ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS uploaded_file_path VARCHAR(500);
+        ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP WITHOUT TIME ZONE;
+        ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITHOUT TIME ZONE;
+        ALTER TABLE generated_reports ADD COLUMN IF NOT EXISTS verified_by VARCHAR(150);
     ");
 
         $reportsDir = __DIR__ . '/../uploads/reports/';
+        $signedDir = __DIR__ . '/../uploads/reports/signed/';
         if (!is_dir($reportsDir)) {
             mkdir($reportsDir, 0755, true);
+        }
+        if (!is_dir($signedDir)) {
+            mkdir($signedDir, 0755, true);
         }
 
         // Helper: Indonesian day names
@@ -103,9 +115,14 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 return true;
             }
             $allowed = array_values(array_filter(array_map('trim', explode(',', $rawAllowed))));
-            $sStmt = $db->prepare("SELECT UPPER(dept) FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
+            $sStmt = $db->prepare("SELECT UPPER(dept), UPPER(COALESCE(divisi, '')) FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
             $sStmt->execute([':sc' => $sc]);
-            $sDept = $sStmt->fetchColumn();
+            $sRow = $sStmt->fetch(PDO::FETCH_NUM);
+            $sDept = $sRow[0] ?? '';
+            $sDivisi = $sRow[1] ?? '';
+            if (in_array('PMD', $allowed) && ($sDivisi === 'PMD' || in_array($sDept, ['PMD', 'DNO', 'DSO']))) {
+                return true;
+            }
             return in_array($sDept, $allowed);
         };
 
@@ -115,8 +132,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
         if ($method === 'GET' && $action === 'list') {
             header('Content-Type: application/json; charset=utf-8');
 
-            $month = (int) ($_GET['month'] ?? 9);
-            $year = (int) ($_GET['year'] ?? 2026);
+            $month = (int) ($_GET['month'] ?? (int) date('n'));
+            $year = (int) ($_GET['year'] ?? (int) date('Y'));
             $soType = strtolower(trim($_GET['so_type'] ?? 'monthly'));
             if ($soType !== 'quarterly') {
                 $soType = 'monthly';
@@ -124,15 +141,50 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             $dept = trim($_GET['dept'] ?? 'all');
             $subDept = trim($_GET['sub_dept'] ?? 'all');
             $statusFilter = trim($_GET['status'] ?? 'all');
+            $view = trim($_GET['view'] ?? '');
             $search = trim($_GET['search'] ?? '');
             $page = max(1, (int) ($_GET['page'] ?? 1));
             $limitParam = $_GET['limit'] ?? '15';
             $limit = ($limitParam === 'all') ? 999999 : max(1, (int) $limitParam);
             $offset = ($page - 1) * $limit;
 
+            // Cutoff check: List report only allowed per tanggal 27 of the target period month
+            $today = date('Y-m-d');
+            $cutoffDate = sprintf('%04d-%02d-27', $year, $month);
+            $isLockedPeriod = ($today < $cutoffDate);
+
+            if ($isLockedPeriod) {
+                $periodMonthName = $monthNames[$month] ?? "Bulan $month";
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => true,
+                    'data' => [],
+                    'total' => 0,
+                    'page' => 1,
+                    'limit' => $limitParam,
+                    'total_pages' => 0,
+                    'so_type' => $soType,
+                    'user_allowed_depts' => ['ALL'],
+                    'depts' => [],
+                    'sub_depts' => [],
+                    'stats' => [
+                        'total_sites' => 0,
+                        'total_generated' => 0,
+                        'total_sent' => 0,
+                        'total_uploaded' => 0,
+                        'total_verified' => 0,
+                        'total_not_generated' => 0,
+                        'total_pending' => 0
+                    ],
+                    'is_locked_period' => true,
+                    'locked_message' => "Laporan periode {$periodMonthName} {$year} baru dapat dimunculkan per tanggal 27 {$periodMonthName} {$year}."
+                ]);
+                exit;
+            }
+
             $effectiveGroupSql = "
                 CASE
-                    WHEN UPPER(COALESCE(sr.dept, '')) = 'PMD' THEN 'monthly'
+                    WHEN UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO') OR COALESCE(sr.category, '') = 'monthly_pmd' THEN 'monthly'
                     ELSE COALESCE(
                         (
                             SELECT sgh.group_type
@@ -165,19 +217,29 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 $rawAllowed = $currentUser['permissions']['reports_depts'];
                 $parsed = array_map('trim', explode(',', $rawAllowed));
                 $userAllowedDepts = array_values(array_filter(array_map('strtoupper', $parsed)));
+                if (in_array('PMD', $userAllowedDepts)) {
+                    if (!in_array('DNO', $userAllowedDepts)) $userAllowedDepts[] = 'DNO';
+                    if (!in_array('DSO', $userAllowedDepts)) $userAllowedDepts[] = 'DSO';
+                }
             }
 
             if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
                 if ($dept !== '' && $dept !== 'all') {
-                    if (in_array(strtoupper($dept), $userAllowedDepts)) {
+                    if (strtoupper($dept) === 'PMD') {
+                        $where[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif (in_array(strtoupper($dept), $userAllowedDepts)) {
                         $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
                         $params[':dept'] = $dept;
                     } else {
                         $deptClauses = [];
                         foreach ($userAllowedDepts as $idx => $ad) {
                             $paramKey = ":uad_{$idx}";
-                            $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
-                            $params[$paramKey] = $ad;
+                            if ($ad === 'PMD') {
+                                $deptClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                            } else {
+                                $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                                $params[$paramKey] = $ad;
+                            }
                         }
                         $where[] = '(' . implode(' OR ', $deptClauses) . ')';
                     }
@@ -185,27 +247,51 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                     $deptClauses = [];
                     foreach ($userAllowedDepts as $idx => $ad) {
                         $paramKey = ":uad_{$idx}";
-                        $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
-                        $params[$paramKey] = $ad;
+                        if ($ad === 'PMD') {
+                            $deptClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                        } else {
+                            $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                            $params[$paramKey] = $ad;
+                        }
                     }
                     $where[] = '(' . implode(' OR ', $deptClauses) . ')';
                 }
             } elseif ($dept !== '' && $dept !== 'all') {
-                $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
-                $params[':dept'] = $dept;
+                if (strtoupper($dept) === 'PMD') {
+                    $where[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                } else {
+                    $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
+                    $params[':dept'] = $dept;
+                }
             }
 
             if ($subDept !== '' && $subDept !== 'all') {
-                $where[] = "UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept)";
+                if (in_array(strtoupper($subDept), ['DNO', 'DSO'])) {
+                    $where[] = "(UPPER(COALESCE(sr.dept, '')) = UPPER(:sub_dept) OR UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept))";
+                } else {
+                    $where[] = "UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept)";
+                }
                 $params[':sub_dept'] = $subDept;
             }
 
+            if ($view === 'verification') {
+                $where[] = "gr.status IN ('sent', 'uploaded', 'verified')";
+            } elseif ($view === 'berita_acara') {
+                $where[] = "gr.id IS NOT NULL";
+            }
+
             if ($statusFilter === 'generated') {
-                $where[] = "(gr.status = 'generated' OR gr.status = 'sent')";
-            } elseif ($statusFilter === 'not_generated' || $statusFilter === 'pending') {
+                $where[] = "(gr.status = 'generated' OR gr.status = 'sent' OR gr.status = 'uploaded' OR gr.status = 'verified')";
+            } elseif ($statusFilter === 'not_generated' || $statusFilter === 'pending_generate') {
                 $where[] = "gr.id IS NULL";
             } elseif ($statusFilter === 'sent') {
                 $where[] = "gr.status = 'sent'";
+            } elseif ($statusFilter === 'uploaded') {
+                $where[] = "gr.status = 'uploaded'";
+            } elseif ($statusFilter === 'verified') {
+                $where[] = "gr.status = 'verified'";
+            } elseif ($statusFilter === 'pending' || $statusFilter === 'pending_verification') {
+                $where[] = "(gr.status = 'sent' OR gr.status = 'uploaded')";
             }
 
             if ($search !== '') {
@@ -236,6 +322,7 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             SELECT 
                 sr.sitecode,
                 COALESCE(NULLIF(sr.name_site, ''), sr.sitecode) as sitename,
+                COALESCE(sr.divisi, '') as divisi,
                 COALESCE(sr.dept, '-') as dept,
                 COALESCE(sr.sub_dept, '-') as sub_dept,
                 sp.pic as pic_name,
@@ -244,6 +331,10 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 gr.status as report_status,
                 gr.pdf_path,
                 gr.docx_path,
+                gr.uploaded_file_path,
+                gr.uploaded_at,
+                gr.verified_at,
+                gr.verified_by,
                 gr.generated_at,
                 gr.sent_at,
                 gr.summary_data->>'keterangan_db' as keterangan_db
@@ -255,7 +346,7 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             ) sp ON sp.sitecode = sr.sitecode
             LEFT JOIN generated_reports gr ON gr.sitecode = sr.sitecode AND gr.period_month = :month AND gr.period_year = :year
             WHERE $whereSql
-            GROUP BY sr.sitecode, sr.name_site, sr.dept, sr.sub_dept, sp.pic, sp.no_telp, gr.id, gr.status, gr.pdf_path, gr.docx_path, gr.generated_at, gr.sent_at, gr.summary_data
+            GROUP BY sr.sitecode, sr.name_site, sr.divisi, sr.dept, sr.sub_dept, sp.pic, sp.no_telp, gr.id, gr.status, gr.pdf_path, gr.docx_path, gr.uploaded_file_path, gr.uploaded_at, gr.verified_at, gr.verified_by, gr.generated_at, gr.sent_at, gr.summary_data
             ORDER BY sr.dept ASC, sr.sub_dept ASC, sr.sitecode ASC
             LIMIT :limit OFFSET :offset
         ";
@@ -283,6 +374,13 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 $row['export_filename'] = $filenameBase . '.pdf';
                 $row['pdf_url'] = buildReportDownloadUrl($row['sitecode'], $month, $year);
                 $row['preview_url'] = "api/generate_report.php?action=download&inline=1&sitecode=" . rawurlencode($row['sitecode']) . "&month={$month}&year={$year}";
+                $row['uploaded_pdf_url'] = !empty($row['uploaded_file_path']) ? "api/generate_report.php?action=download_signed&inline=1&sitecode=" . rawurlencode($row['sitecode']) . "&month={$month}&year={$year}" : null;
+                $row['uploaded_download_url'] = !empty($row['uploaded_file_path']) ? "api/generate_report.php?action=download_signed&sitecode=" . rawurlencode($row['sitecode']) . "&month={$month}&year={$year}" : null;
+                $row['uploaded_filename'] = !empty($row['uploaded_file_path']) ? basename($row['uploaded_file_path']) : null;
+                $row['sent_at_formatted'] = !empty($row['sent_at']) ? date('d/m/Y H:i', strtotime($row['sent_at'])) : null;
+                $row['uploaded_at_formatted'] = !empty($row['uploaded_at']) ? date('d/m/Y H:i', strtotime($row['uploaded_at'])) : null;
+                $row['verified_at_formatted'] = !empty($row['verified_at']) ? date('d/m/Y H:i', strtotime($row['verified_at'])) : null;
+                $row['generated_at_formatted'] = !empty($row['generated_at']) ? date('d/m/Y H:i', strtotime($row['generated_at'])) : null;
             }
             unset($row);
 
@@ -293,8 +391,12 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 $dClauses = [];
                 foreach ($userAllowedDepts as $idx => $ad) {
                     $paramKey = ":duad_{$idx}";
-                    $dClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
-                    $deptParams[$paramKey] = $ad;
+                    if ($ad === 'PMD') {
+                        $dClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } else {
+                        $dClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                        $deptParams[$paramKey] = $ad;
+                    }
                 }
                 $deptExtra = " AND (" . implode(' OR ', $dClauses) . ")";
             }
@@ -309,14 +411,30 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             $deptStmt->execute($deptParams);
             $depts = $deptStmt->fetchAll(PDO::FETCH_COLUMN);
 
+            $hasPmd = false;
+            foreach ($depts as $d) {
+                if (in_array(strtoupper($d), ['PMD', 'DNO', 'DSO'])) {
+                    $hasPmd = true;
+                    break;
+                }
+            }
+            if ($hasPmd && !in_array('PMD', $depts)) {
+                $depts[] = 'PMD';
+                sort($depts);
+            }
+
             $subDeptExtra = "";
             $subDeptParams = [':year' => $year, ':month' => $month, ':so_type' => $soType];
             if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
                 $sdClauses = [];
                 foreach ($userAllowedDepts as $idx => $ad) {
                     $paramKey = ":sduad_{$idx}";
-                    $sdClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
-                    $subDeptParams[$paramKey] = $ad;
+                    if ($ad === 'PMD') {
+                        $sdClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } else {
+                        $sdClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                        $subDeptParams[$paramKey] = $ad;
+                    }
                 }
                 $subDeptExtra = " AND (" . implode(' OR ', $sdClauses) . ")";
             }
@@ -331,17 +449,59 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             $subDeptStmt->execute($subDeptParams);
             $subDepts = $subDeptStmt->fetchAll(PDO::FETCH_COLUMN);
 
-            // Calculate card counts (Total sites, Generated, Sent, Not Generated) for current SO Type & UAC
+            // Calculate card counts (Total sites, Generated, Sent, Uploaded, Verified, Pending) for current SO Type, UAC, Dept & Subdept
             $statDeptClause = "";
             $statParams = [':month' => $month, ':year' => $year, ':so_type' => $soType];
             if ($userAllowedDepts !== null && count($userAllowedDepts) > 0) {
-                $sClauses = [];
-                foreach ($userAllowedDepts as $idx => $ad) {
-                    $paramKey = ":suad_{$idx}";
-                    $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
-                    $statParams[$paramKey] = $ad;
+                if ($dept !== '' && $dept !== 'all') {
+                    if (strtoupper($dept) === 'PMD') {
+                        $statDeptClause = " AND (UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif (in_array(strtoupper($dept), $userAllowedDepts)) {
+                        $statDeptClause = " AND UPPER(COALESCE(sr.dept, '')) = UPPER(:s_dept)";
+                        $statParams[':s_dept'] = $dept;
+                    } else {
+                        $sClauses = [];
+                        foreach ($userAllowedDepts as $idx => $ad) {
+                            $paramKey = ":suad_{$idx}";
+                            if ($ad === 'PMD') {
+                                $sClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                            } else {
+                                $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                                $statParams[$paramKey] = $ad;
+                            }
+                        }
+                        $statDeptClause = " AND (" . implode(' OR ', $sClauses) . ")";
+                    }
+                } else {
+                    $sClauses = [];
+                    foreach ($userAllowedDepts as $idx => $ad) {
+                        $paramKey = ":suad_{$idx}";
+                        if ($ad === 'PMD') {
+                            $sClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                        } else {
+                            $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
+                            $statParams[$paramKey] = $ad;
+                        }
+                    }
+                    $statDeptClause = " AND (" . implode(' OR ', $sClauses) . ")";
                 }
-                $statDeptClause = " AND (" . implode(' OR ', $sClauses) . ")";
+            } elseif ($dept !== '' && $dept !== 'all') {
+                if (strtoupper($dept) === 'PMD') {
+                    $statDeptClause = " AND (UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                } else {
+                    $statDeptClause = " AND UPPER(COALESCE(sr.dept, '')) = UPPER(:s_dept)";
+                    $statParams[':s_dept'] = $dept;
+                }
+            }
+
+            $statSubDeptClause = "";
+            if ($subDept !== '' && $subDept !== 'all') {
+                if (in_array(strtoupper($subDept), ['DNO', 'DSO'])) {
+                    $statSubDeptClause = " AND (UPPER(COALESCE(sr.dept, '')) = UPPER(:s_sub_dept) OR UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:s_sub_dept))";
+                } else {
+                    $statSubDeptClause = " AND UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:s_sub_dept)";
+                }
+                $statParams[':s_sub_dept'] = $subDept;
             }
 
             $statStmt = $db->prepare("
@@ -349,17 +509,21 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 COUNT(DISTINCT sr.sitecode) as total_sites,
                 COUNT(DISTINCT CASE WHEN gr.id IS NOT NULL THEN sr.sitecode END) as total_generated,
                 COUNT(DISTINCT CASE WHEN gr.status = 'sent' THEN sr.sitecode END) as total_sent,
+                COUNT(DISTINCT CASE WHEN gr.status = 'uploaded' THEN sr.sitecode END) as total_uploaded,
+                COUNT(DISTINCT CASE WHEN gr.status = 'verified' THEN sr.sitecode END) as total_verified,
                 COUNT(DISTINCT CASE WHEN gr.id IS NULL THEN sr.sitecode END) as total_not_generated,
-                COUNT(DISTINCT CASE WHEN gr.id IS NULL THEN sr.sitecode END) as total_pending
+                COUNT(DISTINCT CASE WHEN gr.status = 'sent' OR gr.status = 'uploaded' THEN sr.sitecode END) as total_pending
             FROM site_regional sr
             LEFT JOIN generated_reports gr ON gr.sitecode = sr.sitecode AND gr.period_month = :month AND gr.period_year = :year
-            WHERE ($effectiveGroupSql) = :so_type {$statDeptClause}
+            WHERE ($effectiveGroupSql) = :so_type {$statDeptClause} {$statSubDeptClause}
         ");
             $statStmt->execute($statParams);
             $stats = $statStmt->fetch(PDO::FETCH_ASSOC) ?: [
                 'total_sites' => 0,
                 'total_generated' => 0,
                 'total_sent' => 0,
+                'total_uploaded' => 0,
+                'total_verified' => 0,
                 'total_not_generated' => 0,
                 'total_pending' => 0
             ];
@@ -603,6 +767,12 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 echo json_encode(['success' => false, 'message' => 'Sitecode required']);
                 exit;
             }
+            $today = date('Y-m-d');
+            $cutoffDate = sprintf('%04d-%02d-27', $year, $month);
+            if ($today < $cutoffDate) {
+                echo json_encode(['success' => false, 'message' => 'Laporan periode ini baru dapat diakses per tanggal 27.']);
+                exit;
+            }
             if (!$checkSiteAccess($sitecode)) {
                 echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
                 exit;
@@ -745,6 +915,12 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 echo json_encode(['success' => false, 'message' => 'Sitecode required']);
                 exit;
             }
+            $today = date('Y-m-d');
+            $cutoffDate = sprintf('%04d-%02d-27', $year, $month);
+            if ($today < $cutoffDate) {
+                echo json_encode(['success' => false, 'message' => 'Laporan periode ini baru dapat diakses per tanggal 27.']);
+                exit;
+            }
             if (!$checkSiteAccess($sitecode)) {
                 echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
                 exit;
@@ -828,6 +1004,310 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             exit;
         }
 
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: upload_signed - Re-upload signed BA document (PDF/Image)
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'upload_signed') {
+            header('Content-Type: application/json; charset=utf-8');
+            requireAuth();
+
+            $sitecode = trim($_POST['sitecode'] ?? '');
+            $month = (int) ($_POST['month'] ?? (int) date('n'));
+            $year = (int) ($_POST['year'] ?? (int) date('Y'));
+
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen Anda.']);
+                exit;
+            }
+
+            if (!isset($_FILES['signed_file']) || $_FILES['signed_file']['error'] !== UPLOAD_ERR_OK) {
+                echo json_encode(['success' => false, 'message' => 'File dokumen bertanda-tangan tidak valid atau belum dipilih']);
+                exit;
+            }
+
+            $file = $_FILES['signed_file'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'jpg', 'jpeg', 'png'];
+            if (!in_array($ext, $allowedExts, true)) {
+                echo json_encode(['success' => false, 'message' => 'Format file harus PDF, JPG, atau PNG']);
+                exit;
+            }
+            if ($file['size'] > 15 * 1024 * 1024) {
+                echo json_encode(['success' => false, 'message' => 'Ukuran file maksimal 15MB']);
+                exit;
+            }
+
+            $cleanSite = preg_replace('/[^a-zA-Z0-9_-]/', '', $sitecode);
+            $newFilename = "SIGNED_BA_{$cleanSite}_{$year}_{$month}_" . date('YmdHis') . ".{$ext}";
+            $destination = $signedDir . $newFilename;
+
+            if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                echo json_encode(['success' => false, 'message' => 'Gagal memindahkan file ke direktori server']);
+                exit;
+            }
+
+            $relPath = 'uploads/reports/signed/' . $newFilename;
+            $upd = $db->prepare("
+                UPDATE generated_reports 
+                SET uploaded_file_path = :path,
+                    uploaded_at = CURRENT_TIMESTAMP,
+                    status = 'uploaded',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE sitecode = :sc AND period_month = :m AND period_year = :y
+            ");
+            $upd->execute([
+                ':path' => $relPath,
+                ':sc' => $sitecode,
+                ':m' => $month,
+                ':y' => $year
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Dokumen bertanda-tangan berhasil di-upload ulang!',
+                'file_path' => $relPath,
+                'filename' => $newFilename,
+                'status' => 'uploaded',
+                'uploaded_pdf_url' => "api/generate_report.php?action=download_signed&inline=1&sitecode=" . rawurlencode($sitecode) . "&month={$month}&year={$year}"
+            ]);
+            exit;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: verify - Admin verifies uploaded report
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'verify') {
+            header('Content-Type: application/json; charset=utf-8');
+            requireAuth();
+
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $sitecode = trim($input['sitecode'] ?? '');
+            $month = (int) ($input['month'] ?? (int) date('n'));
+            $year = (int) ($input['year'] ?? (int) date('Y'));
+
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak']);
+                exit;
+            }
+
+            $adminUser = getCurrentUser();
+            $adminName = $adminUser['name'] ?? $adminUser['username'] ?? 'Administrator';
+
+            $upd = $db->prepare("
+                UPDATE generated_reports 
+                SET status = 'verified',
+                    verified_at = CURRENT_TIMESTAMP,
+                    verified_by = :vby,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE sitecode = :sc AND period_month = :m AND period_year = :y
+            ");
+            $upd->execute([
+                ':vby' => $adminName,
+                ':sc' => $sitecode,
+                ':m' => $month,
+                ':y' => $year
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Laporan Berita Acara berhasil diverifikasi!',
+                'status' => 'verified',
+                'verified_by' => $adminName,
+                'verified_at' => date('d/m/Y H:i')
+            ]);
+            exit;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: reject - Reject report at any verification step and return to 'generated'
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'reject') {
+            header('Content-Type: application/json; charset=utf-8');
+            requireAuth();
+
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $sitecode = trim($input['sitecode'] ?? '');
+            $month = (int) ($input['month'] ?? (int) date('n'));
+            $year = (int) ($input['year'] ?? (int) date('Y'));
+
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak: Site bukan bagian dari departemen yang ditugaskan kepada Anda.']);
+                exit;
+            }
+
+            // Find existing record to clean up uploaded signed file if present
+            $selStmt = $db->prepare("
+                SELECT id, uploaded_file_path 
+                FROM generated_reports 
+                WHERE UPPER(sitecode) = UPPER(:sc) AND period_month = :m AND period_year = :y
+            ");
+            $selStmt->execute([
+                ':sc' => $sitecode,
+                ':m' => $month,
+                ':y' => $year
+            ]);
+            $existing = $selStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$existing) {
+                echo json_encode(['success' => false, 'message' => 'Laporan tidak ditemukan']);
+                exit;
+            }
+
+            if (!empty($existing['uploaded_file_path']) && file_exists($existing['uploaded_file_path'])) {
+                @unlink($existing['uploaded_file_path']);
+            }
+
+            // Reset status back to 'generated', clearing flow timestamps & verifier
+            $upd = $db->prepare("
+                UPDATE generated_reports 
+                SET status = 'generated',
+                    sent_at = NULL,
+                    uploaded_file_path = NULL,
+                    uploaded_at = NULL,
+                    verified_at = NULL,
+                    verified_by = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ");
+            $upd->execute([':id' => $existing['id']]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Laporan untuk site {$sitecode} berhasil di-reject dan dikembalikan ke status Generated. Tombol Regenerate kini dapat diklik kembali.",
+                'status' => 'generated'
+            ]);
+            exit;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: reset - Delete generated report to reset flow back to Generate button
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'POST' && $action === 'reset') {
+            header('Content-Type: application/json; charset=utf-8');
+            requireAuth();
+
+            $user = getCurrentUser();
+            $isSuperadmin = ($user && strtolower($user['username'] ?? '') === 'd3utsch');
+            if (!$user || (empty($user['permissions']['can_reset_report']) && !$isSuperadmin)) {
+                echo json_encode(['success' => false, 'message' => 'Anda tidak memiliki hak akses (UAC) untuk me-reset Berita Acara.']);
+                exit;
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $sitecode = trim($input['sitecode'] ?? '');
+            $month = (int) ($input['month'] ?? (int) date('n'));
+            $year = (int) ($input['year'] ?? (int) date('Y'));
+
+            if ($sitecode === '') {
+                echo json_encode(['success' => false, 'message' => 'Sitecode required']);
+                exit;
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                echo json_encode(['success' => false, 'message' => 'Akses ditolak']);
+                exit;
+            }
+
+            // Find existing record to clean up files if present
+            $selStmt = $db->prepare("
+                SELECT id, pdf_path, docx_path, uploaded_file_path 
+                FROM generated_reports 
+                WHERE UPPER(sitecode) = UPPER(:sc) AND period_month = :m AND period_year = :y
+            ");
+            $selStmt->execute([
+                ':sc' => $sitecode,
+                ':m' => $month,
+                ':y' => $year
+            ]);
+            $existing = $selStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                // Delete physical files safely if they exist
+                if (!empty($existing['pdf_path']) && file_exists($existing['pdf_path'])) {
+                    @unlink($existing['pdf_path']);
+                }
+                if (!empty($existing['docx_path']) && file_exists($existing['docx_path'])) {
+                    @unlink($existing['docx_path']);
+                }
+                if (!empty($existing['uploaded_file_path']) && file_exists($existing['uploaded_file_path'])) {
+                    @unlink($existing['uploaded_file_path']);
+                }
+
+                // Delete record from database
+                $delStmt = $db->prepare("
+                    DELETE FROM generated_reports 
+                    WHERE id = :id
+                ");
+                $delStmt->execute([':id' => $existing['id']]);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Laporan Berita Acara untuk site {$sitecode} berhasil di-reset. Alur laporan telah dikembalikan ke tombol Generate."
+            ]);
+            exit;
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // ACTION: download_signed - Stream uploaded signed document through PHP
+        // ─────────────────────────────────────────────────────────────────
+        if ($method === 'GET' && $action === 'download_signed') {
+            $sitecode = trim($_GET['sitecode'] ?? '');
+            $month = (int) ($_GET['month'] ?? (int) date('n'));
+            $year = (int) ($_GET['year'] ?? (int) date('Y'));
+            $disposition = (($_GET['inline'] ?? '') === '1') ? 'inline' : 'attachment';
+
+            if ($sitecode === '') {
+                http_response_code(400);
+                exit('Sitecode required');
+            }
+            if (!$checkSiteAccess($sitecode)) {
+                http_response_code(403);
+                exit('Akses ditolak');
+            }
+
+            $stmt = $db->prepare("
+                SELECT uploaded_file_path 
+                FROM generated_reports 
+                WHERE sitecode = :sc AND period_month = :m AND period_year = :y 
+                LIMIT 1
+            ");
+            $stmt->execute([':sc' => $sitecode, ':m' => $month, ':y' => $year]);
+            $filePath = $stmt->fetchColumn();
+
+            if (empty($filePath)) {
+                http_response_code(404);
+                exit('Dokumen bertanda-tangan belum di-upload');
+            }
+
+            $absPath = __DIR__ . '/../' . ltrim($filePath, '/');
+            if (!file_exists($absPath)) {
+                http_response_code(404);
+                exit('File tidak ditemukan di server');
+            }
+
+            $mime = mime_content_type($absPath) ?: 'application/octet-stream';
+            $filename = basename($absPath);
+
+            header('Content-Type: ' . $mime);
+            header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($absPath));
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            readfile($absPath);
+            exit;
+        }
+
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode([
@@ -879,7 +1359,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
 
     // 1. Site details from site_regional
     $siteStmt = $db->prepare("
-        SELECT sr.sitecode, sr.name_site, sr.dept, sr.sub_dept
+        SELECT sr.sitecode, sr.name_site, sr.dept, sr.sub_dept, COALESCE(sr.divisi, '') as divisi
         FROM site_regional sr
         WHERE UPPER(sr.sitecode) = UPPER(:sitecode)
         LIMIT 1
@@ -890,6 +1370,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     $sitename = $site['name_site'] ?? $sitecode;
     $dept = $site['dept'] ?? '';
     $subDept = $site['sub_dept'] ?? '';
+    $divisi = $site['divisi'] ?? '';
 
     // 2. PIC from site_pics
     $picStmt = $db->prepare("
@@ -937,8 +1418,8 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     $fvpStmt = $db->prepare("
         SELECT job_title, pic
         FROM circular_pics
-        WHERE UPPER(dept) = UPPER(:dept)
-          AND (sub_dept IS NULL OR sub_dept = '' OR sub_dept = '-' OR UPPER(sub_dept) = UPPER(dept))
+        WHERE (UPPER(dept) = UPPER(:dept) OR (UPPER(dept) = 'PMD' AND UPPER(sub_dept) = UPPER(:dept)))
+          AND (sub_dept IS NULL OR sub_dept = '' OR sub_dept = '-' OR UPPER(sub_dept) = UPPER(dept) OR UPPER(dept) = 'PMD')
           AND COALESCE(is_active, TRUE) = TRUE
         ORDER BY id ASC LIMIT 1
     ");
@@ -1122,6 +1603,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     return [
         'sitecode' => $sitecode,
         'sitename' => $sitename,
+        'divisi' => $divisi,
         'dept' => $dept,
         'sub_dept' => $subDept,
         'has_sub_dept' => $hasSubDept,

@@ -187,6 +187,12 @@
                                     <input type="checkbox" class="user-uac-dept-checkbox" value="WRO" checked style="width: 14px; height: 14px;"> WRO
                                 </label>
                             </div>
+                            <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #e2e8f0;">
+                                <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
+                                    <input type="checkbox" id="user-uac-reports-reset" style="width: 14px; height: 14px; cursor: pointer;">
+                                    <span style="font-size: 12px; font-weight: 600; color: #dc2626;">Reset Report (Tombol Reset Berita Acara)</span>
+                                </label>
+                            </div>
                         </div>
 
                         <label

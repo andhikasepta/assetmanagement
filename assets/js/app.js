@@ -209,6 +209,32 @@ const App = (() => {
         updateRekapSortIndicators();
     }
 
+    function updateCsrfToken(newToken) {
+        if (!newToken) return;
+        csrfToken = newToken;
+        const metaCsrf = document.querySelector('meta[name="csrf-token"]');
+        if (metaCsrf) {
+            metaCsrf.setAttribute('content', newToken);
+        }
+        document.querySelectorAll('input[name="csrf_token"], #login-page-csrf, #login-modal-csrf').forEach(el => {
+            el.value = newToken;
+        });
+    }
+
+    async function refreshCsrfToken() {
+        try {
+            const res = await fetch('api/csrf.php');
+            const data = await res.json();
+            if (data && data.success && data.token) {
+                updateCsrfToken(data.token);
+                return data.token;
+            }
+        } catch (e) {
+            console.warn('Gagal merefresh token CSRF:', e);
+        }
+        return null;
+    }
+
     function init() {
         const metaCsrf = document.querySelector('meta[name="csrf-token"]');
         if (metaCsrf) {
@@ -289,6 +315,20 @@ const App = (() => {
 
         navigateTo(initialPage, true);
 
+        // Display pending login / logout toast messages after page reload
+        try {
+            const loginSuccessUser = sessionStorage.getItem('login_success_toast');
+            if (loginSuccessUser) {
+                sessionStorage.removeItem('login_success_toast');
+                showToast('success', 'Login Berhasil', `Selamat datang, ${loginSuccessUser}!`);
+            }
+            const logoutSuccess = sessionStorage.getItem('logout_toast');
+            if (logoutSuccess) {
+                sessionStorage.removeItem('logout_toast');
+                showToast('info', 'Logout', 'Anda telah berhasil logout.');
+            }
+        } catch (e) { }
+
         // Check if there was a card jump pending from quick access
         const pendingCard = sessionStorage.getItem('target_card');
         if (pendingCard) {
@@ -335,6 +375,10 @@ const App = (() => {
         const tabReports = document.getElementById('tab-reports');
         if (tabReports) {
             tabReports.style.display = perms.can_access_reports !== false ? '' : 'none';
+        }
+        const tabBeritaAcara = document.getElementById('tab-berita-acara');
+        if (tabBeritaAcara) {
+            tabBeritaAcara.style.display = perms.can_access_reports !== false ? '' : 'none';
         }
         const tabMasterData = document.getElementById('tab-master-data');
         if (tabMasterData) {
@@ -417,7 +461,7 @@ const App = (() => {
         }
 
         // Protected pages require authenticated session
-        if ((page === 'all-summary' || page === 'weekly-summary' || page === 'reports' || page === 'master-data' || page === 'master-data-weekly' || page === 'user-management') && !window.AUTH_USER) {
+        if ((page === 'all-summary' || page === 'weekly-summary' || page === 'reports' || page === 'berita-acara' || page === 'master-data' || page === 'master-data-weekly' || page === 'user-management') && !window.AUTH_USER) {
             showToast('info', 'Akses Terbatas', 'Silakan login untuk mengakses menu Administrator.');
             openLoginModal(page);
             return;
@@ -449,6 +493,13 @@ const App = (() => {
             } else if (page === 'reports' && perms.can_access_reports === false) {
                 if (perms.can_access_all_summary !== false) page = 'all-summary';
                 else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else if (perms.can_access_master_data !== false) page = 'master-data';
+                else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
+                else page = 'user-management';
+            } else if (page === 'berita-acara' && perms.can_access_reports === false) {
+                if (perms.can_access_all_summary !== false) page = 'all-summary';
+                else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
+                else if (perms.can_access_reports !== false) page = 'reports';
                 else if (perms.can_access_master_data !== false) page = 'master-data';
                 else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
                 else page = 'user-management';
@@ -544,6 +595,9 @@ const App = (() => {
             }
             updateReportsMonthDropdown();
             loadReportsData();
+            loadReportsVerificationData();
+        } else if (page === 'berita-acara') {
+            initBeritaAcaraPage();
         }
 
         // Apply UAC rules (button visibility)
@@ -767,43 +821,34 @@ const App = (() => {
 
             const json = await res.json();
             if (json.success) {
-                // Update client session state
+                // Update client session state & fresh CSRF token
+                if (json.csrf_token) {
+                    updateCsrfToken(json.csrf_token);
+                }
+
                 window.AUTH_USER = json.user || {
                     name: username,
                     role: 'admin',
                     permissions: {}
                 };
 
-                // Update Navbar UI
-                const tabSummary = document.getElementById('tab-summary');
-                const tabUserManagement = document.getElementById('tab-user-management');
-                const userDropdown = document.getElementById('user-dropdown-container');
-                const navUserAvatar = document.getElementById('nav-user-avatar');
-                const navUserName = document.getElementById('nav-user-name');
-                const btnNavLogin = document.getElementById('btn-navbar-login');
-                const btnNavLogout = document.getElementById('btn-navbar-logout');
-
-                if (tabSummary) tabSummary.style.display = 'none';
-                if (tabUserManagement) tabUserManagement.style.display = ((window.AUTH_USER.permissions || {}).can_access_user_management !== false) ? '' : 'none';
-                if (userDropdown) userDropdown.style.display = 'inline-block';
-                if (navUserAvatar) navUserAvatar.textContent = (window.AUTH_USER.name || 'A').charAt(0).toUpperCase();
-                if (navUserName) navUserName.textContent = window.AUTH_USER.name || 'Asset Management Administrator';
-                if (btnNavLogin) btnNavLogin.style.display = 'none';
-                if (btnNavLogout) btnNavLogout.style.display = 'none';
-
-                // Apply UAC permissions for tabs & buttons
-                applyUacPermissions();
-
-                // Update Quick Access Drawer Header Login button
-                const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
-                if (drawerHeaderLogin) drawerHeaderLogin.style.display = 'none';
-
                 closeLoginModal();
-                showToast('success', 'Login Berhasil', 'Selamat datang, Administrator!');
 
-                // Switch to requested target page or all-summary
-                navigateTo(pendingTargetPage && pendingTargetPage !== 'summary' ? pendingTargetPage : 'all-summary');
+                const targetPage = (pendingTargetPage && pendingTargetPage !== 'summary') ? pendingTargetPage : 'all-summary';
+
+                // Persist state for post-reload toast & navigation
+                try {
+                    sessionStorage.setItem('active_page', targetPage);
+                    sessionStorage.setItem('login_success_toast', (window.AUTH_USER.name || 'Administrator'));
+                } catch (e) { }
+
+                // Clean reload so server PHP re-renders navbar tabs, permissions, and CSRF token fresh
+                window.location.href = './';
+                return;
             } else {
+                if (res.status === 403 || json.error_code === 'CSRF_INVALID') {
+                    await refreshCsrfToken();
+                }
                 if (alertEl && alertMsg) {
                     alertMsg.textContent = json.message || 'Username atau password tidak sesuai.';
                     alertEl.style.display = 'block';
@@ -827,17 +872,12 @@ const App = (() => {
         closeUserDropdown();
         closeQuickAccess();
 
-        try {
-            await fetch('logout.php', { method: 'POST' });
-        } catch (e) { }
-
-        // Clear local auth session state
-        window.AUTH_USER = null;
-
-        // Update Navbar UI
+        // Immediately hide protected tabs in navbar so UI responds instantly
         const tabSummary = document.getElementById('tab-summary');
         const tabAllSummary = document.getElementById('tab-all-summary');
         const tabWeeklySummary = document.getElementById('tab-weekly-summary');
+        const tabReports = document.getElementById('tab-reports');
+        const tabBeritaAcara = document.getElementById('tab-berita-acara');
         const tabMasterData = document.getElementById('tab-master-data');
         const tabMasterDataWeekly = document.getElementById('tab-master-data-weekly');
         const tabUserManagement = document.getElementById('tab-user-management');
@@ -848,6 +888,8 @@ const App = (() => {
         if (tabSummary) tabSummary.style.display = 'inline-flex';
         if (tabAllSummary) tabAllSummary.style.display = 'none';
         if (tabWeeklySummary) tabWeeklySummary.style.display = 'none';
+        if (tabReports) tabReports.style.display = 'none';
+        if (tabBeritaAcara) tabBeritaAcara.style.display = 'none';
         if (tabMasterData) tabMasterData.style.display = 'none';
         if (tabMasterDataWeekly) tabMasterDataWeekly.style.display = 'none';
         if (tabUserManagement) tabUserManagement.style.display = 'none';
@@ -855,23 +897,21 @@ const App = (() => {
         if (btnNavLogout) btnNavLogout.style.display = 'none';
         if (btnNavLogin) btnNavLogin.style.display = 'none';
 
-        // Update Quick Access Drawer Header Login button
-        const drawerHeaderLogin = document.getElementById('drawer-header-login-btn');
-        if (drawerHeaderLogin) drawerHeaderLogin.style.display = 'inline-flex';
+        // Clear local auth session state
+        window.AUTH_USER = null;
 
-        showToast('info', 'Logout', 'Anda telah berhasil logout.');
         try {
-            sessionStorage.removeItem('active_page');
-            sessionStorage.removeItem('weekly_category');
-            sessionStorage.removeItem('all_summary_so_type');
-            sessionStorage.removeItem('all_summary_filter_month');
-            sessionStorage.removeItem('all_summary_filter_year');
-            sessionStorage.removeItem('weekly_filter_month');
-            sessionStorage.removeItem('weekly_filter_week');
-            sessionStorage.removeItem('weekly_filter_year');
+            await fetch('logout.php', { method: 'POST' });
         } catch (e) { }
-        navigateTo('summary');
-        keepCleanUrl();
+
+        // Clear local storage and set logout flag
+        try {
+            sessionStorage.clear();
+            sessionStorage.setItem('logout_toast', 'true');
+        } catch (e) { }
+
+        // Clean reload to ensure server session is completely destroyed and fresh guest CSRF token is loaded
+        window.location.href = './';
     }
 
     function toggleUserDropdown(e) {
@@ -4130,6 +4170,8 @@ const App = (() => {
         rdbStatusSubDept = 'all';
         rdbStatusCurrentPage = 1;
         rdbStatusFiltersPopulated = false;
+        currentScorecardDeptFilter = 'all';
+        currentScorecardSubDeptFilter = 'all';
         loadRekapitulasi();
         loadSubDeptResults();
 
@@ -6410,6 +6452,30 @@ const App = (() => {
     let currentRatingFilter = 'very_poor';
     let currentExecutionFilter = 'not_executed';
     let currentNationalRatingFilter = 'very_poor';
+    let currentScorecardDeptFilter = 'all';
+    let currentScorecardSubDeptFilter = 'all';
+
+    function matchesScorecardFilter(item, deptFilter, subDeptFilter) {
+        if (!item) return false;
+        const itemDept = (item.dept || '').trim().toUpperCase();
+        const itemSub = (item.sub_dept || '').trim().toUpperCase();
+
+        if (deptFilter && deptFilter !== 'all') {
+            const d = deptFilter.trim().toUpperCase();
+            if (d === 'DNO' || d === 'DSO') {
+                if (itemSub !== d && itemDept !== d) return false;
+            } else {
+                if (itemDept !== d && itemSub !== d) return false;
+            }
+        }
+
+        if (subDeptFilter && subDeptFilter !== 'all') {
+            const s = subDeptFilter.trim().toUpperCase();
+            if (itemSub !== s) return false;
+        }
+
+        return true;
+    }
 
     function getThreeMonthsBack(year, month) {
         const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -6587,11 +6653,8 @@ const App = (() => {
                 if (thExecSel) thExecSel.textContent = `${json.period.m3.label} (%)`;
             }
 
-            renderNationalScoreCardRating();
-            renderScoreCardRating();
-            renderScoreCardExecution();
-            renderScoreCardRatingPieChart(json.rating_counts);
-            renderScoreCardExecPieChart(json.execution_counts);
+            populateScorecardFilters();
+            applyScorecardFiltersAndRender();
         }
 
         const scorecardCacheKey = `${soType}_${category}_${y}_${m}`;
@@ -6611,27 +6674,145 @@ const App = (() => {
                 scorecardRatingData = [];
                 scorecardExecutionData = [];
                 scorecardPeriod = null;
-                renderNationalScoreCardRating();
-                renderScoreCardRating();
-                renderScoreCardExecution();
-                renderScoreCardRatingPieChart(null);
-                renderScoreCardExecPieChart(null);
+                populateScorecardFilters();
+                applyScorecardFiltersAndRender();
             }
         } catch (err) {
             console.error('Error fetching scorecard summary:', err);
             scorecardRatingData = [];
             scorecardExecutionData = [];
             scorecardPeriod = null;
-            renderNationalScoreCardRating();
-            renderScoreCardRating();
-            renderScoreCardExecution();
-            renderScoreCardRatingPieChart(null);
-            renderScoreCardExecPieChart(null);
+            populateScorecardFilters();
+            applyScorecardFiltersAndRender();
         }
     }
 
     function updateScoreCardPeriod(year, month) {
         return loadScoreCardSummary(year, month);
+    }
+
+    function populateScorecardFilters() {
+        const deptSelect = document.getElementById('scorecard-dept-filter');
+        const subdeptSelect = document.getElementById('scorecard-subdept-filter');
+        if (!deptSelect || !subdeptSelect) return;
+
+        const isPmd = (summaryCategory === 'pmd');
+
+        let deptHtml = '<option value="all">Semua DEPT</option>';
+        if (isPmd) {
+            deptHtml += '<option value="PMD">PMD</option>';
+            deptHtml += '<option value="DNO">DNO</option>';
+            deptHtml += '<option value="DSO">DSO</option>';
+        } else {
+            const depts = (summarySOType === 'quarterly') ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO'];
+            depts.forEach(d => {
+                deptHtml += `<option value="${d}">${d}</option>`;
+            });
+        }
+        deptSelect.innerHTML = deptHtml;
+
+        if (currentScorecardDeptFilter !== 'all' && deptSelect.querySelector(`option[value="${currentScorecardDeptFilter}"]`)) {
+            deptSelect.value = currentScorecardDeptFilter;
+        } else {
+            deptSelect.value = 'all';
+            currentScorecardDeptFilter = 'all';
+        }
+
+        updateScorecardSubdeptOptions();
+    }
+
+    function updateScorecardSubdeptOptions() {
+        const deptSelect = document.getElementById('scorecard-dept-filter');
+        const subdeptSelect = document.getElementById('scorecard-subdept-filter');
+        if (!subdeptSelect) return;
+
+        const selectedDept = deptSelect ? deptSelect.value : 'all';
+        const isPmd = (summaryCategory === 'pmd');
+
+        let html = '<option value="all">Semua Sub Dept</option>';
+
+        if (isPmd) {
+            html += '<option value="DNO">DNO</option>';
+            html += '<option value="DSO">DSO</option>';
+        } else {
+            if (selectedDept === 'all') {
+                const depts = (summarySOType === 'quarterly') ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO'];
+                depts.forEach(d => {
+                    const subs = DEPT_SUBDEPTS_MAP[d] || [];
+                    if (subs.length > 0) {
+                        html += `<optgroup label="${d}">`;
+                        subs.forEach(s => {
+                            html += `<option value="${s}">${s}</option>`;
+                        });
+                        html += `</optgroup>`;
+                    }
+                });
+            } else if (DEPT_SUBDEPTS_MAP[selectedDept]) {
+                const subs = DEPT_SUBDEPTS_MAP[selectedDept] || [];
+                subs.forEach(s => {
+                    html += `<option value="${s}">${s}</option>`;
+                });
+            }
+        }
+
+        subdeptSelect.innerHTML = html;
+        if (currentScorecardSubDeptFilter !== 'all' && subdeptSelect.querySelector(`option[value="${currentScorecardSubDeptFilter}"]`)) {
+            subdeptSelect.value = currentScorecardSubDeptFilter;
+        } else {
+            subdeptSelect.value = 'all';
+            currentScorecardSubDeptFilter = 'all';
+        }
+    }
+
+    function onScorecardDeptFilterChange() {
+        const deptSelect = document.getElementById('scorecard-dept-filter');
+        currentScorecardDeptFilter = deptSelect ? deptSelect.value : 'all';
+        updateScorecardSubdeptOptions();
+        const subdeptSelect = document.getElementById('scorecard-subdept-filter');
+        currentScorecardSubDeptFilter = subdeptSelect ? subdeptSelect.value : 'all';
+
+        applyScorecardFiltersAndRender();
+    }
+
+    function onScorecardSubDeptFilterChange() {
+        const subdeptSelect = document.getElementById('scorecard-subdept-filter');
+        currentScorecardSubDeptFilter = subdeptSelect ? subdeptSelect.value : 'all';
+
+        applyScorecardFiltersAndRender();
+    }
+
+    function applyScorecardFiltersAndRender() {
+        // 1. Recompute Rating Pie Chart counts based on filtered rating data
+        const filteredRating = scorecardRatingData.filter(r => matchesScorecardFilter(r, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
+        const rCounts = {
+            very_good: 0,
+            good: 0,
+            moderate: 0,
+            poor: 0,
+            very_poor: 0
+        };
+        filteredRating.forEach(r => {
+            const k = (r.rating || '').toLowerCase().replace(/\s+/g, '_');
+            if (rCounts[k] !== undefined) rCounts[k]++;
+        });
+        renderScoreCardRatingPieChart(rCounts);
+
+        // 2. Recompute Execution Pie Chart counts based on filtered execution data
+        const filteredExec = scorecardExecutionData.filter(e => matchesScorecardFilter(e, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
+        const eCounts = {
+            executed: 0,
+            not_executed: 0
+        };
+        filteredExec.forEach(e => {
+            const k = (e.execution_status || '').toLowerCase().replace(/\s+/g, '_');
+            if (eCounts[k] !== undefined) eCounts[k]++;
+        });
+        renderScoreCardExecPieChart(eCounts);
+
+        // 3. Render Tables
+        renderScoreCardRating();
+        renderScoreCardExecution();
+        renderNationalScoreCardRating();
     }
 
     function onNationalRatingFilterChange(filterValue) {
@@ -6673,9 +6854,9 @@ const App = (() => {
         }
 
         const renderTableMonth = (tbody, countEl, monthKey, ratingKey) => {
-            let filtered = scorecardRatingData;
+            let filtered = scorecardRatingData.filter(r => matchesScorecardFilter(r, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
             if (currentNationalRatingFilter !== 'all') {
-                filtered = scorecardRatingData.filter(r => {
+                filtered = filtered.filter(r => {
                     const rVal = (r[ratingKey] || '').toLowerCase().replace(/\s+/g, '_');
                     return rVal === currentNationalRatingFilter;
                 });
@@ -6733,10 +6914,11 @@ const App = (() => {
         // Count for m0 sites matching current filter
         let list0Count = null;
         if (hasM0Data) {
+            const filteredM0 = scorecardRatingData.filter(r => matchesScorecardFilter(r, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
             if (currentNationalRatingFilter === 'all') {
-                list0Count = scorecardRatingData.length;
+                list0Count = filteredM0.length;
             } else {
-                list0Count = scorecardRatingData.filter(r => {
+                list0Count = filteredM0.filter(r => {
                     const rVal = (r.m0_rating || '').toLowerCase().replace(/\s+/g, '_');
                     return rVal === currentNationalRatingFilter;
                 }).length;
@@ -6841,9 +7023,9 @@ const App = (() => {
             return;
         }
 
-        let filtered = scorecardRatingData;
+        let filtered = scorecardRatingData.filter(r => matchesScorecardFilter(r, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
         if (currentRatingFilter !== 'all') {
-            filtered = scorecardRatingData.filter(r => (r.rating || '').toLowerCase().replace(/\s+/g, '_') === currentRatingFilter);
+            filtered = filtered.filter(r => (r.rating || '').toLowerCase().replace(/\s+/g, '_') === currentRatingFilter);
         }
 
         if (filtered.length === 0) {
@@ -6899,9 +7081,9 @@ const App = (() => {
             return;
         }
 
-        let filtered = scorecardExecutionData;
+        let filtered = scorecardExecutionData.filter(e => matchesScorecardFilter(e, currentScorecardDeptFilter, currentScorecardSubDeptFilter));
         if (currentExecutionFilter !== 'all') {
-            filtered = scorecardExecutionData.filter(e => (e.execution_status || '').toLowerCase().replace(/\s+/g, '_') === currentExecutionFilter);
+            filtered = filtered.filter(e => (e.execution_status || '').toLowerCase().replace(/\s+/g, '_') === currentExecutionFilter);
         }
 
         if (filtered.length === 0) {
@@ -12526,7 +12708,9 @@ const App = (() => {
 
         updateReportsMonthDropdown();
         reportsState.page = 1;
+        reportsVerifState.page = 1;
         loadReportsData(1);
+        loadReportsVerificationData(1);
     }
 
     function updateReportsMonthDropdown() {
@@ -12634,6 +12818,32 @@ const App = (() => {
             const res = await fetch(`api/generate_report.php?${params.toString()}`);
             const json = await res.json();
 
+            if (json.is_locked_period) {
+                reportsState.data = [];
+                reportsState.total = 0;
+                reportsState.totalPages = 0;
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 3rem; color: #64748b;">
+                                <div style="font-weight: 700; font-size: 14px; color: #334155; margin-bottom: 6px;">Periode Report Belum Tersedia</div>
+                                <div style="font-size: 12.5px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const elTot = document.getElementById('stat-reports-total-sites');
+                const elGen = document.getElementById('stat-reports-generated');
+                const elSent = document.getElementById('stat-reports-sent');
+                const elPend = document.getElementById('stat-reports-pending');
+                if (elTot) elTot.textContent = '0';
+                if (elGen) elGen.textContent = '0';
+                if (elSent) elSent.textContent = '0';
+                if (elPend) elPend.textContent = '0';
+                renderReportsPagination();
+                return;
+            }
+
             if (!json.success) {
                 if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data laporan')}</td></tr>`;
                 return;
@@ -12652,7 +12862,8 @@ const App = (() => {
                 if (elTot) elTot.textContent = Number(json.stats.total_sites || 0).toLocaleString('id-ID');
                 if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
                 if (elSent) elSent.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
-                if (elPend) elPend.textContent = Number(json.stats.total_pending || 0).toLocaleString('id-ID');
+                const notGeneratedVal = json.stats.total_not_generated !== undefined ? json.stats.total_not_generated : json.stats.total_pending;
+                if (elPend) elPend.textContent = Number(notGeneratedVal || 0).toLocaleString('id-ID');
             }
 
             // Populate filter dropdowns dynamically based on current so_type
@@ -12750,7 +12961,20 @@ const App = (() => {
 
             // Status Badge (Generated vs Not Generated)
             let statusBadge = '';
-            if (status === 'sent') {
+            if (status === 'verified') {
+                statusBadge = `
+                    <span class="badge" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Verified
+                    </span>
+                `;
+            } else if (status === 'uploaded') {
+                statusBadge = `
+                    <span class="badge" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;">
+                        Uploaded
+                    </span>
+                `;
+            } else if (status === 'sent') {
                 statusBadge = `
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
                         <span class="badge" style="background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
@@ -12788,18 +13012,27 @@ const App = (() => {
                     </button>
                 `;
             } else if (status === 'generated') {
+                const previewPdfUrl = `api/generate_report.php?action=download&inline=1&sitecode=${encodeURIComponent(r.sitecode)}&month=${month}&year=${year}`;
                 const downloadPdfUrl = `api/generate_report.php?action=download&sitecode=${encodeURIComponent(r.sitecode)}&month=${month}&year=${year}`;
                 const exportPdfName = r.export_filename || `Berita Acara Tindak Lanjut DB-${r.sitecode}.pdf`;
+                const canReset = window.AUTH_USER && window.AUTH_USER.permissions && (window.AUTH_USER.permissions.can_reset_report === true || (window.AUTH_USER.username || '').toLowerCase() === 'd3utsch');
+                const resetBtnHtml = canReset ? `
+                        <button class="btn-report-action btn-report-reset" onclick="App.resetReportForSite('${sitecode}')" title="Reset laporan & kembalikan ke tombol Generate">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+                            <span>Reset</span>
+                        </button>
+                ` : '';
+
                 actionHtml = `
                     <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.35rem;flex-wrap:nowrap;white-space:nowrap;">
                         <span class="report-badge-action report-badge-ready" title="Dokumen siap dikirim (Checked)">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
                             Ready
                         </span>
-                        <button class="btn-report-action btn-report-preview-style" onclick="App.previewReport('${sitecode}')" title="Preview Dokumen BA">
+                        <a class="btn-report-action btn-report-preview-style" href="${previewPdfUrl}" target="_blank" rel="noopener noreferrer" title="Preview Dokumen BA di Tab Baru">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             <span>Preview</span>
-                        </button>
+                        </a>
                         <a class="btn-report-action btn-report-preview-style" href="${downloadPdfUrl}" target="_blank" download="${escapeHtml(exportPdfName)}" title="Download PDF">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                             <span>PDF</span>
@@ -12812,33 +13045,38 @@ const App = (() => {
                             <span>Send</span>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
+                        ${resetBtnHtml}
                     </div>
                 `;
-            } else if (status === 'sent') {
-                const downloadPdfUrl = `api/generate_report.php?action=download&sitecode=${encodeURIComponent(r.sitecode)}&month=${month}&year=${year}`;
-                const exportPdfName = r.export_filename || `Berita Acara Tindak Lanjut DB-${r.sitecode}.pdf`;
+            } else if (status === 'sent' || status === 'uploaded' || status === 'verified') {
+                let badgeClass = 'report-badge-sent';
+                let badgeText = 'Sent';
+                if (status === 'verified') {
+                    badgeClass = 'report-badge-ready';
+                    badgeText = 'Verified';
+                } else if (status === 'uploaded') {
+                    badgeClass = 'report-badge-ready';
+                    badgeText = 'Uploaded';
+                }
+                const canReset = window.AUTH_USER && window.AUTH_USER.permissions && (window.AUTH_USER.permissions.can_reset_report === true || (window.AUTH_USER.username || '').toLowerCase() === 'd3utsch');
+                const resetBtnHtml = canReset ? `
+                        <button class="btn-report-action btn-report-reset" onclick="App.resetReportForSite('${sitecode}')" title="Reset laporan & kembalikan ke tombol Generate">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+                            <span>Reset</span>
+                        </button>
+                ` : '';
+
                 actionHtml = `
                     <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.35rem;flex-wrap:nowrap;white-space:nowrap;">
-                        <span class="report-badge-action report-badge-sent" title="Dokumen sudah terkirim (Checked)">
+                        <span class="report-badge-action ${badgeClass}" title="Dokumen sudah masuk alur (${badgeText})">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            Sent
+                            ${badgeText}
                         </span>
-                        <button class="btn-report-action btn-report-preview-style" onclick="App.previewReport('${sitecode}')" title="Preview Dokumen BA">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                            <span>Preview</span>
-                        </button>
-                        <a class="btn-report-action btn-report-preview-style" href="${downloadPdfUrl}" target="_blank" download="${escapeHtml(exportPdfName)}" title="Download PDF">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            <span>PDF</span>
-                        </a>
-                        <button class="btn-report-action btn-report-regenerate" onclick="App.generateReportForSite('${sitecode}')" title="Regenerate & ganti file PDF">
+                        <button class="btn-report-action btn-report-regenerate btn-report-locked" disabled title="Dokumen sudah dikirim ke WhatsApp (Regenerate dikunci). Gunakan tombol Reset jika ingin membuat ulang dari awal.">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                             <span>Regenerate</span>
                         </button>
-                        <button class="btn-report-action btn-report-preview-style" onclick="App.sendReportWhatsApp('${sitecode}')" title="Kirim Ulang ke WhatsApp PIC">
-                            <span>Send Again</span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                        </button>
+                        ${resetBtnHtml}
                     </div>
                 `;
             } else {
@@ -12849,9 +13087,6 @@ const App = (() => {
                 `;
             }
 
-            const waSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:-1px;flex-shrink:0;"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.134 8.134 0 0 1-1.25-4.29c0-4.5 3.66-8.16 8.17-8.16 2.18 0 4.23.85 5.77 2.39a8.118 8.118 0 0 1 2.4 5.77c-.01 4.51-3.67 8.15-8.17 8.15zm4.48-6.11c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3z"/></svg>`;
-            const phoneBadge = picPhone ? `<span style="font-size:11px;color:#059669;background:#ecfdf5;padding:1px 5px;border-radius:4px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;font-weight:600;">${waSvg} ${picPhone}</span>` : '';
-
             html += `
                 <tr>
                     <td style="text-align: center; color: #94a3b8; font-size: 12px;">${no}</td>
@@ -12859,12 +13094,11 @@ const App = (() => {
                     <td style="color: #475569;">${subDept}</td>
                     <td style="max-width: 250px;">
                         <div style="display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <span style="font-family: monospace; font-weight: 700; color: #0284c7; font-size: 12.5px; flex-shrink: 0;">${sitecode}</span>
+                            <span style="font-weight: 700; color: #0284c7; font-size: 12.5px; flex-shrink: 0;">${sitecode}</span>
                             <span style="font-weight: 600; color: #0f172a; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;" title="${sitename}">${sitename}</span>
                         </div>
-                        <div style="font-size: 11px; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <span style="overflow: hidden; text-overflow: ellipsis;" title="${picName}">👤 ${picName}</span>
-                            ${phoneBadge}
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${picName}">
+                            ${picName}
                         </div>
                     </td>
                     <td style="text-align: center; white-space: nowrap; min-width: 380px;">${actionHtml}</td>
@@ -13033,6 +13267,7 @@ const App = (() => {
             showToast('success', 'WhatsApp Dibuka', `Membuka WhatsApp untuk mengirim pesan ke ${json.pic_name || sitecode}.`, 4000);
 
             await loadReportsData(reportsState.page);
+            await loadReportsVerificationData(reportsVerifState.page);
 
         } catch (err) {
             console.error('Error sending report via WhatsApp:', err);
@@ -13044,39 +13279,8 @@ const App = (() => {
         if (!sitecode) return;
         reportsState.activeSitecode = sitecode;
         const { month, year } = getReportsSelectedPeriod();
-
-        const modal = document.getElementById('report-preview-modal');
-        const iframe = document.getElementById('report-preview-iframe');
-        const titleEl = document.getElementById('report-preview-title');
-        const metaEl = document.getElementById('report-preview-meta');
-        const dlBtn = document.getElementById('report-preview-download-pdf');
-
-        const row = reportsState.data.find(r => r.sitecode === sitecode);
-        const sitename = row ? row.sitename : sitecode;
-        const filename = (row && row.export_filename) ? row.export_filename : `Berita Acara Tindak Lanjut DB-${sitecode}.pdf`;
-
-        if (titleEl) titleEl.textContent = `Preview Berita Acara Tindak Lanjut DB - ${sitecode} (${sitename})`;
-        if (metaEl) metaEl.textContent = `File: ${filename}`;
-
         const previewPdfUrl = `api/generate_report.php?action=download&inline=1&sitecode=${encodeURIComponent(sitecode)}&month=${month}&year=${year}`;
-        const previewUrl = `api/generate_report.php?action=preview_html&sitecode=${encodeURIComponent(sitecode)}&month=${month}&year=${year}`;
-        if (iframe) iframe.src = previewUrl;
-
-        const downloadPdfUrl = `api/generate_report.php?action=download&sitecode=${encodeURIComponent(sitecode)}&month=${month}&year=${year}`;
-        if (dlBtn) {
-            dlBtn.href = downloadPdfUrl;
-            dlBtn.setAttribute('download', filename);
-        }
-
-        const openNewTabBtn = document.getElementById('report-preview-open-new-tab');
-        if (openNewTabBtn) {
-            openNewTabBtn.href = previewPdfUrl;
-        }
-
-        if (modal) {
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
+        window.open(previewPdfUrl, '_blank', 'noopener,noreferrer');
     }
 
     function closeReportPreviewModal() {
@@ -13108,7 +13312,9 @@ const App = (() => {
 
     function onReportsPeriodChange() {
         reportsState.page = 1;
+        reportsVerifState.page = 1;
         loadReportsData(1);
+        loadReportsVerificationData(1);
     }
 
     function onReportsDeptChange() {
@@ -13189,6 +13395,1064 @@ const App = (() => {
                 console.error(err);
                 showToast('error', 'Gagal Ekspor', 'Terjadi kesalahan saat mengekspor data.');
             });
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // ── Reports: Card 2 - Verification Report ────────────────────────
+    // ═════════════════════════════════════════════════════════════════
+    let reportsVerifState = {
+        page: 1,
+        limit: 15,
+        dept: 'all',
+        sub_dept: 'all',
+        status: 'all',
+        search: '',
+        total: 0,
+        totalPages: 1,
+        data: [],
+        selectedFile: null
+    };
+
+    async function loadReportsVerificationData(targetPage = reportsVerifState.page) {
+        reportsVerifState.page = targetPage;
+        const { month, year } = getReportsSelectedPeriod();
+
+        const tbody = document.getElementById('reports-verif-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg class="spin-animation" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-linecap="round"></circle>
+                            </svg>
+                            <span>Memuat data verification report...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                view: 'verification',
+                month: month,
+                year: year,
+                so_type: reportsState.so_type || 'monthly',
+                dept: reportsVerifState.dept,
+                sub_dept: reportsVerifState.sub_dept,
+                status: reportsVerifState.status,
+                search: reportsVerifState.search,
+                page: reportsVerifState.page,
+                limit: reportsVerifState.limit
+            });
+
+            const res = await fetch(`api/generate_report.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (json.is_locked_period) {
+                reportsVerifState.data = [];
+                reportsVerifState.total = 0;
+                reportsVerifState.totalPages = 0;
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                <div style="font-weight: 700; font-size: 13.5px; color: #334155; margin-bottom: 4px;">Periode Report Belum Tersedia</div>
+                                <div style="font-size: 12px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                renderReportsVerifPagination();
+                return;
+            }
+
+            if (!json.success) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data verifikasi')}</td></tr>`;
+                return;
+            }
+
+            reportsVerifState.data = json.data || [];
+            reportsVerifState.total = json.total || 0;
+            reportsVerifState.totalPages = json.total_pages || 1;
+
+            populateReportsVerifDropdowns(json.depts || [], json.sub_depts || []);
+            renderReportsVerificationTable();
+            renderReportsVerifPagination();
+
+        } catch (err) {
+            console.error('Error loading verification reports:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal terhubung ke server.</td></tr>`;
+            }
+        }
+    }
+
+    function populateReportsVerifDropdowns(depts, subDepts) {
+        const deptEl = document.getElementById('reports-verif-filter-dept');
+        if (deptEl) {
+            const userDepts = getUserReportsDepts();
+            const onlyPMD = (userDepts.length === 1 && userDepts[0] === 'PMD');
+            const isRestricted = (userDepts.length > 0 && !userDepts.includes('ALL'));
+            if (isRestricted) {
+                depts = depts.filter(d => userDepts.includes(d.toUpperCase()));
+            }
+
+            const curDept = onlyPMD ? 'PMD' : (reportsVerifState.dept || 'all');
+            let deptHtml = onlyPMD ? '' : '<option value="all">Semua DEPT</option>';
+            depts.forEach(d => {
+                const isSel = (d === curDept) ? 'selected' : '';
+                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(d)}</option>`;
+            });
+            deptEl.innerHTML = deptHtml;
+            if (onlyPMD) {
+                reportsVerifState.dept = 'PMD';
+                deptEl.value = 'PMD';
+            } else if (curDept !== 'all' && !depts.includes(curDept)) {
+                reportsVerifState.dept = 'all';
+                deptEl.value = 'all';
+            }
+        }
+
+        const subDeptEl = document.getElementById('reports-verif-filter-subdept');
+        if (subDeptEl) {
+            const curSubDept = reportsVerifState.sub_dept || 'all';
+            let subDeptHtml = '<option value="all">Semua SUB DEPT</option>';
+            subDepts.forEach(sd => {
+                const isSel = (sd === curSubDept) ? 'selected' : '';
+                subDeptHtml += `<option value="${escapeHtml(sd)}" ${isSel}>${escapeHtml(sd)}</option>`;
+            });
+            subDeptEl.innerHTML = subDeptHtml;
+            if (curSubDept !== 'all' && !subDepts.includes(curSubDept)) {
+                reportsVerifState.sub_dept = 'all';
+                subDeptEl.value = 'all';
+            }
+        }
+    }
+
+    function renderReportsVerificationTable() {
+        const tbody = document.getElementById('reports-verif-tbody');
+        if (!tbody) return;
+
+        if (!reportsVerifState.data || reportsVerifState.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                        <div style="font-size: 13.5px; font-weight: 500; color: #64748b; margin-bottom: 3px;">No pending report</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const pageSize = reportsVerifState.limit === 'all' ? 0 : parseInt(reportsVerifState.limit);
+        const startIndex = (reportsVerifState.page - 1) * pageSize;
+        const { month, year } = getReportsSelectedPeriod();
+        let html = '';
+
+        reportsVerifState.data.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const sitecode = escapeHtml(r.sitecode);
+            const sitename = escapeHtml(r.sitename || '-');
+            const dept = escapeHtml(r.dept || '-');
+            const subDept = escapeHtml(r.sub_dept || '-');
+            const picName = escapeHtml(r.pic_name || 'PIC Belum Terdaftar');
+            const picPhone = escapeHtml(r.pic_phone || '');
+            const status = r.report_status;
+            const sentAt = r.sent_at_formatted ? escapeHtml(r.sent_at_formatted) : '-';
+
+            // Dokumen Asli Links
+            const previewOrigUrl = r.preview_url || `api/generate_report.php?action=download&inline=1&sitecode=${encodeURIComponent(r.sitecode)}&month=${month}&year=${year}`;
+            const downloadOrigUrl = r.pdf_url || `api/generate_report.php?action=download&sitecode=${encodeURIComponent(r.sitecode)}&month=${month}&year=${year}`;
+            const docAsliHtml = `
+                <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">
+                    <a class="btn-report-action btn-report-preview-style" href="${previewOrigUrl}" target="_blank" rel="noopener noreferrer" title="Preview Dokumen BA Asli">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <span>Preview</span>
+                    </a>
+                    <a class="btn-report-action btn-report-preview-style" href="${downloadOrigUrl}" target="_blank" download="${escapeHtml(r.export_filename || 'BA.pdf')}" title="Unduh Dokumen Asli">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>PDF</span>
+                    </a>
+                </div>
+            `;
+
+            // Dokumen Bertanda Tangan (Uploaded File)
+            let docTtdHtml = '';
+            if (r.uploaded_file_path && r.uploaded_pdf_url) {
+                docTtdHtml = `
+                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">
+                        <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_pdf_url}" target="_blank" rel="noopener noreferrer" title="Preview Dokumen TTD">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Preview</span>
+                        </a>
+                        <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_download_url}" target="_blank" download title="Unduh Dokumen TTD">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>PDF</span>
+                        </a>
+                    </div>
+                `;
+            } else {
+                docTtdHtml = `<span style="color:#94a3b8;font-size:11.5px;font-style:italic;">Belum diunggah</span>`;
+            }
+
+            // Action / Verification Button
+            let verifActionHtml = '';
+            let statusBadgeHtml = '';
+
+            if (status === 'sent') {
+                verifActionHtml = `
+                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.35rem;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="App.openUploadSignedModal('${sitecode}')"
+                            style="background:#0284c7;border-color:#0284c7;color:#fff;font-size:11.5px;padding:4px 10px;border-radius:6px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Upload Dokumen</span>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="App.rejectReport('${sitecode}')" title="Reject laporan & kembalikan ke Generated (Regenerate aktif)"
+                            style="background:#ef4444;border-color:#ef4444;color:#fff;font-size:11.5px;padding:4px 9px;border-radius:6px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            <span>Reject</span>
+                        </button>
+                    </div>
+                `;
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">
+                        Menunggu Upload
+                    </span>
+                `;
+            } else if (status === 'uploaded') {
+                verifActionHtml = `
+                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.35rem;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="App.openUploadSignedModal('${sitecode}')" title="Upload Ulang Dokumen TTD"
+                            style="font-size:11px;padding:4px 8px;border-radius:5px;">
+                            Upload Ulang
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm" onclick="App.verifyReport('${sitecode}')" title="Verifikasi Laporan"
+                            style="background:#10b981;border-color:#10b981;color:#fff;font-size:11.5px;padding:4px 11px;border-radius:6px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>Verifikasi</span>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="App.rejectReport('${sitecode}')" title="Reject laporan & kembalikan ke Generated (Regenerate aktif)"
+                            style="background:#ef4444;border-color:#ef4444;color:#fff;font-size:11.5px;padding:4px 9px;border-radius:6px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            <span>Reject</span>
+                        </button>
+                    </div>
+                `;
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">
+                        Menunggu Verifikasi
+                    </span>
+                `;
+            } else if (status === 'verified') {
+                const verifier = escapeHtml(r.verified_by || 'Admin');
+                const verifiedAt = r.verified_at_formatted ? escapeHtml(r.verified_at_formatted) : '';
+                verifActionHtml = `
+                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;flex-wrap:nowrap;">
+                        <div style="font-size:11.5px;color:#15803d;line-height:1.3;text-align:left;">
+                            <div style="font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span>Verified</span>
+                            </div>
+                            <div style="font-size:10.5px;color:#64748b;margin-top:1px;" title="${verifier}">oleh: ${verifier}</div>
+                            <div style="font-size:10px;color:#94a3b8;">${verifiedAt}</div>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="App.rejectReport('${sitecode}')" title="Reject verifikasi / kembalikan ke Generated (Regenerate aktif)"
+                            style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;font-size:11px;padding:3px 8px;border-radius:5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            <span>Reject</span>
+                        </button>
+                    </div>
+                `;
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Verified
+                    </span>
+                `;
+            }
+
+            html += `
+                <tr>
+                    <td style="text-align: center; color: #94a3b8; font-size: 12px;">${no}</td>
+                    <td style="font-weight: 600; color: #1e293b;">${dept}</td>
+                    <td style="color: #475569;">${subDept}</td>
+                    <td style="max-width: 250px;">
+                        <div style="display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <span style="font-weight: 700; color: #0284c7; font-size: 12.5px; flex-shrink: 0;">${sitecode}</span>
+                            <span style="font-weight: 600; color: #0f172a; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;" title="${sitename}">${sitename}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${picName}">
+                            ${picName}
+                        </div>
+                    </td>
+                    <td style="text-align: center; color: #64748b; font-size: 11.5px;">${sentAt}</td>
+                    <td style="text-align: center;">${docAsliHtml}</td>
+                    <td style="text-align: center;">${docTtdHtml}</td>
+                    <td style="text-align: center; white-space: nowrap;">${verifActionHtml}</td>
+                    <td style="text-align: center;">${statusBadgeHtml}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function renderReportsVerifPagination() {
+        const infoEl = document.getElementById('reports-verif-pagination-info');
+        const ctrlEl = document.getElementById('reports-verif-pagination-controls');
+        if (!infoEl || !ctrlEl) return;
+
+        if (reportsVerifState.total === 0) {
+            infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            ctrlEl.innerHTML = '';
+            return;
+        }
+
+        const pageSize = (reportsVerifState.limit === 'all') ? reportsVerifState.total : parseInt(reportsVerifState.limit);
+        const start = ((reportsVerifState.page - 1) * pageSize) + 1;
+        const end = Math.min(reportsVerifState.page * pageSize, reportsVerifState.total);
+        infoEl.textContent = `Menampilkan ${start} sampai ${end} dari ${reportsVerifState.total} data`;
+
+        let html = '';
+        html += `<button class="pagination-btn" ${reportsVerifState.page <= 1 ? 'disabled' : ''} onclick="App.goToReportsVerifPage(${reportsVerifState.page - 1})">Prev</button>`;
+
+        const totalP = reportsVerifState.totalPages;
+        const curP = reportsVerifState.page;
+        let startP = Math.max(1, curP - 2);
+        let endP = Math.min(totalP, startP + 4);
+        if (endP - startP < 4) startP = Math.max(1, endP - 4);
+
+        if (startP > 1) {
+            html += `<button class="pagination-btn" onclick="App.goToReportsVerifPage(1)">1</button>`;
+            if (startP > 2) html += `<span class="pagination-dots">...</span>`;
+        }
+
+        for (let p = startP; p <= endP; p++) {
+            html += `<button class="pagination-btn ${p === curP ? 'active' : ''}" onclick="App.goToReportsVerifPage(${p})">${p}</button>`;
+        }
+
+        if (endP < totalP) {
+            if (endP < totalP - 1) html += `<span class="pagination-dots">...</span>`;
+            html += `<button class="pagination-btn" onclick="App.goToReportsVerifPage(${totalP})">${totalP}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${curP >= totalP ? 'disabled' : ''} onclick="App.goToReportsVerifPage(${curP + 1})">Next</button>`;
+        ctrlEl.innerHTML = html;
+    }
+
+    function goToReportsVerifPage(p) {
+        if (p < 1 || p > reportsVerifState.totalPages || p === reportsVerifState.page) return;
+        loadReportsVerificationData(p);
+    }
+
+    function onReportsVerifDeptChange() {
+        const el = document.getElementById('reports-verif-filter-dept');
+        reportsVerifState.dept = el ? el.value : 'all';
+        reportsVerifState.page = 1;
+        loadReportsVerificationData(1);
+    }
+
+    function onReportsVerifSubDeptChange() {
+        const el = document.getElementById('reports-verif-filter-subdept');
+        reportsVerifState.sub_dept = el ? el.value : 'all';
+        reportsVerifState.page = 1;
+        loadReportsVerificationData(1);
+    }
+
+    function onReportsVerifStatusFilterChange() {
+        const el = document.getElementById('reports-verif-filter-status');
+        reportsVerifState.status = el ? el.value : 'all';
+        reportsVerifState.page = 1;
+        loadReportsVerificationData(1);
+    }
+
+    function changeReportsVerifPageSize(size) {
+        reportsVerifState.limit = size;
+        reportsVerifState.page = 1;
+        loadReportsVerificationData(1);
+    }
+
+    let reportsVerifSearchTimeout = null;
+    function handleReportsVerifSearch(term) {
+        clearTimeout(reportsVerifSearchTimeout);
+        reportsVerifSearchTimeout = setTimeout(() => {
+            reportsVerifState.search = term.trim();
+            reportsVerifState.page = 1;
+            loadReportsVerificationData(1);
+        }, 300);
+    }
+
+    // Modal Upload Signed Document Handlers
+    function openUploadSignedModal(sitecode) {
+        if (!sitecode) return;
+        const row = reportsVerifState.data.find(r => r.sitecode === sitecode);
+        const sitename = row ? row.sitename : sitecode;
+
+        const modal = document.getElementById('report-upload-signed-modal');
+        const siteInfoEl = document.getElementById('report-upload-signed-site-info');
+        const inputSitecode = document.getElementById('upload-signed-sitecode');
+        const fileInput = document.getElementById('upload-signed-file-input');
+        const fileInfo = document.getElementById('upload-signed-file-info');
+        const submitBtn = document.getElementById('btn-submit-upload-signed');
+
+        if (inputSitecode) inputSitecode.value = sitecode;
+        if (siteInfoEl) siteInfoEl.textContent = `Site: ${sitecode} - ${sitename}`;
+        if (fileInput) fileInput.value = '';
+        if (fileInfo) fileInfo.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+        reportsVerifState.selectedFile = null;
+
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeUploadSignedModal() {
+        const modal = document.getElementById('report-upload-signed-modal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
+        reportsVerifState.selectedFile = null;
+    }
+
+    function onSignedFileSelected(files) {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        const maxBytes = 15 * 1024 * 1024; // 15MB
+        if (file.size > maxBytes) {
+            showToast('error', 'Ukuran Terlalu Besar', 'Ukuran file tidak boleh melebihi 15MB.');
+            clearSignedFileSelected();
+            return;
+        }
+
+        const validExts = ['.pdf', '.jpg', '.jpeg', '.png'];
+        const nameLower = file.name.toLowerCase();
+        const isValid = validExts.some(ext => nameLower.endsWith(ext));
+        if (!isValid) {
+            showToast('error', 'Format Tidak Didukung', 'Hanya file PDF, JPG, atau PNG yang diperbolehkan.');
+            clearSignedFileSelected();
+            return;
+        }
+
+        reportsVerifState.selectedFile = file;
+        const nameEl = document.getElementById('upload-signed-filename');
+        const infoEl = document.getElementById('upload-signed-file-info');
+        const submitBtn = document.getElementById('btn-submit-upload-signed');
+
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        if (nameEl) nameEl.textContent = `${file.name} (${sizeMb} MB)`;
+        if (infoEl) infoEl.style.display = 'flex';
+        if (submitBtn) submitBtn.disabled = false;
+    }
+
+    function clearSignedFileSelected() {
+        const fileInput = document.getElementById('upload-signed-file-input');
+        const fileInfo = document.getElementById('upload-signed-file-info');
+        const submitBtn = document.getElementById('btn-submit-upload-signed');
+
+        if (fileInput) fileInput.value = '';
+        if (fileInfo) fileInfo.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+        reportsVerifState.selectedFile = null;
+    }
+
+    async function submitUploadSignedReport(event) {
+        if (event && event.preventDefault) event.preventDefault();
+
+        const inputSitecode = document.getElementById('upload-signed-sitecode');
+        const sitecode = inputSitecode ? inputSitecode.value.trim() : '';
+        const file = reportsVerifState.selectedFile;
+
+        if (!sitecode || !file) {
+            showToast('warning', 'Pilih File', 'Silakan pilih dokumen yang akan diunggah.');
+            return;
+        }
+
+        const { month, year } = getReportsSelectedPeriod();
+        const submitBtn = document.getElementById('btn-submit-upload-signed');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mengunggah...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('sitecode', sitecode);
+            formData.append('month', month);
+            formData.append('year', year);
+            formData.append('signed_file', file);
+
+            const res = await fetch('api/generate_report.php?action=upload_signed', {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Upload', json.message || 'Terjadi kesalahan saat mengunggah dokumen.');
+                return;
+            }
+
+            showToast('success', 'Upload Berhasil', `Dokumen bertanda-tangan untuk ${sitecode} berhasil diunggah.`);
+            closeUploadSignedModal();
+
+            await loadReportsVerificationData(reportsVerifState.page);
+            await loadReportsData(reportsState.page);
+
+        } catch (err) {
+            console.error('Error uploading signed report:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Upload Dokumen';
+            }
+        }
+    }
+
+    async function verifyReport(sitecode) {
+        if (!sitecode) return;
+        const { month, year } = getReportsSelectedPeriod();
+
+        try {
+            const res = await fetch('api/generate_report.php?action=verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitecode, month, year })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Verifikasi', json.message || 'Terjadi kesalahan saat memverifikasi laporan.');
+                return;
+            }
+
+            showToast('success', 'Laporan Diverifikasi', `Berita Acara untuk ${sitecode} berhasil diverifikasi!`);
+
+            await loadReportsVerificationData(reportsVerifState.page);
+            await loadReportsData(reportsState.page);
+
+        } catch (err) {
+            console.error('Error verifying report:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat verifikasi.');
+        }
+    }
+
+    async function rejectReport(sitecode) {
+        if (!sitecode) return;
+
+        const confirmed = window.confirm(`Apakah Anda yakin ingin me-reject laporan untuk site ${sitecode}?\n\nLaporan akan dikembalikan ke status Generated, dan tombol Regenerate dapat diklik kembali.`);
+        if (!confirmed) return;
+
+        const { month, year } = getReportsSelectedPeriod();
+
+        try {
+            const res = await fetch('api/generate_report.php?action=reject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitecode, month, year })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Reject Laporan', json.message || 'Terjadi kesalahan saat me-reject laporan.');
+                return;
+            }
+
+            showToast('success', 'Laporan Di-reject', json.message || `Laporan untuk ${sitecode} berhasil dikembalikan ke status Generated.`);
+
+            await loadReportsVerificationData(reportsVerifState.page);
+            await loadReportsData(reportsState.page);
+            if (typeof loadBeritaAcaraData === 'function') {
+                await loadBeritaAcaraData(baState.page);
+            }
+
+        } catch (err) {
+            console.error('Error rejecting report:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat me-reject laporan.');
+        }
+    }
+
+    async function resetReportForSite(sitecode) {
+        if (!sitecode) return;
+
+        const canReset = window.AUTH_USER && window.AUTH_USER.permissions && (window.AUTH_USER.permissions.can_reset_report === true || (window.AUTH_USER.username || '').toLowerCase() === 'd3utsch');
+        if (!canReset) {
+            showToast('error', 'Akses Ditolak', 'Anda tidak memiliki hak akses (UAC) untuk me-reset Berita Acara.');
+            return;
+        }
+
+        const confirmed = window.confirm(`Apakah Anda yakin ingin me-reset Berita Acara untuk site ${sitecode}?\n\nSemua data laporan yang telah dibuat atau dikirim akan dihapus, dan alur akan dikembalikan ke tombol Generate.`);
+        if (!confirmed) return;
+
+        const { month, year } = getReportsSelectedPeriod();
+
+        try {
+            const res = await fetch('api/generate_report.php?action=reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sitecode, month, year })
+            });
+            const json = await res.json();
+
+            if (!json.success) {
+                showToast('error', 'Gagal Reset Laporan', json.message || 'Terjadi kesalahan saat me-reset laporan.');
+                return;
+            }
+
+            showToast('success', 'Laporan Di-reset', json.message || `Berita Acara untuk ${sitecode} berhasil di-reset ke kondisi awal.`);
+
+            await loadReportsData(reportsState.page);
+            await loadReportsVerificationData(reportsVerifState.page);
+            if (typeof loadBeritaAcaraData === 'function') {
+                await loadBeritaAcaraData(baState.page);
+            }
+
+        } catch (err) {
+            console.error('Error resetting report:', err);
+            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat me-reset laporan.');
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // ── Berita Acara Page (Monitoring & Arsip Hasil Tindak Lanjut) ───
+    // ═════════════════════════════════════════════════════════════════
+    let baState = {
+        page: 1,
+        limit: 15,
+        so_type: 'monthly',
+        dept: 'all',
+        sub_dept: 'all',
+        status: 'all',
+        search: '',
+        total: 0,
+        totalPages: 1,
+        data: []
+    };
+
+    function initBeritaAcaraPage() {
+        const userDepts = getUserReportsDepts();
+        const onlyPMD = (userDepts.length === 1 && userDepts[0] === 'PMD');
+        if (onlyPMD) {
+            baState.so_type = 'monthly';
+            baState.dept = 'PMD';
+            const soTypeGroup = document.getElementById('ba-so-type-filter-group');
+            if (soTypeGroup) soTypeGroup.style.display = 'none';
+        }
+
+        updateBaMonthDropdown();
+        loadBeritaAcaraData(1);
+    }
+
+    function switchBaSOType(type) {
+        baState.so_type = (type === 'quarterly') ? 'quarterly' : 'monthly';
+
+        const btnM = document.getElementById('ba-btn-so-type-monthly');
+        const btnQ = document.getElementById('ba-btn-so-type-quarterly');
+        if (btnM && btnQ) {
+            btnM.classList.toggle('active', baState.so_type === 'monthly');
+            btnQ.classList.toggle('active', baState.so_type === 'quarterly');
+        }
+
+        updateBaMonthDropdown();
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    function updateBaMonthDropdown() {
+        const monthSelect = document.getElementById('ba-filter-month');
+        if (!monthSelect) return;
+
+        const currentVal = monthSelect.value;
+        const optionsList = (baState.so_type === 'quarterly') ? [
+            { val: '3', label: 'Maret' },
+            { val: '6', label: 'Juni' },
+            { val: '9', label: 'September' },
+            { val: '12', label: 'Desember' }
+        ] : [
+            { val: '1', label: 'Januari' },
+            { val: '2', label: 'Februari' },
+            { val: '3', label: 'Maret' },
+            { val: '4', label: 'April' },
+            { val: '5', label: 'Mei' },
+            { val: '6', label: 'Juni' },
+            { val: '7', label: 'Juli' },
+            { val: '8', label: 'Agustus' },
+            { val: '9', label: 'September' },
+            { val: '10', label: 'Oktober' },
+            { val: '11', label: 'November' },
+            { val: '12', label: 'Desember' }
+        ];
+
+        monthSelect.innerHTML = '';
+        optionsList.forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt.val;
+            el.textContent = opt.label;
+            monthSelect.appendChild(el);
+        });
+
+        const hasCurrent = optionsList.some(o => o.val === currentVal);
+        if (hasCurrent) {
+            monthSelect.value = currentVal;
+        } else if (baState.so_type === 'quarterly') {
+            const num = parseInt(currentVal, 10) || 3;
+            let qMonth = '3';
+            if (num >= 10) qMonth = '12';
+            else if (num >= 7) qMonth = '9';
+            else if (num >= 4) qMonth = '6';
+            else qMonth = '3';
+            monthSelect.value = qMonth;
+        }
+    }
+
+    function getBaSelectedPeriod() {
+        const monthEl = document.getElementById('ba-filter-month');
+        const yearEl = document.getElementById('ba-filter-year');
+        const now = new Date();
+        const month = monthEl ? parseInt(monthEl.value) || (now.getMonth() + 1) : (now.getMonth() + 1);
+        const year = yearEl ? parseInt(yearEl.value) || now.getFullYear() : now.getFullYear();
+        return { month, year };
+    }
+
+    async function loadBeritaAcaraData(targetPage = baState.page) {
+        baState.page = targetPage;
+        const { month, year } = getBaSelectedPeriod();
+
+        const tbody = document.getElementById('ba-tbody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                            <svg class="spin-animation" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-linecap="round"></circle>
+                            </svg>
+                            <span>Memuat data Berita Acara...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                action: 'list',
+                view: 'berita_acara',
+                month: month,
+                year: year,
+                so_type: baState.so_type || 'monthly',
+                dept: baState.dept,
+                sub_dept: baState.sub_dept,
+                status: baState.status,
+                search: baState.search,
+                page: baState.page,
+                limit: baState.limit
+            });
+
+            const res = await fetch(`api/generate_report.php?${params.toString()}`);
+            const json = await res.json();
+
+            if (json.is_locked_period) {
+                baState.data = [];
+                baState.total = 0;
+                baState.totalPages = 0;
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 3rem; color: #64748b;">
+                                <div style="font-weight: 700; font-size: 14px; color: #334155; margin-bottom: 6px;">Periode Report Belum Tersedia</div>
+                                <div style="font-size: 12.5px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const elGen = document.getElementById('stat-ba-generated');
+                const elPend = document.getElementById('stat-ba-pending');
+                const elVer = document.getElementById('stat-ba-verified');
+                if (elGen) elGen.textContent = '0';
+                if (elPend) elPend.textContent = '0';
+                if (elVer) elVer.textContent = '0';
+                renderBaPagination();
+                return;
+            }
+
+            if (!json.success) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data Berita Acara')}</td></tr>`;
+                return;
+            }
+
+            baState.data = json.data || [];
+            baState.total = json.total || 0;
+            baState.totalPages = json.total_pages || 1;
+
+            // Update 3 Overview Cards: Generated, Pending, Verified
+            if (json.stats) {
+                const elGen = document.getElementById('stat-ba-generated');
+                const elPend = document.getElementById('stat-ba-pending');
+                const elVer = document.getElementById('stat-ba-verified');
+                if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
+                if (elPend) elPend.textContent = Number(json.stats.total_pending !== undefined ? json.stats.total_pending : (json.stats.total_sent || 0)).toLocaleString('id-ID');
+                if (elVer) elVer.textContent = Number(json.stats.total_verified || 0).toLocaleString('id-ID');
+            }
+
+            populateBaDropdowns(json.depts || [], json.sub_depts || []);
+            renderBeritaAcaraTable();
+            renderBaPagination();
+
+        } catch (err) {
+            console.error('Error loading Berita Acara:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal terhubung ke server.</td></tr>`;
+            }
+        }
+    }
+
+    function populateBaDropdowns(depts, subDepts) {
+        const deptEl = document.getElementById('ba-filter-dept');
+        if (deptEl) {
+            const userDepts = getUserReportsDepts();
+            const onlyPMD = (userDepts.length === 1 && userDepts[0] === 'PMD');
+            const isRestricted = (userDepts.length > 0 && !userDepts.includes('ALL'));
+            if (isRestricted) {
+                depts = depts.filter(d => userDepts.includes(d.toUpperCase()));
+            }
+
+            const curDept = onlyPMD ? 'PMD' : (baState.dept || 'all');
+            let deptHtml = onlyPMD ? '' : '<option value="all">Semua DEPT</option>';
+            depts.forEach(d => {
+                const isSel = (d === curDept) ? 'selected' : '';
+                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(d)}</option>`;
+            });
+            deptEl.innerHTML = deptHtml;
+            if (onlyPMD) {
+                baState.dept = 'PMD';
+                deptEl.value = 'PMD';
+            } else if (curDept !== 'all' && !depts.includes(curDept)) {
+                baState.dept = 'all';
+                deptEl.value = 'all';
+            }
+        }
+
+        const subDeptEl = document.getElementById('ba-filter-subdept');
+        if (subDeptEl) {
+            const curSubDept = baState.sub_dept || 'all';
+            let subDeptHtml = '<option value="all">Semua SUB DEPT</option>';
+            subDepts.forEach(sd => {
+                const isSel = (sd === curSubDept) ? 'selected' : '';
+                subDeptHtml += `<option value="${escapeHtml(sd)}" ${isSel}>${escapeHtml(sd)}</option>`;
+            });
+            subDeptEl.innerHTML = subDeptHtml;
+            if (curSubDept !== 'all' && !subDepts.includes(curSubDept)) {
+                baState.sub_dept = 'all';
+                subDeptEl.value = 'all';
+            }
+        }
+    }
+
+    function renderBeritaAcaraTable() {
+        const tbody = document.getElementById('ba-tbody');
+        if (!tbody) return;
+
+        if (!baState.data || baState.data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                        <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-bottom: 4px;">No data report.</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const pageSize = (baState.limit === 'all') ? 0 : parseInt(baState.limit);
+        const startIndex = (baState.page - 1) * pageSize;
+        const { month, year } = getBaSelectedPeriod();
+        let html = '';
+
+        baState.data.forEach((r, idx) => {
+            const no = startIndex + idx + 1;
+            const sitecode = escapeHtml(r.sitecode);
+            const sitename = escapeHtml(r.sitename || '-');
+            const dept = escapeHtml(r.dept || '-');
+            const subDept = escapeHtml(r.sub_dept || '-');
+            const status = r.report_status;
+
+            // Dokumen Bertanda Tangan
+            let docTtdHtml = '';
+            if (r.uploaded_file_path && r.uploaded_pdf_url) {
+                docTtdHtml = `
+                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">
+                        <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_pdf_url}" target="_blank" rel="noopener noreferrer" title="Preview Dokumen TTD">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <span>Preview</span>
+                        </a>
+                        <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_download_url}" target="_blank" download title="Unduh Dokumen TTD">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>PDF</span>
+                        </a>
+                    </div>
+                `;
+            } else {
+                docTtdHtml = `<span style="color:#94a3b8;font-size:11.5px;font-style:italic;">Belum diunggah</span>`;
+            }
+
+            // Tanggal & Verifikator
+            let verifInfoHtml = '';
+            if (status === 'verified') {
+                const verifier = escapeHtml(r.verified_by || 'Admin');
+                const verifiedAt = r.verified_at_formatted ? escapeHtml(r.verified_at_formatted) : '';
+                verifInfoHtml = `
+                    <div style="font-size:11.5px;color:#1e293b;line-height:1.3;">
+                        <div style="font-weight:600;">${verifier}</div>
+                        <div style="font-size:10.5px;color:#64748b;">${verifiedAt}</div>
+                    </div>
+                `;
+            } else {
+                verifInfoHtml = `<span style="color:#94a3b8;font-size:11.5px;font-style:italic;">Belum diverifikasi</span>`;
+            }
+
+            // Status Badge
+            let statusBadgeHtml = '';
+            if (status === 'verified') {
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Verified
+                    </span>
+                `;
+            } else if (status === 'uploaded') {
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;">
+                        Uploaded
+                    </span>
+                `;
+            } else if (status === 'sent') {
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;">
+                        Pending
+                    </span>
+                `;
+            } else {
+                statusBadgeHtml = `
+                    <span class="badge" style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;">
+                        Generated
+                    </span>
+                `;
+            }
+
+            html += `
+                <tr>
+                    <td style="text-align: center; color: #94a3b8; font-size: 12px;">${no}</td>
+                    <td style="font-weight: 600; color: #1e293b;">${dept}</td>
+                    <td style="color: #475569;">${subDept}</td>
+                    <td style="max-width: 250px;">
+                        <div style="display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <span style="font-weight: 700; color: #0284c7; font-size: 12.5px; flex-shrink: 0;">${sitecode}</span>
+                            <span style="font-weight: 600; color: #0f172a; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis;" title="${sitename}">${sitename}</span>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">${docTtdHtml}</td>
+                    <td style="text-align: center;">${verifInfoHtml}</td>
+                    <td style="text-align: center;">${statusBadgeHtml}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    function renderBaPagination() {
+        const infoEl = document.getElementById('ba-pagination-info');
+        const ctrlEl = document.getElementById('ba-pagination-controls');
+        if (!infoEl || !ctrlEl) return;
+
+        if (baState.total === 0) {
+            infoEl.textContent = 'Menampilkan 0 sampai 0 dari 0 data';
+            ctrlEl.innerHTML = '';
+            return;
+        }
+
+        const pageSize = (baState.limit === 'all') ? baState.total : parseInt(baState.limit);
+        const start = ((baState.page - 1) * pageSize) + 1;
+        const end = Math.min(baState.page * pageSize, baState.total);
+        infoEl.textContent = `Menampilkan ${start} sampai ${end} dari ${baState.total} data`;
+
+        let html = '';
+        html += `<button class="pagination-btn" ${baState.page <= 1 ? 'disabled' : ''} onclick="App.goToBaPage(${baState.page - 1})">Prev</button>`;
+
+        const totalP = baState.totalPages;
+        const curP = baState.page;
+        let startP = Math.max(1, curP - 2);
+        let endP = Math.min(totalP, startP + 4);
+        if (endP - startP < 4) startP = Math.max(1, endP - 4);
+
+        if (startP > 1) {
+            html += `<button class="pagination-btn" onclick="App.goToBaPage(1)">1</button>`;
+            if (startP > 2) html += `<span class="pagination-dots">...</span>`;
+        }
+
+        for (let p = startP; p <= endP; p++) {
+            html += `<button class="pagination-btn ${p === curP ? 'active' : ''}" onclick="App.goToBaPage(${p})">${p}</button>`;
+        }
+
+        if (endP < totalP) {
+            if (endP < totalP - 1) html += `<span class="pagination-dots">...</span>`;
+            html += `<button class="pagination-btn" onclick="App.goToBaPage(${totalP})">${totalP}</button>`;
+        }
+
+        html += `<button class="pagination-btn" ${curP >= totalP ? 'disabled' : ''} onclick="App.goToBaPage(${curP + 1})">Next</button>`;
+        ctrlEl.innerHTML = html;
+    }
+
+    function goToBaPage(p) {
+        if (p < 1 || p > baState.totalPages || p === baState.page) return;
+        loadBeritaAcaraData(p);
+    }
+
+    function onBaPeriodChange() {
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    function onBaDeptChange() {
+        const el = document.getElementById('ba-filter-dept');
+        baState.dept = el ? el.value : 'all';
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    function onBaSubDeptChange() {
+        const el = document.getElementById('ba-filter-subdept');
+        baState.sub_dept = el ? el.value : 'all';
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    function onBaStatusFilterChange() {
+        const el = document.getElementById('ba-filter-status');
+        baState.status = el ? el.value : 'all';
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    function changeBaPageSize(size) {
+        baState.limit = size;
+        baState.page = 1;
+        loadBeritaAcaraData(1);
+    }
+
+    let baSearchTimeout = null;
+    function handleBaSearch(term) {
+        clearTimeout(baSearchTimeout);
+        baSearchTimeout = setTimeout(() => {
+            baState.search = term.trim();
+            baState.page = 1;
+            loadBeritaAcaraData(1);
+        }, 300);
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -13561,6 +14825,10 @@ const App = (() => {
                 uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Reports</span>`);
             }
 
+            if (u.can_reset_report === true || isSuperadmin) {
+                uacBadges.push(`<span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Reset Report</span>`);
+            }
+
             if (u.can_access_master_data !== false) {
                 uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master Data</span>`);
             } else {
@@ -13662,6 +14930,8 @@ const App = (() => {
         const deptsContainer = document.getElementById('user-uac-reports-depts-container');
         if (deptsContainer) deptsContainer.style.display = 'block';
         document.querySelectorAll('.user-uac-dept-checkbox').forEach(cb => { cb.checked = true; });
+        const uacReportsResetAdd = document.getElementById('user-uac-reports-reset');
+        if (uacReportsResetAdd) uacReportsResetAdd.checked = false;
         document.getElementById('user-uac-master-data').checked = true;
         document.getElementById('user-uac-master-data-weekly').checked = true;
         const uacUserMgmtAdd = document.getElementById('user-uac-user-management');
@@ -13684,6 +14954,8 @@ const App = (() => {
             return;
         }
 
+        const isSuperadmin = (user.username || '').toLowerCase() === 'd3utsch';
+
         document.getElementById('user-form-id').value = user.id;
         document.getElementById('user-form-name').value = user.name || '';
         document.getElementById('user-form-username').value = user.username || '';
@@ -13703,6 +14975,8 @@ const App = (() => {
         document.querySelectorAll('.user-uac-dept-checkbox').forEach(cb => {
             cb.checked = (rawDepts === 'ALL') || userDeptsArr.includes(cb.value.toUpperCase());
         });
+        const uacReportsResetEdit = document.getElementById('user-uac-reports-reset');
+        if (uacReportsResetEdit) uacReportsResetEdit.checked = (user.can_reset_report === true || isSuperadmin);
         document.getElementById('user-uac-master-data').checked = user.can_access_master_data !== false;
         document.getElementById('user-uac-master-data-weekly').checked = user.can_access_master_data_weekly !== false;
         const uacUserMgmtEdit = document.getElementById('user-uac-user-management');
@@ -13713,7 +14987,6 @@ const App = (() => {
         document.getElementById('user-uac-master-weekly-add-import').checked = user.can_master_weekly_add_import !== false;
         document.getElementById('user-uac-master-weekly-delete').checked = user.can_master_weekly_delete !== false;
 
-        const isSuperadmin = (user.username || '').toLowerCase() === 'd3utsch';
         document.getElementById('user-form-modal-title').textContent = isSuperadmin ? 'Edit Superadmin: D3utsch' : `Edit User: ${user.username}`;
         document.getElementById('btn-submit-user').textContent = 'Perbarui User';
         document.getElementById('user-form-modal').style.display = 'flex';
@@ -13755,6 +15028,7 @@ const App = (() => {
             can_access_weekly_summary: document.getElementById('user-uac-weekly-summary').checked,
             can_access_reports: document.getElementById('user-uac-reports') ? document.getElementById('user-uac-reports').checked : true,
             reports_depts: reportsDepts,
+            can_reset_report: document.getElementById('user-uac-reports-reset') ? document.getElementById('user-uac-reports-reset').checked : false,
             can_access_master_data: document.getElementById('user-uac-master-data').checked,
             can_access_master_data_weekly: document.getElementById('user-uac-master-data-weekly').checked,
             can_access_user_management: document.getElementById('user-uac-user-management') ? document.getElementById('user-uac-user-management').checked : true,
@@ -14499,6 +15773,8 @@ const App = (() => {
     let weeklySummaryData = null;
     let currentWeeklyRatingFilter = 'very_poor';
     let currentWeeklyExecutionFilter = 'not_executed';
+    let currentWeeklyScorecardDeptFilter = 'all';
+    let currentWeeklyScorecardSubDeptFilter = 'all';
     let weeklyReportSortColumn = null;
     let weeklyReportSortDirection = 'asc';
     let weeklyScorecardRatingPieChart = null;
@@ -14513,6 +15789,8 @@ const App = (() => {
     function switchWeeklyCategory(cat) {
         currentWeeklyCategory = cat === 'outlet' ? 'outlet' : 'pmd';
         currentWeeklyReportPage = 1;
+        currentWeeklyScorecardDeptFilter = 'all';
+        currentWeeklyScorecardSubDeptFilter = 'all';
 
         try {
             sessionStorage.setItem('weekly_category', currentWeeklyCategory);
@@ -14884,11 +16162,130 @@ const App = (() => {
     function renderWeeklyScorecard(scorecard) {
         if (!scorecard) return;
 
-        // Render Pie Charts
-        renderWeeklyScorecardRatingPieChart(scorecard.rating);
-        renderWeeklyScorecardExecPieChart(scorecard.execution);
+        populateWeeklyScorecardFilters(scorecard.sites || []);
+        applyWeeklyScorecardFiltersAndRender();
+    }
 
-        // Render Tables
+    function populateWeeklyScorecardFilters(sites) {
+        const deptSelect = document.getElementById('weekly-scorecard-dept-filter');
+        const subdeptSelect = document.getElementById('weekly-scorecard-subdept-filter');
+        if (!deptSelect || !subdeptSelect) return;
+
+        const isPmd = (currentWeeklyCategory === 'pmd');
+
+        let deptHtml = '<option value="all">Semua DEPT</option>';
+        if (isPmd) {
+            deptHtml += '<option value="PMD">PMD</option>';
+            deptHtml += '<option value="DNO">DNO</option>';
+            deptHtml += '<option value="DSO">DSO</option>';
+        } else {
+            const depts = ['CRO', 'ERO', 'WRO'];
+            depts.forEach(d => {
+                deptHtml += `<option value="${d}">${d}</option>`;
+            });
+        }
+        deptSelect.innerHTML = deptHtml;
+
+        if (currentWeeklyScorecardDeptFilter !== 'all' && deptSelect.querySelector(`option[value="${currentWeeklyScorecardDeptFilter}"]`)) {
+            deptSelect.value = currentWeeklyScorecardDeptFilter;
+        } else {
+            deptSelect.value = 'all';
+            currentWeeklyScorecardDeptFilter = 'all';
+        }
+
+        updateWeeklyScorecardSubdeptOptions();
+    }
+
+    function updateWeeklyScorecardSubdeptOptions() {
+        const deptSelect = document.getElementById('weekly-scorecard-dept-filter');
+        const subdeptSelect = document.getElementById('weekly-scorecard-subdept-filter');
+        if (!subdeptSelect) return;
+
+        const selectedDept = deptSelect ? deptSelect.value : 'all';
+        const isPmd = (currentWeeklyCategory === 'pmd');
+
+        let html = '<option value="all">Semua Sub Dept</option>';
+
+        if (isPmd) {
+            html += '<option value="DNO">DNO</option>';
+            html += '<option value="DSO">DSO</option>';
+        } else {
+            if (selectedDept === 'all') {
+                const depts = ['CRO', 'ERO', 'WRO'];
+                depts.forEach(d => {
+                    const subs = DEPT_SUBDEPTS_MAP[d] || [];
+                    if (subs.length > 0) {
+                        html += `<optgroup label="${d}">`;
+                        subs.forEach(s => {
+                            html += `<option value="${s}">${s}</option>`;
+                        });
+                        html += `</optgroup>`;
+                    }
+                });
+            } else if (DEPT_SUBDEPTS_MAP[selectedDept]) {
+                const subs = DEPT_SUBDEPTS_MAP[selectedDept] || [];
+                subs.forEach(s => {
+                    html += `<option value="${s}">${s}</option>`;
+                });
+            }
+        }
+
+        subdeptSelect.innerHTML = html;
+        if (currentWeeklyScorecardSubDeptFilter !== 'all' && subdeptSelect.querySelector(`option[value="${currentWeeklyScorecardSubDeptFilter}"]`)) {
+            subdeptSelect.value = currentWeeklyScorecardSubDeptFilter;
+        } else {
+            subdeptSelect.value = 'all';
+            currentWeeklyScorecardSubDeptFilter = 'all';
+        }
+    }
+
+    function onWeeklyScorecardDeptFilterChange() {
+        const deptSelect = document.getElementById('weekly-scorecard-dept-filter');
+        currentWeeklyScorecardDeptFilter = deptSelect ? deptSelect.value : 'all';
+        updateWeeklyScorecardSubdeptOptions();
+        const subdeptSelect = document.getElementById('weekly-scorecard-subdept-filter');
+        currentWeeklyScorecardSubDeptFilter = subdeptSelect ? subdeptSelect.value : 'all';
+
+        applyWeeklyScorecardFiltersAndRender();
+    }
+
+    function onWeeklyScorecardSubDeptFilterChange() {
+        const subdeptSelect = document.getElementById('weekly-scorecard-subdept-filter');
+        currentWeeklyScorecardSubDeptFilter = subdeptSelect ? subdeptSelect.value : 'all';
+
+        applyWeeklyScorecardFiltersAndRender();
+    }
+
+    function applyWeeklyScorecardFiltersAndRender() {
+        if (!weeklySummaryData || !weeklySummaryData.scorecard) return;
+        const sites = weeklySummaryData.scorecard.sites || [];
+        const filtered = sites.filter(s => matchesScorecardFilter(s, currentWeeklyScorecardDeptFilter, currentWeeklyScorecardSubDeptFilter));
+
+        const rCounts = {
+            very_good: 0,
+            good: 0,
+            moderate: 0,
+            poor: 0,
+            very_poor: 0
+        };
+        const eCounts = {
+            executed: 0,
+            not_executed: 0
+        };
+
+        filtered.forEach(s => {
+            const rCode = s.rating_code || 'very_poor';
+            if (rCounts[rCode] !== undefined) rCounts[rCode]++;
+
+            if (s.executed) {
+                eCounts.executed++;
+            } else {
+                eCounts.not_executed++;
+            }
+        });
+
+        renderWeeklyScorecardRatingPieChart(rCounts);
+        renderWeeklyScorecardExecPieChart(eCounts);
         renderWeeklyScorecardRatingTable();
         renderWeeklyScorecardExecTable();
     }
@@ -15063,9 +16460,9 @@ const App = (() => {
         if (!tbody || !weeklySummaryData || !weeklySummaryData.scorecard) return;
 
         const sites = weeklySummaryData.scorecard.sites || [];
-        let filtered = sites;
+        let filtered = sites.filter(s => matchesScorecardFilter(s, currentWeeklyScorecardDeptFilter, currentWeeklyScorecardSubDeptFilter));
         if (currentWeeklyRatingFilter && currentWeeklyRatingFilter !== 'all') {
-            filtered = sites.filter(s => s.rating_code === currentWeeklyRatingFilter);
+            filtered = filtered.filter(s => s.rating_code === currentWeeklyRatingFilter);
         }
 
         // Highlight selected stat row
@@ -15123,12 +16520,12 @@ const App = (() => {
         if (!tbody || !weeklySummaryData || !weeklySummaryData.scorecard) return;
 
         const sites = weeklySummaryData.scorecard.sites || [];
-        let filtered = sites;
+        let filtered = sites.filter(s => matchesScorecardFilter(s, currentWeeklyScorecardDeptFilter, currentWeeklyScorecardSubDeptFilter));
         if (currentWeeklyExecutionFilter && currentWeeklyExecutionFilter !== 'all') {
             if (currentWeeklyExecutionFilter === 'executed') {
-                filtered = sites.filter(s => s.executed);
+                filtered = filtered.filter(s => s.executed);
             } else {
-                filtered = sites.filter(s => !s.executed);
+                filtered = filtered.filter(s => !s.executed);
             }
         }
 
@@ -15819,6 +17216,8 @@ const App = (() => {
         renderScoreCardExecution,
         renderScoreCardRatingPieChart,
         renderScoreCardExecPieChart,
+        onScorecardDeptFilterChange,
+        onScorecardSubDeptFilterChange,
         // Score Card KPI Master Data exports
         loadScorecardKpi,
         renderScorecardKpiTable,
@@ -15967,6 +17366,40 @@ const App = (() => {
         closeReportKeteranganModal,
         onReportKeteranganInput,
         submitReportKeteranganAndGenerate,
+        // Reports: Verification Card exports
+        reportsVerifState,
+        loadReportsVerificationData,
+        renderReportsVerificationTable,
+        renderReportsVerifPagination,
+        goToReportsVerifPage,
+        onReportsVerifDeptChange,
+        onReportsVerifSubDeptChange,
+        onReportsVerifStatusFilterChange,
+        changeReportsVerifPageSize,
+        handleReportsVerifSearch,
+        openUploadSignedModal,
+        closeUploadSignedModal,
+        onSignedFileSelected,
+        clearSignedFileSelected,
+        submitUploadSignedReport,
+        verifyReport,
+        rejectReport,
+        resetReportForSite,
+        // Berita Acara Page exports
+        baState,
+        initBeritaAcaraPage,
+        switchBaSOType,
+        updateBaMonthDropdown,
+        loadBeritaAcaraData,
+        renderBeritaAcaraTable,
+        renderBaPagination,
+        goToBaPage,
+        onBaPeriodChange,
+        onBaDeptChange,
+        onBaSubDeptChange,
+        onBaStatusFilterChange,
+        changeBaPageSize,
+        handleBaSearch,
         // Chat Room PIC Sites exports
         openChatRoomModal,
         closeChatRoomModal,
@@ -15985,6 +17418,8 @@ const App = (() => {
         toggleLoginModalPassword,
         submitLogin,
         logout,
+        updateCsrfToken,
+        refreshCsrfToken,
         toggleUserDropdown,
         closeUserDropdown,
         navigateTo,
@@ -16030,6 +17465,8 @@ const App = (() => {
         toggleWeeklyScorecardRatingFilter,
         onWeeklyScorecardExecutionFilterChange,
         toggleWeeklyScorecardExecutionFilter,
+        onWeeklyScorecardDeptFilterChange,
+        onWeeklyScorecardSubDeptFilterChange,
         applyWeeklyReportSoFilter,
         renderWeeklyReportTable,
         changeWeeklyReportPageSize,

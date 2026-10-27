@@ -236,7 +236,7 @@
                         <th style="width: 105px;">DEPT</th>
                         <th style="width: 115px;">SUB DEPT</th>
                         <th style="width: 250px; max-width: 270px;">SITE CODE / SITE NAME</th>
-                        <th style="width: 380px; min-width: 380px; text-align: center; white-space: nowrap;">ACTION</th>
+                        <th style="width: 440px; min-width: 440px; text-align: center; white-space: nowrap;">ACTION</th>
                         <th style="width: 130px; text-align: center;">STATUS</th>
                     </tr>
                 </thead>
@@ -263,72 +263,123 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- PREVIEW MODAL: Berita Acara BA Document                     -->
+    <!-- CARD 2: Verification Report Table                           -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div id="report-preview-modal" class="modal-backdrop"
-        style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(2px);">
-        <div class="modal-card"
-            style="background: #fff; width: 100%; max-width: 960px; max-height: 92vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-            <!-- Modal Header -->
-            <div
-                style="padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
-                <div>
-                    <h3 id="report-preview-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">
-                        Preview Berita Acara Tindak Lanjut DB</h3>
+    <div class="card" id="card-verification-report" style="margin-bottom: 1.5rem;">
+        <div class="card-header"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 0.95rem 1.25rem; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+                <h2 class="card-title" style="font-size: 15px; margin: 0; color: #0f172a; font-weight: 700;">
+                    Verification Report</h2>
+            </div>
+            <div id="badge-verification-count"
+                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 20px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span id="stat-verification-summary-text">0 Terkirim ke WA</span>
+            </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="table-toolbar"
+            style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+                <!-- Page size -->
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                    <label for="reports-verif-page-size"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">Tampilkan</label>
+                    <select id="reports-verif-page-size" class="form-control unified-filter-select" style="width: auto;"
+                        onchange="App.changeReportsVerifPageSize(this.value)">
+                        <option value="10">10</option>
+                        <option value="15" selected>15</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="all">Semua</option>
+                    </select>
                 </div>
-                <button type="button" class="modal-close-btn" onclick="App.closeReportPreviewModal()"
-                    style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
+
+                <!-- Dept filter -->
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                    <label for="reports-verif-filter-dept"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
+                    <select id="reports-verif-filter-dept" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.onReportsVerifDeptChange()">
+                        <option value="all">Semua DEPT</option>
+                    </select>
+                </div>
+
+                <!-- Subdept filter -->
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                    <label for="reports-verif-filter-subdept"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                    <select id="reports-verif-filter-subdept" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.onReportsVerifSubDeptChange()">
+                        <option value="all">Semua SUB DEPT</option>
+                    </select>
+                </div>
+
+                <!-- Status filter -->
+                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                    <label for="reports-verif-filter-status"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">STATUS</label>
+                    <select id="reports-verif-filter-status" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="App.onReportsVerifStatusFilterChange()">
+                        <option value="all">Semua Status</option>
+                        <option value="sent">Menunggu Upload</option>
+                        <option value="uploaded">Menunggu Verifikasi</option>
+                        <option value="verified">Verified</option>
+                    </select>
+                </div>
             </div>
 
-            <!-- Modal Body (Iframe for pixel-perfect print layout) -->
-            <div
-                style="flex: 1; padding: 0; background: #e2e8f0; overflow: hidden; position: relative; min-height: 520px;">
-                <iframe id="report-preview-iframe" src="about:blank"
-                    style="width: 100%; height: 100%; min-height: 520px; border: none; background: #fff;"></iframe>
+            <!-- Search input strictly follows AGENTS.md rule 1 -->
+            <div style="min-width: 240px;">
+                <input type="text" id="reports-verif-search-input" class="table-search-input unified-search-input"
+                    placeholder="Search..." oninput="App.handleReportsVerifSearch(this.value)">
             </div>
+        </div>
 
-            <!-- Modal Footer -->
-            <div
-                style="padding: 0.85rem 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; flex-wrap: wrap; gap: 0.5rem;">
-                <div style="font-size: 12px; color: #64748b;">
-                    <span id="report-preview-meta">Dokumen Berita Acara v1.2</span>
-                </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                    <a id="report-preview-open-new-tab" href="#" target="_blank" class="btn btn-secondary btn-sm"
-                        style="display: inline-flex; align-items: center; gap: 6px;" title="Buka Dokumen PDF di Tab Baru">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                        <span>Tab Baru</span>
-                    </a>
-                    <a id="report-preview-download-pdf" href="#" target="_blank" class="btn btn-primary btn-sm"
-                        style="display: inline-flex; align-items: center; gap: 6px;" title="Download PDF">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        <span>Download PDF</span>
-                    </a>
-                    <button type="button" id="report-preview-btn-wa" class="btn btn-success btn-sm"
-                        onclick="App.sendCurrentPreviewWhatsApp()"
-                        style="display: inline-flex; align-items: center; gap: 6px;">
-                        <span>Kirim WhatsApp</span>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm"
-                        onclick="App.closeReportPreviewModal()">Tutup</button>
-                </div>
+        <!-- Table Container -->
+        <div class="table-container" style="overflow-x: auto;">
+            <table class="reconciliation-table" id="reports-verif-table"
+                style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="width: 45px; text-align: center;">NO</th>
+                        <th style="width: 105px;">DEPT</th>
+                        <th style="width: 115px;">SUB DEPT</th>
+                        <th style="width: 240px; max-width: 260px;">SITE CODE / SITE NAME</th>
+                        <th style="width: 130px; text-align: center;">SENT AT</th>
+                        <th style="width: 130px; text-align: center;">DOKUMEN ASLI</th>
+                        <th style="width: 150px; text-align: center;">DOKUMEN TTD</th>
+                        <th style="width: 210px; text-align: center;">VERIFIKASI</th>
+                        <th style="width: 125px; text-align: center;">STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="reports-verif-tbody">
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                            Memuat data verification report...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Table Pagination -->
+        <div class="table-footer"
+            style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 0.75rem;">
+            <div id="reports-verif-pagination-info" style="font-size: 12px; color: #64748b;">
+                Menampilkan 0 sampai 0 dari 0 data
+            </div>
+            <div class="pagination-controls" id="reports-verif-pagination-controls">
+                <!-- Injected via JS -->
             </div>
         </div>
     </div>
+
+
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- MODAL: Input Keterangan DB Sebelum Generate Berita Acara     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
@@ -373,6 +424,78 @@
                     Generate BA
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL: Upload Dokumen Berita Acara Bertanda-Tangan          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="report-upload-signed-modal" class="modal-backdrop"
+        style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(2px);">
+        <div class="modal-card"
+            style="background: #fff; width: 100%; max-width: 500px; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <!-- Modal Header -->
+            <div
+                style="padding: 1.1rem 1.4rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <div>
+                    <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">Upload Dokumen BA
+                        Bertanda-Tangan</h3>
+                    <p id="report-upload-signed-site-info" style="margin: 3px 0 0 0; font-size: 12px; color: #64748b;">
+                        Site: -</p>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="App.closeUploadSignedModal()"
+                    style="background: transparent; border: none; font-size: 22px; cursor: pointer; color: #64748b; line-height: 1;">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <form id="form-upload-signed-report" onsubmit="App.submitUploadSignedReport(event)" style="margin: 0;">
+                <input type="hidden" id="upload-signed-sitecode" value="">
+                <div style="padding: 1.35rem 1.4rem;">
+
+                    <div id="upload-signed-dropzone"
+                        onclick="document.getElementById('upload-signed-file-input').click()"
+                        style="border: 2px dashed #cbd5e1; border-radius: 10px; padding: 1.5rem; text-align: center; background: #f8fafc; cursor: pointer; transition: all 0.2s ease;">
+                        <input type="file" id="upload-signed-file-input" accept=".pdf,image/jpeg,image/png"
+                            style="display: none;" onchange="App.onSignedFileSelected(this.files)">
+                        <div style="color: #64748b;">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.8" style="margin: 0 auto 8px auto; display: block; color: #0284c7;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <div style="font-size: 13px; font-weight: 600; color: #1e293b;">Pilih file atau drag and
+                                drop file</div>
+                        </div>
+                    </div>
+
+                    <div id="upload-signed-file-info"
+                        style="display: none; margin-top: 0.85rem; padding: 0.65rem 0.85rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            <span id="upload-signed-filename"
+                                style="font-size: 12.5px; font-weight: 600; color: #15803d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span>
+                        </div>
+                        <button type="button" onclick="App.clearSignedFileSelected()"
+                            style="background: none; border: none; color: #ef4444; font-size: 16px; cursor: pointer; padding: 2px 6px;">&times;</button>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div
+                    style="padding: 0.85rem 1.4rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.5rem; background: #f8fafc;">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="App.closeUploadSignedModal()">Batal</button>
+                    <button type="submit" id="btn-submit-upload-signed" class="btn btn-primary btn-sm" disabled
+                        style="background: #0284c7; border-color: #0284c7; color: #fff; font-weight: 600; padding: 6px 18px; border-radius: 6px;">
+                        Upload Dokumen
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

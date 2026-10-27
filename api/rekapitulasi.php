@@ -55,7 +55,8 @@ try {
         $pmdSites = [];
         foreach ($sites as $s) {
             $sc = strtoupper(trim($s['sitecode'] ?? ''));
-            if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+            $isSitePmd = (in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'], true) || strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || ($s['category'] ?? '') === 'monthly_pmd');
+            if ($isSitePmd) {
                 $baseTypes[$sc] = 'monthly';
                 $pmdSites[$sc] = true;
             } else {
@@ -148,6 +149,12 @@ try {
             '50002003289' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
             '50002003307' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
         ];
+        $hubSiteBuckets = [
+            'BALIKPAPAN' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'MEDAN'      => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'PALEMBANG'  => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'SURABAYA'   => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+        ];
 
         foreach ($sites as $s) {
             $sitecode = trim($s['sitecode'] ?? '');
@@ -156,10 +163,15 @@ try {
             $subDept = trim($s['sub_dept'] ?? '');
             $cat = trim($s['category'] ?? '');
 
+            $isPmd = ($dept === 'PMD' || in_array($dept, ['DNO', 'DSO'], true) || $cat === 'monthly_pmd' || ($s['divisi'] ?? '') === 'PMD');
+
             if ($subDept !== '') {
-                if ($dept === 'PMD' || $cat === 'monthly_pmd') {
+                if ($isPmd) {
                     if (!isset($pmdSubDeptBuckets[$subDept])) {
                         $pmdSubDeptBuckets[$subDept] = array_fill(1, 12, ['sum' => 0.0, 'count' => 0]);
+                    }
+                    if (!isset($pmdSubDeptBuckets[$dept])) {
+                        $pmdSubDeptBuckets[$dept] = array_fill(1, 12, ['sum' => 0.0, 'count' => 0]);
                     }
                 } else {
                     if (!isset($subDeptBuckets[$subDept])) {
@@ -175,7 +187,6 @@ try {
                 $eff = $monthlyEffMap[$m][$upperCode] ?? 'monthly';
                 if ($eff === 'inactive' || $eff === 'uncounted')
                     continue;
-                $isPmd = ($dept === 'PMD' || $cat === 'monthly_pmd');
                 if ($soType === 'quarterly') {
                     if ($isPmd || $eff !== 'quarterly')
                         continue;
@@ -220,16 +231,26 @@ try {
                 }
 
                 if ($val !== null) {
-                    if (isset($deptBuckets[$dept])) {
+                    $infoVal = trim($s['info'] ?? '');
+                    $siteNameVal = trim($s['name_site'] ?? '');
+                    $isItSite = in_array($upperCode, ['50002001384', '50002003133'], true) || in_array($infoVal, ['IT Coorporate', 'IT Corporate'], true);
+                    $isTeknoSite = in_array($upperCode, ['50002003289', '50002003307'], true) || stripos($siteNameVal, 'TEKNO') !== false;
+                    $isHubSite = (stripos($infoVal, 'HUB') !== false || stripos($siteNameVal, 'HUB') !== false);
+                    $isWarehouseOrSpecial = ($isItSite || $isTeknoSite || $isHubSite);
+
+                    // 1. Pure Outlet Regional (CRO, WRO, ERO) & PMD
+                    if ($isPmd) {
+                        $deptBuckets['PMD'][$m]['sum'] += $val;
+                        $deptBuckets['PMD'][$m]['count']++;
+                    } elseif (!$isWarehouseOrSpecial && isset($deptBuckets[$dept])) {
                         $deptBuckets[$dept][$m]['sum'] += $val;
                         $deptBuckets[$dept][$m]['count']++;
                     }
+
                     $nationalBuckets[$m]['sum'] += $val;
                     $nationalBuckets[$m]['count']++;
 
-                    $isItSite = in_array($upperCode, ['50002001384', '50002003133'], true) || in_array(trim($s['info'] ?? ''), ['IT Coorporate', 'IT Corporate'], true);
-                    $isTeknoSite = in_array($upperCode, ['50002003289', '50002003307'], true) || stripos(trim($s['name_site'] ?? ''), 'TEKNO') !== false;
-
+                    // 2. IT Corporate
                     if ($isItSite) {
                         $itBuckets[$m]['sum'] += $val;
                         $itBuckets[$m]['count']++;
@@ -239,6 +260,7 @@ try {
                         }
                     }
 
+                    // 3. Tekno Warehouse
                     if ($isTeknoSite) {
                         $teknoBuckets[$m]['sum'] += $val;
                         $teknoBuckets[$m]['count']++;
@@ -248,12 +270,34 @@ try {
                         }
                     }
 
-                    if ($dept === 'PMD' || $cat === 'monthly_pmd') {
+                    // 4. Warehouse HUB
+                    if ($isHubSite) {
+                        if (stripos($siteNameVal, 'BALIKPAPAN') !== false || in_array($upperCode, ['0BLPKLA058', '0BLPKLA057'], true)) {
+                            $hubSiteBuckets['BALIKPAPAN'][$m]['sum'] += $val;
+                            $hubSiteBuckets['BALIKPAPAN'][$m]['count']++;
+                        } elseif (stripos($siteNameVal, 'MEDAN') !== false || in_array($upperCode, ['0MDNKLA022', '0MDNKLA021'], true)) {
+                            $hubSiteBuckets['MEDAN'][$m]['sum'] += $val;
+                            $hubSiteBuckets['MEDAN'][$m]['count']++;
+                        } elseif (stripos($siteNameVal, 'PALEMBANG') !== false || in_array($upperCode, ['0PLBKLA031', '0PLBKLA030'], true)) {
+                            $hubSiteBuckets['PALEMBANG'][$m]['sum'] += $val;
+                            $hubSiteBuckets['PALEMBANG'][$m]['count']++;
+                        } elseif (stripos($siteNameVal, 'SURABAYA') !== false || in_array($upperCode, ['0SDAKLA012', '0SDAKLA011'], true)) {
+                            $hubSiteBuckets['SURABAYA'][$m]['sum'] += $val;
+                            $hubSiteBuckets['SURABAYA'][$m]['count']++;
+                        }
+                    }
+
+                    // 5. Sub Depts (Exclude warehouse and special sites from Outlet Regional subdepts)
+                    if ($isPmd) {
                         if (isset($pmdSubDeptBuckets[$subDept])) {
                             $pmdSubDeptBuckets[$subDept][$m]['sum'] += $val;
                             $pmdSubDeptBuckets[$subDept][$m]['count']++;
                         }
-                    } else {
+                        if (isset($pmdSubDeptBuckets[$dept])) {
+                            $pmdSubDeptBuckets[$dept][$m]['sum'] += $val;
+                            $pmdSubDeptBuckets[$dept][$m]['count']++;
+                        }
+                    } elseif (!$isWarehouseOrSpecial) {
                         if (isset($subDeptBuckets[$subDept])) {
                             $subDeptBuckets[$subDept]['months'][$m]['sum'] += $val;
                             $subDeptBuckets[$subDept]['months'][$m]['count']++;
@@ -331,6 +375,23 @@ try {
                 'GUDANG WAREHOUSE TEKNO' => $toSeries($teknoSiteBuckets['50002003289']),
                 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO' => $toSeries($teknoSiteBuckets['50002003307']),
             ],
+            'hub_site_trends' => [
+                'Warehouse HUB BALIKPAPAN' => $toSeries($hubSiteBuckets['BALIKPAPAN']),
+                'Warehouse HUB MEDAN'      => $toSeries($hubSiteBuckets['MEDAN']),
+                'Warehouse HUB PALEMBANG'  => $toSeries($hubSiteBuckets['PALEMBANG']),
+                'Warehouse HUB SURABAYA'   => $toSeries($hubSiteBuckets['SURABAYA']),
+            ],
+            'division_warehouse_trends' => array_filter([
+                'PMD' => ($soType === 'quarterly') ? null : $toSeries($deptBuckets['PMD']),
+                'WRO' => $toSeries($deptBuckets['WRO']),
+                'CRO' => ($soType === 'quarterly') ? null : $toSeries($deptBuckets['CRO']),
+                'ERO' => $toSeries($deptBuckets['ERO']),
+                'Warehouse HUB BALIKPAPAN' => $toSeries($hubSiteBuckets['BALIKPAPAN']),
+                'Warehouse HUB MEDAN' => $toSeries($hubSiteBuckets['MEDAN']),
+                'Warehouse HUB PALEMBANG' => $toSeries($hubSiteBuckets['PALEMBANG']),
+                'Warehouse HUB SURABAYA' => $toSeries($hubSiteBuckets['SURABAYA']),
+                'Warehouse TEKNO (50002003289)' => ($soType === 'quarterly') ? null : $toSeries($teknoSiteBuckets['50002003289']),
+            ], function ($v) { return $v !== null; }),
         ]);
         exit;
     }
@@ -348,23 +409,23 @@ try {
             $whereParts[] = "(group_type != 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type != 'quarterly'))";
         }
     } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
-        $whereParts[] = "dept = 'PMD'";
+        $whereParts[] = "(dept = 'PMD' OR dept IN ('DNO', 'DSO') OR COALESCE(divisi, '') = 'PMD' OR category = 'monthly_pmd')";
     } elseif ($category === 'quarterly_tekno' || $category === 'quarterly_warehouse_tekno' || ($category === 'warehouse_tekno' && ($isQuarterly || $soType === 'quarterly'))) {
-        $whereParts[] = "COALESCE(dept, '') != 'PMD' AND name_site ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "COALESCE(dept, '') != 'PMD' AND COALESCE(dept, '') NOT IN ('DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } elseif ($category === 'monthly_tekno' || $category === 'monthly_warehouse_tekno' || $category === 'warehouse_tekno') {
-        $whereParts[] = "COALESCE(dept, '') != 'PMD' AND name_site ILIKE '%TEKNO%' AND (group_type != 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type != 'quarterly'))";
+        $whereParts[] = "COALESCE(dept, '') != 'PMD' AND COALESCE(dept, '') NOT IN ('DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site ILIKE '%TEKNO%' AND (group_type != 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type != 'quarterly'))";
     } elseif ($category === 'quarterly_subarep') {
-        $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '') AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } elseif ($category === 'quarterly_warehouse' || $category === 'quarterly_warehouse_hub') {
-        $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))))";
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))))";
     } elseif ($category === 'monthly_warehouse' || $category === 'monthly_warehouse_hub') {
-        $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
     } elseif ($category === 'monthly_it_coorporate' || $category === 'it_coorporate' || $category === 'monthly_it_corporate' || $category === 'it_corporate') {
-        $whereParts[] = "dept != 'PMD' AND info IN ('IT Coorporate', 'IT Corporate')";
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND info IN ('IT Coorporate', 'IT Corporate')";
     } elseif ($category === 'quarterly' || $category === 'quarterly_outlet') {
-        $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site NOT ILIKE '%TEKNO%' AND (group_type = 'quarterly' OR EXISTS (SELECT 1 FROM site_group_history sgh WHERE sgh.sitecode = site_regional.sitecode AND sgh.group_type = 'quarterly'))";
     } else {
-        $whereParts[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB') OR info IS NULL) AND (
+        $whereParts[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND COALESCE(category, '') != 'monthly_pmd' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate', 'Under Warehouse', 'HUB') OR info IS NULL) AND (
             EXISTS (
                 SELECT 1 FROM asset_reconciliation ar 
                 WHERE ar.period_year = {$year}
@@ -426,7 +487,8 @@ try {
     $baseTypes = [];
     foreach ($sites as $s) {
         $sc = strtoupper(trim($s['sitecode'] ?? ''));
-        if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+        $isPmdSite = (in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'], true) || strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || ($s['category'] ?? '') === 'monthly_pmd');
+        if ($isPmdSite) {
             $baseTypes[$sc] = 'monthly';
         } elseif (empty($s['is_active'])) {
             $baseTypes[$sc] = 'inactive';

@@ -24,10 +24,10 @@ function getCurrentUser(): ?array
         if (!empty($_SESSION['user']['id']) || !empty($_SESSION['user']['username'])) {
             try {
                 $db = getDbConnection();
-                $stmt = $db->prepare('SELECT id, username, name, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE id = :id OR LOWER(username) = LOWER(:u) LIMIT 1');
+                $stmt = $db->prepare('SELECT id, username, name, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_reset_report, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE id = :id OR LOWER(username) = LOWER(:u) LIMIT 1');
                 $stmt->execute([
-                    ':id' => (int)($_SESSION['user']['id'] ?? 0),
-                    ':u'  => (string)($_SESSION['user']['username'] ?? '')
+                    ':id' => (int) ($_SESSION['user']['id'] ?? 0),
+                    ':u' => (string) ($_SESSION['user']['username'] ?? '')
                 ]);
                 $u = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($u) {
@@ -36,21 +36,23 @@ function getCurrentUser(): ?array
                     $_SESSION['user']['name'] = $u['name'];
                     $_SESSION['user']['role'] = $u['role'] ?? 'admin';
                     $_SESSION['user']['permissions'] = [
-                        'can_access_all_summary'         => filter_var($u['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_weekly_summary'      => filter_var($u['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_reports'             => filter_var($u['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'reports_depts'                  => !empty($u['reports_depts']) ? $u['reports_depts'] : 'ALL',
-                        'can_access_master_data'         => filter_var($u['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_master_data_weekly'  => filter_var($u['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_user_management'     => filter_var($u['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_add_import'          => filter_var($u['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_edit'                => filter_var($u['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_delete'              => filter_var($u['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_weekly_add_import'   => filter_var($u['can_master_weekly_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_weekly_delete'       => filter_var($u['can_master_weekly_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_all_summary' => filter_var($u['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_weekly_summary' => filter_var($u['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_reports' => filter_var($u['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'reports_depts' => !empty($u['reports_depts']) ? $u['reports_depts'] : 'ALL',
+                        'can_reset_report' => filter_var($u['can_reset_report'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data' => filter_var($u['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data_weekly' => filter_var($u['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_user_management' => filter_var($u['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_add_import' => filter_var($u['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_edit' => filter_var($u['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_delete' => filter_var($u['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_add_import' => filter_var($u['can_master_weekly_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_delete' => filter_var($u['can_master_weekly_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
                     ];
                 }
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+            }
         }
         if (!isset($_SESSION['user']['permissions']['can_access_user_management'])) {
             $_SESSION['user']['permissions']['can_access_user_management'] = true;
@@ -109,7 +111,8 @@ function attemptLogin(string $username, string $password): array
                     $newHash = password_hash($password, PASSWORD_DEFAULT);
                     $up = $db->prepare('UPDATE users SET password = :p WHERE id = :id');
                     $up->execute(['p' => $newHash, 'id' => $user['id']]);
-                } catch (Throwable $ignore) {}
+                } catch (Throwable $ignore) {
+                }
             }
 
             if ($isPasswordValid) {
@@ -118,23 +121,24 @@ function attemptLogin(string $username, string $password): array
                 }
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 $_SESSION['user'] = [
-                    'id'          => $user['id'],
-                    'username'    => $user['username'],
-                    'name'        => $user['name'],
-                    'role'        => $user['role'] ?? 'admin',
+                    'id' => $user['id'],
+                    'username' => $user['username'],
+                    'name' => $user['name'],
+                    'role' => $user['role'] ?? 'admin',
                     'permissions' => [
-                        'can_access_all_summary'         => filter_var($user['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_weekly_summary'      => filter_var($user['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_reports'             => filter_var($user['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'reports_depts'                  => !empty($user['reports_depts']) ? $user['reports_depts'] : 'ALL',
-                        'can_access_master_data'         => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_master_data_weekly'  => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_access_user_management'     => filter_var($user['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_add_import'          => filter_var($user['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_edit'                => filter_var($user['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_delete'              => filter_var($user['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_weekly_add_import'   => filter_var($user['can_master_weekly_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                        'can_master_weekly_delete'       => filter_var($user['can_master_weekly_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_all_summary' => filter_var($user['can_access_all_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_weekly_summary' => filter_var($user['can_access_weekly_summary'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_reports' => filter_var($user['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'reports_depts' => !empty($user['reports_depts']) ? $user['reports_depts'] : 'ALL',
+                        'can_reset_report' => filter_var($user['can_reset_report'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data' => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_master_data_weekly' => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_user_management' => filter_var($user['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_add_import' => filter_var($user['can_master_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_edit' => filter_var($user['can_master_edit'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_delete' => filter_var($user['can_master_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_add_import' => filter_var($user['can_master_weekly_add_import'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'can_master_weekly_delete' => filter_var($user['can_master_weekly_delete'] ?? true, FILTER_VALIDATE_BOOLEAN),
                     ],
                 ];
                 return ['success' => true, 'user' => $_SESSION['user']];
@@ -151,23 +155,24 @@ function attemptLogin(string $username, string $password): array
         }
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         $_SESSION['user'] = [
-            'id'          => 1,
-            'username'    => 'D3utsch',
-            'name'        => 'Asset Management Administrator',
-            'role'        => 'admin',
+            'id' => 1,
+            'username' => 'D3utsch',
+            'name' => 'Asset Management Administrator',
+            'role' => 'admin',
             'permissions' => [
-                'can_access_all_summary'        => true,
-                'can_access_weekly_summary'     => true,
-                'can_access_reports'            => true,
-                'reports_depts'                 => 'ALL',
-                'can_access_master_data'        => true,
+                'can_access_all_summary' => true,
+                'can_access_weekly_summary' => true,
+                'can_access_reports' => true,
+                'reports_depts' => 'ALL',
+                'can_reset_report' => true,
+                'can_access_master_data' => true,
                 'can_access_master_data_weekly' => true,
-                'can_access_user_management'    => true,
-                'can_master_add_import'         => true,
-                'can_master_edit'               => true,
-                'can_master_delete'             => true,
-                'can_master_weekly_add_import'  => true,
-                'can_master_weekly_delete'      => true,
+                'can_access_user_management' => true,
+                'can_master_add_import' => true,
+                'can_master_edit' => true,
+                'can_master_delete' => true,
+                'can_master_weekly_add_import' => true,
+                'can_master_weekly_delete' => true,
             ],
         ];
         return ['success' => true, 'user' => $_SESSION['user']];
@@ -187,11 +192,11 @@ function logoutUser(): void
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-    unset($_SESSION['user']);
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    $_SESSION = [];
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
     }
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 /**

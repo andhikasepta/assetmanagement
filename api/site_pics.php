@@ -42,9 +42,9 @@ try {
         $dept = trim($_GET['dept'] ?? 'all');
         $subDept = trim($_GET['sub_dept'] ?? 'all');
         $search = trim($_GET['search'] ?? '');
-        $page = max(1, (int)($_GET['page'] ?? 1));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
         $limitParam = $_GET['limit'] ?? '10';
-        $limit = ($limitParam === 'all') ? 999999 : max(1, (int)$limitParam);
+        $limit = ($limitParam === 'all') ? 999999 : max(1, (int) $limitParam);
         $offset = ($page - 1) * $limit;
 
         $sortCol = $_GET['sort_col'] ?? 'dept';
@@ -91,7 +91,7 @@ try {
         // Total count
         $countStmt = $db->prepare("SELECT COUNT(*) FROM site_pics sp WHERE $whereSql");
         $countStmt->execute($params);
-        $total = (int)$countStmt->fetchColumn();
+        $total = (int) $countStmt->fetchColumn();
 
         // Data query
         $sql = "
@@ -114,7 +114,7 @@ try {
         $depts = $db->query("SELECT DISTINCT dept FROM site_pics WHERE dept IS NOT NULL AND TRIM(dept) != '' ORDER BY dept ASC")->fetchAll(PDO::FETCH_COLUMN);
         $subDepts = $db->query("SELECT DISTINCT sub_dept FROM site_pics WHERE sub_dept IS NOT NULL AND TRIM(sub_dept) != '' ORDER BY sub_dept ASC")->fetchAll(PDO::FETCH_COLUMN);
 
-        $totalPages = ($limitParam === 'all') ? 1 : (int)ceil($total / $limit);
+        $totalPages = ($limitParam === 'all') ? 1 : (int) ceil($total / $limit);
 
         echo json_encode([
             'success' => true,
@@ -241,10 +241,10 @@ try {
             $sheet->setCellValue('A' . $curRow, $no++);
             $sheet->setCellValue('B' . $curRow, $r['dept'] ?? '-');
             $sheet->setCellValue('C' . $curRow, $r['sub_dept'] ?? '-');
-            $sheet->setCellValueExplicit('D' . $curRow, (string)($r['sitecode'] ?? '-'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('D' . $curRow, (string) ($r['sitecode'] ?? '-'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             $sheet->setCellValue('E' . $curRow, $r['name_site'] ?? '-');
             $sheet->setCellValue('F' . $curRow, $r['pic'] ?? '-');
-            $sheet->setCellValueExplicit('G' . $curRow, (string)($r['no_telp'] ?? '-'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('G' . $curRow, (string) ($r['no_telp'] ?? '-'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 
             $sheet->getStyle('A' . $curRow . ':G' . $curRow)->applyFromArray($cellBorder);
             $sheet->getStyle('A' . $curRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
@@ -350,7 +350,7 @@ try {
 
             foreach ($rows as $rIdx => $row) {
                 foreach ($row as $colLetter => $cellVal) {
-                    $cleaned = strtolower(trim((string)$cellVal));
+                    $cleaned = strtolower(trim((string) $cellVal));
                     $cleaned = str_replace(['_', '.', ' '], '', $cleaned);
                     if ($cleaned === 'sitecode' || $cleaned === 'site' || $cleaned === 'kodesite') {
                         $headerRowIdx = $rIdx;
@@ -366,7 +366,7 @@ try {
             // Map columns from header row
             $headerRow = $rows[$headerRowIdx];
             foreach ($headerRow as $colLetter => $cellVal) {
-                $val = strtolower(trim((string)$cellVal));
+                $val = strtolower(trim((string) $cellVal));
                 $norm = str_replace(['_', '.', ' '], '', $val);
 
                 if (in_array($norm, ['sitecode', 'kodesite', 'siteid'], true) || ($norm === 'site' && !$colMap['sitecode'])) {
@@ -385,7 +385,7 @@ try {
             }
 
             if (!$colMap['sitecode']) {
-                throw new Exception('Kolom SITECODE tidak ditemukan pada file Excel. Pastikan terdapat kolom bertuliskan SITECODE.');
+                throw new Exception('Kolom SITECODE tidak ditemukan pada file Excel.');
             }
 
             // Pre-fetch site_regional for fallback lookups
@@ -429,29 +429,32 @@ try {
                     continue;
                 }
 
-                $sitecode = trim((string)($row[$colMap['sitecode']] ?? ''));
+                $sitecode = trim((string) ($row[$colMap['sitecode']] ?? ''));
                 if ($sitecode === '') {
                     $skipped++;
                     continue;
                 }
 
-                $dept = $colMap['dept'] ? trim((string)($row[$colMap['dept']] ?? '')) : '';
-                $subDept = $colMap['sub_dept'] ? trim((string)($row[$colMap['sub_dept']] ?? '')) : '';
-                $nameSite = $colMap['name_site'] ? trim((string)($row[$colMap['name_site']] ?? '')) : '';
-                $pic = $colMap['pic'] ? trim((string)($row[$colMap['pic']] ?? '')) : '';
-                $noTelp = $colMap['no_telp'] ? trim((string)($row[$colMap['no_telp']] ?? '')) : '';
+                $dept = $colMap['dept'] ? trim((string) ($row[$colMap['dept']] ?? '')) : '';
+                $subDept = $colMap['sub_dept'] ? trim((string) ($row[$colMap['sub_dept']] ?? '')) : '';
+                $nameSite = $colMap['name_site'] ? trim((string) ($row[$colMap['name_site']] ?? '')) : '';
+                $pic = $colMap['pic'] ? trim((string) ($row[$colMap['pic']] ?? '')) : '';
+                $noTelp = $colMap['no_telp'] ? trim((string) ($row[$colMap['no_telp']] ?? '')) : '';
 
                 // Fallback from site_regional if name_site / dept / sub_dept is missing
                 $scUpper = strtoupper($sitecode);
                 if (isset($srLookup[$scUpper])) {
-                    if ($nameSite === '') $nameSite = $srLookup[$scUpper]['name_site'] ?? '';
-                    if ($dept === '') $dept = $srLookup[$scUpper]['dept'] ?? '';
-                    if ($subDept === '') $subDept = $srLookup[$scUpper]['sub_dept'] ?? '';
+                    if ($nameSite === '')
+                        $nameSite = $srLookup[$scUpper]['name_site'] ?? '';
+                    if ($dept === '')
+                        $dept = $srLookup[$scUpper]['dept'] ?? '';
+                    if ($subDept === '')
+                        $subDept = $srLookup[$scUpper]['sub_dept'] ?? '';
                 }
 
                 // Clean phone number format if scientific notation from Excel
                 if (is_numeric($noTelp) && strpos($noTelp, 'E+') !== false) {
-                    $noTelp = number_format((float)$noTelp, 0, '', '');
+                    $noTelp = number_format((float) $noTelp, 0, '', '');
                 }
 
                 if ($replaceExisting) {
@@ -531,7 +534,7 @@ try {
             $input = $_POST;
         }
 
-        $id = !empty($input['id']) ? (int)$input['id'] : null;
+        $id = !empty($input['id']) ? (int) $input['id'] : null;
         $sitecode = trim($input['sitecode'] ?? '');
         $nameSite = trim($input['name_site'] ?? '');
         $dept = trim($input['dept'] ?? '');
@@ -551,9 +554,12 @@ try {
             $srStmt->execute([':sc' => $sitecode]);
             $srRow = $srStmt->fetch(PDO::FETCH_ASSOC);
             if ($srRow) {
-                if ($nameSite === '') $nameSite = $srRow['name_site'] ?? '';
-                if ($dept === '') $dept = $srRow['dept'] ?? '';
-                if ($subDept === '') $subDept = $srRow['sub_dept'] ?? '';
+                if ($nameSite === '')
+                    $nameSite = $srRow['name_site'] ?? '';
+                if ($dept === '')
+                    $dept = $srRow['dept'] ?? '';
+                if ($subDept === '')
+                    $subDept = $srRow['sub_dept'] ?? '';
             }
         }
 
@@ -592,7 +598,7 @@ try {
                 ':pic' => $pic,
                 ':no_telp' => $noTelp,
             ]);
-            $id = (int)$db->lastInsertId();
+            $id = (int) $db->lastInsertId();
             $msg = 'Data PIC Site berhasil ditambahkan!';
         }
 
@@ -609,7 +615,7 @@ try {
             $input = $_POST;
         }
 
-        $id = (int)($input['id'] ?? 0);
+        $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'ID data tidak valid!']);

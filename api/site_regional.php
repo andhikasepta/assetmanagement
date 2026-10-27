@@ -89,7 +89,7 @@ try {
 
             // Fetch all sites
             $siteStmt = $db->query("
-                SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(is_active, TRUE) as is_active
+                SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(divisi, '') as divisi, COALESCE(is_active, TRUE) as is_active
                 FROM site_regional
                 ORDER BY regional ASC, dept ASC, sub_dept ASC, sitecode ASC
             ");
@@ -101,7 +101,7 @@ try {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
                 if ($sc !== '') {
                     $siteMap[$sc] = $s;
-                    if (strtoupper(trim($s['dept'] ?? '')) === 'PMD') {
+                    if (strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'])) {
                         $baseTypes[$sc] = 'monthly';
                     } elseif (empty($s['is_active'])) {
                         $baseTypes[$sc] = 'inactive';
@@ -126,7 +126,7 @@ try {
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
                     $sc = strtoupper(trim($r['sitecode']));
                     if (isset($map[$sc])) {
-                        if (isset($siteMap[$sc]) && strtoupper(trim($siteMap[$sc]['dept'] ?? '')) === 'PMD') {
+                        if (isset($siteMap[$sc]) && (strtoupper(trim($siteMap[$sc]['divisi'] ?? '')) === 'PMD' || in_array(strtoupper(trim($siteMap[$sc]['dept'] ?? '')), ['PMD', 'DNO', 'DSO']))) {
                             $map[$sc] = 'monthly';
                         } else {
                             $map[$sc] = strtolower(trim($r['group_type']));
@@ -617,7 +617,7 @@ try {
         $executeSyncSite = function($site, $maxYear, $maxMonth) use ($db) {
             $sc = strtoupper(trim($site['sitecode'] ?? ''));
             if ($sc === '') return ['mapped' => 0, 'group_type' => 'monthly'];
-            $isPmd = (strtoupper(trim($site['dept'] ?? '')) === 'PMD');
+            $isPmd = (strtoupper(trim($site['divisi'] ?? '')) === 'PMD' || in_array(strtoupper(trim($site['dept'] ?? '')), ['PMD', 'DNO', 'DSO']));
 
             // 1. Fetch matching profiles from asset_reconciliation up to max period
             $profStmt = $db->prepare("
@@ -1086,7 +1086,7 @@ try {
                         }
                     }
 
-                    $category = (strtoupper($dept) === 'PMD') ? 'monthly_pmd' : ($groupType === 'quarterly' ? 'quarterly' : 'monthly_outlet');
+                    $category = (strtoupper($dept) === 'PMD' || in_array(strtoupper($dept), ['DNO', 'DSO'])) ? 'monthly_pmd' : ($groupType === 'quarterly' ? 'quarterly' : 'monthly_outlet');
 
                     $findStmt->execute([':sitecode' => $sitecode]);
                     $existingId = $findStmt->fetchColumn();

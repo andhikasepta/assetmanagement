@@ -62,7 +62,8 @@ $monthNames = [
         rel="stylesheet">
 
     <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- Clean Corporate App CSS -->
     <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
@@ -113,6 +114,11 @@ $monthNames = [
                 onclick="App.navigateTo('reports')"
                 style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_reports'] ?? true) !== false) ? '' : 'display: none;' ?>">
                 Reports
+            </button>
+            <button type="button" class="nav-link" data-page="berita-acara" id="tab-berita-acara"
+                onclick="App.navigateTo('berita-acara')"
+                style="<?= ($isLoggedIn && ($currentUser['permissions']['can_access_reports'] ?? true) !== false) ? '' : 'display: none;' ?>">
+                Berita Acara
             </button>
             <button type="button" class="nav-link" data-page="master-data" id="tab-master-data"
                 onclick="App.navigateTo('master-data')"
@@ -1253,9 +1259,32 @@ $monthNames = [
 
             <!-- ── Card: Score Card Summary ── -->
             <div class="card" id="card-scorecard-summary" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+                <div class="card-header"
+                    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                     <div>
                         <h2 class="card-title" style="margin: 0;">Score Card Summary</h2>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <!-- Dept Filter -->
+                        <div style="display: flex; align-items: center; gap: 0.45rem;"
+                            id="scorecard-dept-filter-container">
+                            <label for="scorecard-dept-filter" id="label-scorecard-dept-filter"
+                                style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
+                            <select id="scorecard-dept-filter" class="form-control unified-filter-select"
+                                style="width: auto;" onchange="App.onScorecardDeptFilterChange()">
+                                <option value="all" selected>Semua DEPT</option>
+                            </select>
+                        </div>
+                        <!-- Subdept Filter -->
+                        <div style="display: flex; align-items: center; gap: 0.45rem;"
+                            id="scorecard-subdept-filter-container">
+                            <label for="scorecard-subdept-filter" id="label-scorecard-subdept-filter"
+                                style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                            <select id="scorecard-subdept-filter" class="form-control unified-filter-select"
+                                style="width: auto;" onchange="App.onScorecardSubDeptFilterChange()">
+                                <option value="all" selected>Semua Sub Dept</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1853,8 +1882,6 @@ $monthNames = [
                                 <div class="so-pie-header">
                                     <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                         Status Pencapaian</h3>
-                                    <p style="font-size: 11px; color: #64748b; margin: 0;" id="subdept-pie-subtitle">
-                                        Tercapai vs Tidak Tercapai</p>
                                 </div>
                                 <div class="so-pie-canvas-box">
                                     <canvas id="chart-subdept-pie"></canvas>
@@ -2210,8 +2237,7 @@ $monthNames = [
                                         SITECODE <span class="sort-indicator" data-rekap-col="sitecode">⇅</span>
                                     </th>
                                     <th class="text-left align-middle sortable"
-                                        onclick="App.toggleRekapSort('name_site')"
-                                        style="text-align: left;">
+                                        onclick="App.toggleRekapSort('name_site')" style="text-align: left;">
                                         NAME SITE <span class="sort-indicator" data-rekap-col="name_site">⇅</span>
                                     </th>
                                     <th class="text-center align-middle sortable" onclick="App.toggleRekapSort('m1')">
@@ -2459,6 +2485,9 @@ $monthNames = [
 
         <!-- Reports Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_reports.php'; ?>
+
+        <!-- Berita Acara Page Section (SPA) -->
+        <?php require_once __DIR__ . '/layout/section_berita_acara.php'; ?>
 
         <!-- Master Data Page Section (SPA) -->
         <?php require_once __DIR__ . '/layout/section_master_data.php'; ?>

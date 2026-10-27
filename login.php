@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode([
                     'success' => true,
                     'message' => 'Login berhasil.',
+                    'csrf_token' => $_SESSION['csrf_token'] ?? '',
                     'user' => $result['user'] ?? null
                 ]);
                 exit;

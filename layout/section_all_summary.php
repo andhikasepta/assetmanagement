@@ -82,26 +82,47 @@
             </div>
         </div>
         <div class="card-body" style="padding: 1.25rem;">
-            <!-- ── Achievement Card: Count All (No Dept or Subdept Cards) ── -->
-            <div class="kpi-grid" id="all-achievement-cards" style="margin-bottom: 1.25rem;">
-                <div class="kpi-card kpi-card-split" id="kpi-card-all" style="width: 100%;">
-                    <div class="kpi-title">Summary Achievement (All Sites)</div>
-                    <div class="kpi-card-main">
-                        <div class="kpi-split-value" id="kpi-all-achievement">0%</div>
-                        <div class="kpi-split-badges">
+            <!-- ── Executive Summary: 3 Cards Inline (Achievement, Result DB, Status DB) ── -->
+            <div class="executive-all-inline-row" id="all-card-executive-db-analysis">
+
+                <!-- ── Card 1: Summary Achievement (All Sites) ── -->
+                <div class="executive-db-col" id="all-col-achievement"
+                    style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                        <div>
+                            <h3
+                                style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                Summary Achievement (All Sites)
+                            </h3>
+                            <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;"
+                                id="kpi-all-subtext">
+                                Avg All Sites (0 Sites)
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <span id="kpi-all-status" style="display: none;"></span>
                             <div class="kpi-split-trend" id="kpi-all-trend"></div>
                         </div>
                     </div>
-                    <div class="kpi-card-meta">
-                        <div class="kpi-subtext" id="kpi-all-subtext">Avg All Sites (0 Sites)</div>
+                    <div class="db-status-card"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.03em;">
+                                PHYSICAL ACHIEVEMENT</div>
+                            <span class="so-status-badge"
+                                style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">
+                                All Sites
+                            </span>
+                        </div>
+                        <div style="font-size: 22px; font-weight: 800; color: #0284c7; margin-top: 4px;"
+                            id="kpi-all-achievement">0%</div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ── Result DB Analysis & Status Penyelesaian DB (Grand Totals for All Sites) ── -->
-            <div class="executive-db-row" id="all-card-executive-db-analysis">
-                <!-- Left Column: Result DB Analysis Total -->
-                <div class="executive-db-col" id="all-col-result-db-analysis">
+                <!-- ── Card 2: Result DB Analysis (All Sites) ── -->
+                <div class="executive-db-col" id="all-col-result-db-analysis"
+                    style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
                         <div>
@@ -133,8 +154,9 @@
                     </div>
                 </div>
 
-                <!-- Right Column: Status Penyelesaian DB Summary -->
-                <div class="executive-db-col" id="all-col-status-db-analysis">
+                <!-- ── Card 3: Status Penyelesaian DB Summary ── -->
+                <div class="executive-db-col" id="all-col-status-db-analysis"
+                    style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
                     <div
                         style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
                         <div>
@@ -155,30 +177,31 @@
                         </div>
                     </div>
                     <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;">
+                        style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem;">
                         <div class="db-status-card"
-                            style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 1rem;">
+                            style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
                             <div style="font-size: 11px; font-weight: 700; color: #16a34a; letter-spacing: 0.03em;">
                                 SOLVED</div>
-                            <div style="font-size: 22px; font-weight: 800; color: #15803d; margin-top: 4px;"
+                            <div style="font-size: 20px; font-weight: 800; color: #15803d; margin-top: 4px;"
                                 id="all-db-status-val-solved">0</div>
                         </div>
                         <div class="db-status-card"
-                            style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 1rem;">
+                            style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
                             <div style="font-size: 11px; font-weight: 700; color: #d97706; letter-spacing: 0.03em;">
                                 UNSOLVED</div>
-                            <div style="font-size: 22px; font-weight: 800; color: #b45309; margin-top: 4px;"
+                            <div style="font-size: 20px; font-weight: 800; color: #b45309; margin-top: 4px;"
                                 id="all-db-status-val-unsolved">0</div>
                         </div>
                         <div class="db-status-card"
-                            style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 1rem;">
+                            style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
                             <div style="font-size: 11px; font-weight: 700; color: #2563eb; letter-spacing: 0.03em;">NEW
                                 DB</div>
-                            <div style="font-size: 22px; font-weight: 800; color: #1d4ed8; margin-top: 4px;"
+                            <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; margin-top: 4px;"
                                 id="all-db-status-val-new">0</div>
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -191,10 +214,31 @@
                 <h2 class="card-title">Score Card Summary (All Sites)</h2>
                 <p class="card-subtitle">Evaluasi Rating & SO Execution seluruh site</p>
             </div>
-            <span id="all-scorecard-total-sites-badge" class="badge"
-                style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 4px 10px; border-radius: 6px;">
-                0 Sites Total
-            </span>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <!-- Dept Filter -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;" id="all-scorecard-dept-filter-container">
+                    <label for="all-scorecard-filter-dept" id="label-all-scorecard-dept-filter"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">DEPT</label>
+                    <select id="all-scorecard-filter-dept" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="AllSummaryApp.onScorecardDeptChange()">
+                        <option value="all" selected>Semua DEPT</option>
+                    </select>
+                </div>
+                <!-- Subdept Filter -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;"
+                    id="all-scorecard-subdept-filter-container">
+                    <label for="all-scorecard-filter-subdept" id="label-all-scorecard-subdept-filter"
+                        style="font-size: 12px; font-weight: 600; color: #475569;">SUB DEPT</label>
+                    <select id="all-scorecard-filter-subdept" class="form-control unified-filter-select"
+                        style="width: auto;" onchange="AllSummaryApp.onScorecardSubDeptChange()">
+                        <option value="all" selected>Semua Sub Dept</option>
+                    </select>
+                </div>
+                <span id="all-scorecard-total-sites-badge" class="badge"
+                    style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 4px 10px; border-radius: 6px;">
+                    0 Sites Total
+                </span>
+            </div>
         </div>
         <div class="card-body" style="padding: 1.25rem;">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
@@ -269,16 +313,55 @@
         </div>
     </div>
 
+    <!-- ── Card: Trend Achievement SO (Division & Warehouse - 3 Months Backdate) ── -->
+    <div class="card" id="all-card-trend-div-wh-wrapper" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="card-header"
+            style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.65rem;">
+            <div>
+                <h3 class="card-title"
+                    style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                    Grafik Achievement SO
+                </h3>
+                <p class="card-subtitle" id="all-trend-div-wh-subtitle"
+                    style="font-size: 0.78rem; color: #64748b; margin-bottom: 0;">
+                    Pencapaian Fisik (%) per Bulan - PMD, CRO, WRO, ERO, HUB & Warehouse Tekno
+                </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span id="all-trend-div-wh-badge" class="badge"
+                    style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px;">
+                    3 Months Backdate
+                </span>
+            </div>
+        </div>
+        <div class="card-body" style="padding: 1rem; position: relative;">
+            <div style="position: relative; height: 380px; width: 100%;">
+                <canvas id="all-chart-trend-div-wh"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Card: Report Hasil Stock Opname (All Data) ─────────── -->
     <div class="card" id="card-hasil-so-all" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
             <div>
                 <h2 class="card-title">Report Hasil Stock Opname (All Sites)</h2>
                 <p class="card-subtitle">Hasil pencapaian Stock Opname untuk seluruh site</p>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                <input type="search" id="hasil-so-search" class="table-search-input unified-search-input"
-                    placeholder="Search..." oninput="AllSummaryApp.applyHasilFilter()" style="max-width: 250px;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                <!-- Dept Filter -->
+                <select id="all-hasil-filter-dept" class="form-control unified-filter-select"
+                    onchange="AllSummaryApp.onAllHasilDeptChange()" style="width: auto;">
+                    <option value="all" selected>Semua DEPT</option>
+                </select>
+
+                <!-- Subdept Filter -->
+                <select id="all-hasil-filter-subdept" class="form-control unified-filter-select"
+                    onchange="AllSummaryApp.onAllHasilSubDeptChange()" style="width: auto;">
+                    <option value="all" selected>Semua Sub Dept</option>
+                </select>
+
+                <!-- Status Filter -->
                 <select id="hasil-so-filter-status" class="form-control unified-filter-select"
                     onchange="AllSummaryApp.applyHasilFilter()" style="width: auto;">
                     <option value="all">Semua Status</option>
@@ -286,7 +369,9 @@
                     <option value="tidak_tercapai">Tidak Tercapai</option>
                     <option value="no_data">Belum Ada Data</option>
                 </select>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
+
+                <!-- Tampilkan Row Data (Page Size) -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
                     <label for="hasil-so-page-size"
                         style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
                     <select id="hasil-so-page-size" class="form-control unified-filter-select"
@@ -298,6 +383,10 @@
                         <option value="all">Semua</option>
                     </select>
                 </div>
+
+                <!-- Search Input -->
+                <input type="search" id="hasil-so-search" class="table-search-input unified-search-input"
+                    placeholder="Search..." oninput="AllSummaryApp.applyHasilFilter()" style="max-width: 200px;">
             </div>
         </div>
         <div class="card-body" style="padding: 1rem 1.25rem;">
@@ -381,8 +470,6 @@
                         <div class="so-pie-header">
                             <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
                                 Status Pencapaian (All Sites)</h3>
-                            <p style="font-size: 11px; color: #64748b; margin: 0;" id="all-hasil-pie-subtitle">
-                                Tercapai vs Tidak Tercapai</p>
                         </div>
                         <div class="so-pie-canvas-box">
                             <canvas id="all-chart-hasil-so-pie"></canvas>
@@ -400,10 +487,51 @@
 
     <!-- ── Card: Rekapitulasi Status DB (All Data) ───────────── -->
     <div class="card" id="all-card-rekap-status-db" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
             <div>
                 <h2 class="card-title">Rekapitulasi Status Penyelesaian DB (All Sites)</h2>
                 <p class="card-subtitle">Perbandingan status DB (Solved / Unsolved / New DB) seluruh site</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                <!-- Dept Filter -->
+                <select id="all-rdb-filter-dept" class="form-control unified-filter-select"
+                    style="width: auto;" onchange="AllSummaryApp.onAllRdbDeptChange()">
+                    <option value="all" selected>Semua DEPT</option>
+                </select>
+
+                <!-- Subdept Filter -->
+                <select id="all-rdb-filter-subdept" class="form-control unified-filter-select"
+                    style="width: auto;" onchange="AllSummaryApp.onAllRdbSubDeptChange()">
+                    <option value="all" selected>Semua Sub Dept</option>
+                </select>
+
+                <!-- Status Filter -->
+                <select id="all-rdb-filter-status" class="form-control unified-filter-select"
+                    style="width: auto;" onchange="AllSummaryApp.onAllRdbStatusChange()">
+                    <option value="all" selected>Semua Status</option>
+                    <option value="solved">Solved DB</option>
+                    <option value="unsolved">Unsolved DB</option>
+                    <option value="new_db">New DB</option>
+                </select>
+
+                <!-- Tampilkan Row Data (Page Size) -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    <label for="all-rdb-page-size"
+                        style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                    <select id="all-rdb-page-size" class="form-control unified-filter-select"
+                        onchange="AllSummaryApp.changeAllRekapDbStatusPageSize(this.value)" style="width: auto;">
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="all">Semua</option>
+                    </select>
+                </div>
+
+                <!-- Search Input -->
+                <input type="search" id="all-rdb-search-input" class="table-search-input unified-search-input"
+                    placeholder="Search..." oninput="AllSummaryApp.handleAllRdbSearch(this.value)"
+                    style="max-width: 200px;">
             </div>
         </div>
         <div class="card-body" style="padding: 1rem;">
@@ -440,14 +568,43 @@
 
     <!-- ── Card: Rekapitulasi 2026 (All Sites) ──────────────── -->
     <div class="card" id="all-card-rekapitulasi" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
             <div>
                 <h2 class="card-title">Rekapitulasi Stock Opname (All Sites)</h2>
                 <p class="card-subtitle">Rekapitulasi persentase seluruh site per bulan</p>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                <!-- Dept Filter -->
+                <select id="all-rekap-filter-dept" class="form-control unified-filter-select"
+                    style="width: auto;" onchange="AllSummaryApp.onAllRekapDeptChange()">
+                    <option value="all" selected>Semua DEPT</option>
+                </select>
+
+                <!-- Subdept Filter -->
+                <select id="all-rekap-filter-subdept" class="form-control unified-filter-select"
+                    style="width: auto;" onchange="AllSummaryApp.onAllRekapSubDeptChange()">
+                    <option value="all" selected>Semua Sub Dept</option>
+                </select>
+
+                <!-- Tampilkan Row Data (Page Size) -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    <label for="all-rekap-page-size"
+                        style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                    <select id="all-rekap-page-size" class="form-control unified-filter-select"
+                        onchange="AllSummaryApp.changeRekapPageSize(this.value)" style="width: auto;">
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="all">Semua</option>
+                    </select>
+                </div>
+
+                <!-- Search Input -->
                 <input type="search" id="all-rekap-search" class="table-search-input unified-search-input"
-                    placeholder="Search..." oninput="AllSummaryApp.applyRekapFilter()" style="max-width: 240px;">
+                    placeholder="Search..." oninput="AllSummaryApp.applyRekapFilter()" style="max-width: 200px;">
+
+                <!-- Export Excel -->
                 <button class="btn btn-success" id="btn-all-rekap-export-excel"
                     onclick="AllSummaryApp.exportRekapExcel()"
                     style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-height: 36px; box-sizing: border-box; padding: 0 1rem; border-radius: 8px; font-size: 12.5px; font-weight: 600; line-height: 1;">
@@ -469,7 +626,7 @@
                         <tr>
                             <th style="width: 110px; text-align: center;">SITE CODE</th>
                             <th style="text-align: left;">NAME SITE</th>
-                            <th>DEPT</th>
+                            <th>DEPT / SUB DEPT</th>
                             <th style="text-align: center;">JAN</th>
                             <th style="text-align: center;">FEB</th>
                             <th style="text-align: center;">MAR</th>
@@ -491,6 +648,7 @@
                             </td>
                         </tr>
                     </tbody>
+                    <tfoot id="all-rekap-table-foot"></tfoot>
                 </table>
             </div>
             <!-- Table Pagination Footer -->
@@ -622,12 +780,44 @@
             <!-- Movement Logs Table Container -->
             <div id="all-sm-table-container" style="padding: 1.25rem;">
                 <div
-                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <input type="search" id="all-sm-search-input" class="table-search-input unified-search-input"
-                        placeholder="Search..." oninput="AllSummaryApp.filterMovementsTable()"
-                        onkeyup="AllSummaryApp.filterMovementsTable()" onsearch="AllSummaryApp.filterMovementsTable()">
-                    <div style="font-size: 12px; color: #64748b;" id="all-sm-table-info">
-                        Menampilkan log pergerakan
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                    <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                        <!-- Dept Filter -->
+                        <select id="all-sm-filter-dept" class="form-control unified-filter-select"
+                            onchange="AllSummaryApp.onAllSmDeptChange()" style="width: auto;">
+                            <option value="all" selected>Semua DEPT</option>
+                        </select>
+
+                        <!-- Movement Status Filter -->
+                        <select id="all-sm-filter-status" class="form-control unified-filter-select"
+                            onchange="AllSummaryApp.onAllSmStatusChange()" style="width: auto;">
+                            <option value="all" selected>Semua Perubahan</option>
+                            <option value="monthly">To Monthly</option>
+                            <option value="quarterly">To Quarterly</option>
+                            <option value="inactive">To Inactive</option>
+                            <option value="uncounted">To Uncounted</option>
+                        </select>
+
+                        <!-- Tampilkan Row Data (Page Size) -->
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <label for="all-sm-page-size"
+                                style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                            <select id="all-sm-page-size" class="form-control unified-filter-select"
+                                onchange="AllSummaryApp.changeAllSmPageSize(this.value)" style="width: auto;">
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all">Semua</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                        <input type="search" id="all-sm-search-input" class="table-search-input unified-search-input"
+                            placeholder="Search..." oninput="AllSummaryApp.filterMovementsTable()"
+                            onkeyup="AllSummaryApp.filterMovementsTable()" onsearch="AllSummaryApp.filterMovementsTable()"
+                            style="max-width: 220px;">
                     </div>
                 </div>
                 <div class="table-responsive"
@@ -652,6 +842,12 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                <!-- Table Pagination Footer -->
+                <div class="table-pagination-footer"
+                    style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <div id="all-sm-pagination-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                    <div class="pagination-controls" id="all-sm-pagination-controls"></div>
                 </div>
             </div>
         </div>

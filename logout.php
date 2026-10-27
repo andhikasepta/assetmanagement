@@ -13,7 +13,11 @@ $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
 
 if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => true, 'message' => 'Logout berhasil.']);
+    echo json_encode([
+        'success' => true,
+        'message' => 'Logout berhasil.',
+        'csrf_token' => $_SESSION['csrf_token'] ?? ''
+    ]);
     exit;
 }
 

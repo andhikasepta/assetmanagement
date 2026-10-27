@@ -42,12 +42,14 @@ try {
             $year = $y ?: (int) date('Y');
             $month = $m ?: 12;
 
-            $sites = $db->query("SELECT sitecode, dept, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+            $sites = $db->query("SELECT sitecode, dept, COALESCE(divisi, '') as divisi, COALESCE(NULLIF(group_type, ''), 'monthly') as group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
             $map = [];
             $pmdSites = [];
             foreach ($sites as $s) {
                 $sc = strtoupper(trim($s['sitecode']));
-                if (strtoupper(trim($s['dept'])) === 'PMD') {
+                $div = strtoupper(trim($s['divisi'] ?? ''));
+                $dept = strtoupper(trim($s['dept'] ?? ''));
+                if ($div === 'PMD' || in_array($dept, ['PMD', 'DNO', 'DSO'])) {
                     $map[$sc] = 'monthly';
                     $pmdSites[$sc] = true;
                 } else {
@@ -136,7 +138,7 @@ try {
 
             // Dynamic site filtering based on effective group type for the period
             $effectiveMap = $getEffectiveTypes($db, $y, $m);
-            $allSites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
+            $allSites = $db->query("SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type, COALESCE(divisi, '') as divisi, COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted FROM site_regional")->fetchAll(PDO::FETCH_ASSOC);
 
             $sites = [];
             foreach ($allSites as $s) {
@@ -148,7 +150,9 @@ try {
                     continue;
                 }
 
-                $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                $div = strtoupper(trim($s['divisi'] ?? ''));
+                $dept = strtoupper(trim($s['dept'] ?? ''));
+                $isPmd = ($div === 'PMD' || in_array($dept, ['PMD', 'DNO', 'DSO']));
                 $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
                 $info = trim($s['info'] ?? '');
 
@@ -258,10 +262,26 @@ try {
                 $sc = strtoupper(trim($s['sitecode'] ?? ''));
                 $dept = strtoupper(trim($s['dept'] ?? ''));
                 $sub = strtoupper(trim($s['sub_dept'] ?? ''));
-                if (isset($deptStats[$dept])) {
+                $div = strtoupper(trim($s['divisi'] ?? ''));
+                $isPmdSite = ($div === 'PMD' || in_array($dept, ['PMD', 'DNO', 'DSO']));
+
+                if ($isPmdSite) {
+                    $deptStats['PMD']['total']++;
+                    $deptDbStats['PMD']['total']++;
+                } elseif (isset($deptStats[$dept])) {
                     $deptStats[$dept]['total']++;
                     $deptDbStats[$dept]['total']++;
                 }
+
+                if ($dept === 'DNO' || $dept === 'DSO') {
+                    if (isset($subDeptStats[$dept])) {
+                        $subDeptStats[$dept]['total']++;
+                    }
+                    if (isset($subDeptDbStats[$dept])) {
+                        $subDeptDbStats[$dept]['total']++;
+                    }
+                }
+
                 if ($sub !== '') {
                     if (!isset($subDeptStats[$sub])) {
                         $subDeptStats[$sub] = ['sum' => 0.0, 'count' => 0, 'total' => 0];
@@ -311,9 +331,16 @@ try {
                 if ($pct !== null) {
                     $nationalSum += $pct;
                     $nationalCount++;
-                    if (isset($deptStats[$dept])) {
+                    if ($isPmdSite) {
+                        $deptStats['PMD']['sum'] += $pct;
+                        $deptStats['PMD']['count']++;
+                    } elseif (isset($deptStats[$dept])) {
                         $deptStats[$dept]['sum'] += $pct;
                         $deptStats[$dept]['count']++;
+                    }
+                    if (($dept === 'DNO' || $dept === 'DSO') && isset($subDeptStats[$dept])) {
+                        $subDeptStats[$dept]['sum'] += $pct;
+                        $subDeptStats[$dept]['count']++;
                     }
                     if ($sub !== '' && isset($subDeptStats[$sub])) {
                         $subDeptStats[$sub]['sum'] += $pct;
@@ -323,10 +350,19 @@ try {
 
                 if ($dbQty !== null) {
                     $nationalDbQty += $dbQty;
-                    if (isset($deptDbStats[$dept])) {
+                    if ($isPmdSite) {
+                        $deptDbStats['PMD']['qty'] += $dbQty;
+                        $deptDbStats['PMD']['count']++;
+                        if ($dbQty > 0) $deptDbStats['PMD']['sites_with_qty']++;
+                    } elseif (isset($deptDbStats[$dept])) {
                         $deptDbStats[$dept]['qty'] += $dbQty;
                         $deptDbStats[$dept]['count']++;
                         if ($dbQty > 0) $deptDbStats[$dept]['sites_with_qty']++;
+                    }
+                    if (($dept === 'DNO' || $dept === 'DSO') && isset($subDeptDbStats[$dept])) {
+                        $subDeptDbStats[$dept]['qty'] += $dbQty;
+                        $subDeptDbStats[$dept]['count']++;
+                        if ($dbQty > 0) $subDeptDbStats[$dept]['sites_with_qty']++;
                     }
                     if ($sub !== '' && isset($subDeptDbStats[$sub])) {
                         $subDeptDbStats[$sub]['qty'] += $dbQty;
@@ -831,6 +867,7 @@ try {
                                 FULL OUTER JOIN curr c ON p.reg_no = c.reg_no
                             )
                             SELECT 
+                                COALESCE(sr.divisi, '') as divisi,
                                 sr.dept,
                                 sr.sub_dept,
                                 cb.sitecode,
@@ -891,9 +928,17 @@ try {
                                 $outlet[$status]++;
                                 $outlet[$status . '_sites'][$sc] = true;
                             }
-                            if (strtoupper($d) === 'PMD') {
+                            $isPmdSite = (strtoupper(trim($r['divisi'] ?? '')) === 'PMD' || in_array(strtoupper($d), ['PMD', 'DNO', 'DSO']));
+                            if ($isPmdSite) {
                                 $pmd[$status]++;
                                 $pmd[$status . '_sites'][$sc] = true;
+                            }
+                            if ($d === 'dno' || $d === 'dso') {
+                                if (!isset($subDepts[$d])) {
+                                    $subDepts[$d] = ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => [], 'unsolved_sites' => [], 'new_db_sites' => []];
+                                }
+                                $subDepts[$d][$status]++;
+                                $subDepts[$d][$status . '_sites'][$sc] = true;
                             }
                         }
 
@@ -1182,8 +1227,8 @@ try {
                     // Also populate top-level dno and dso if present
                     foreach (['dno', 'dso'] as $dsub) {
                         if (isset($dbA[$dsub])) {
-                            $cSub = $currStatus['sub_depts'][$dsub] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
-                            $pSub = $prevStatus['sub_depts'][$dsub] ?? null;
+                            $cSub = $currStatus['depts'][$dsub] ?? $currStatus['sub_depts'][$dsub] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
+                            $pSub = $prevStatus['depts'][$dsub] ?? $prevStatus['sub_depts'][$dsub] ?? null;
                             $dbA[$dsub]['solved'] = $cSub['solved'];
                             $dbA[$dsub]['unsolved'] = $cSub['unsolved'];
                             $dbA[$dsub]['new_db'] = $cSub['new_db'];
@@ -1249,34 +1294,43 @@ try {
             if ($category === 'all') {
                 // All data mode: no category filter on raw query
             } elseif ($category === 'outlet' || $category === 'outlet_regional') {
-                $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('Under Warehouse', 'HUB', 'HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate') OR info IS NULL)";
+                $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info NOT IN ('Under Warehouse', 'HUB', 'HUB Monthly', 'HUB Quarterly', 'IT Coorporate', 'IT Corporate') OR info IS NULL)";
             } elseif ($category === 'outlet_subarep') {
-                $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '')";
+                $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info IN ('Subarep', 'Outlet') OR info IS NULL OR info = '')";
             } elseif ($category === 'warehouse_hub') {
                 if ($soType === 'quarterly') {
-                    $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND group_type = 'quarterly'))";
+                    $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Quarterly' OR (info = 'HUB' AND group_type = 'quarterly'))";
                 } else {
-                    $where[] = "dept != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
+                    $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND name_site NOT ILIKE '%TEKNO%' AND (info = 'HUB Monthly' OR (info = 'HUB' AND group_type != 'quarterly'))";
                 }
             } elseif ($category === 'warehouse_tekno') {
-                $where[] = "dept != 'PMD' AND name_site ILIKE '%TEKNO%'";
+                $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND name_site ILIKE '%TEKNO%'";
             } elseif ($category === 'it_coorporate' || $category === 'it_corporate') {
-                $where[] = "dept != 'PMD' AND info IN ('IT Coorporate', 'IT Corporate')";
+                $where[] = "dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(divisi, '') != 'PMD' AND info IN ('IT Coorporate', 'IT Corporate')";
             } elseif ($category === 'pmd') {
-                $where[] = "dept = 'PMD'";
+                $where[] = "(dept IN ('PMD', 'DNO', 'DSO') OR COALESCE(divisi, '') = 'PMD')";
             }
             if (!empty($dept) && strtolower($dept) !== 'all') {
-                $where[] = "dept = :dept";
-                $params[':dept'] = $dept;
+                if (strtoupper($dept) === 'PMD') {
+                    $where[] = "(dept IN ('PMD', 'DNO', 'DSO') OR COALESCE(divisi, '') = 'PMD')";
+                } else {
+                    $where[] = "dept = :dept";
+                    $params[':dept'] = $dept;
+                }
             }
             if (!empty($subDept) && strtolower($subDept) !== 'all') {
-                $where[] = "sub_dept = :sub_dept";
+                if (in_array(strtoupper($subDept), ['DNO', 'DSO'])) {
+                    $where[] = "(dept = :sub_dept OR sub_dept = :sub_dept)";
+                } else {
+                    $where[] = "sub_dept = :sub_dept";
+                }
                 $params[':sub_dept'] = $subDept;
             }
             $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
             $siteStmt = $db->prepare("
                 SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+                       COALESCE(divisi, '') as divisi,
                        COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
                 FROM site_regional
                 $whereSql
@@ -1297,7 +1351,7 @@ try {
                     continue;
                 }
 
-                $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+                $isPmd = (strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO']));
                 $isTekno = (stripos($s['name_site'] ?? '', 'TEKNO') !== false);
                 $info = trim($s['info'] ?? '');
                 if ($category === 'all') {

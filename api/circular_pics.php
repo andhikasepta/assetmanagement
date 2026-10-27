@@ -44,9 +44,9 @@ try {
         $subDept = trim($_GET['sub_dept'] ?? 'all');
         $status = trim($_GET['status'] ?? 'all');
         $search = trim($_GET['search'] ?? '');
-        $page = max(1, (int)($_GET['page'] ?? 1));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
         $limitParam = $_GET['limit'] ?? '10';
-        $limit = ($limitParam === 'all') ? 999999 : max(1, (int)$limitParam);
+        $limit = ($limitParam === 'all') ? 999999 : max(1, (int) $limitParam);
         $offset = ($page - 1) * $limit;
 
         $sortCol = $_GET['sort_col'] ?? 'dept';
@@ -96,7 +96,7 @@ try {
         // Total count
         $countStmt = $db->prepare("SELECT COUNT(*) FROM circular_pics cp WHERE $whereSql");
         $countStmt->execute($params);
-        $total = (int)$countStmt->fetchColumn();
+        $total = (int) $countStmt->fetchColumn();
 
         // Data query
         $sql = "
@@ -119,7 +119,7 @@ try {
         $depts = $db->query("SELECT DISTINCT dept FROM circular_pics WHERE dept IS NOT NULL AND TRIM(dept) != '' ORDER BY dept ASC")->fetchAll(PDO::FETCH_COLUMN);
         $subDepts = $db->query("SELECT DISTINCT sub_dept FROM circular_pics WHERE sub_dept IS NOT NULL AND TRIM(sub_dept) != '' ORDER BY sub_dept ASC")->fetchAll(PDO::FETCH_COLUMN);
 
-        $totalPages = ($limitParam === 'all') ? 1 : (int)ceil($total / $limit);
+        $totalPages = ($limitParam === 'all') ? 1 : (int) ceil($total / $limit);
 
         echo json_encode([
             'success' => true,
@@ -398,7 +398,7 @@ try {
 
             foreach ($rows as $rIdx => $row) {
                 foreach ($row as $colLetter => $cellVal) {
-                    $cleaned = strtolower(trim((string)$cellVal));
+                    $cleaned = strtolower(trim((string) $cellVal));
                     $cleaned = str_replace(['_', '.', ' '], '', $cleaned);
                     if ($cleaned === 'pic' || $cleaned === 'namapic' || $cleaned === 'jobtitle' || $cleaned === 'jabatan') {
                         $headerRowIdx = $rIdx;
@@ -413,7 +413,7 @@ try {
 
             $headerRow = $rows[$headerRowIdx];
             foreach ($headerRow as $colLetter => $cellVal) {
-                $val = strtolower(trim((string)$cellVal));
+                $val = strtolower(trim((string) $cellVal));
                 $norm = str_replace(['_', '.', ' ', '/', '-'], '', $val);
 
                 if (in_array($norm, ['dept', 'departemen', 'department'], true)) {
@@ -422,7 +422,8 @@ try {
                     $colMap['sub_dept'] = $colLetter;
                 } elseif (in_array($norm, ['deptsubdept', 'deptsub'], true)) {
                     // Combined column
-                    if (!$colMap['dept']) $colMap['dept'] = $colLetter;
+                    if (!$colMap['dept'])
+                        $colMap['dept'] = $colLetter;
                 } elseif (in_array($norm, ['pic', 'namapic', 'personincharge', 'picname', 'nama'], true)) {
                     $colMap['pic'] = $colLetter;
                 } elseif (in_array($norm, ['jobtitle', 'title', 'jabatan', 'posisi', 'position'], true)) {
@@ -433,7 +434,7 @@ try {
             }
 
             if (!$colMap['pic'] && !$colMap['job_title']) {
-                throw new Exception('Kolom PIC atau JOB TITLE tidak ditemukan pada file Excel. Pastikan terdapat kolom bertuliskan PIC dan JOB TITLE.');
+                throw new Exception('Kolom PIC atau JOB TITLE tidak ditemukan pada file Excel.');
             }
 
             $db->beginTransaction();
@@ -466,10 +467,10 @@ try {
                     continue;
                 }
 
-                $pic = $colMap['pic'] ? trim((string)($row[$colMap['pic']] ?? '')) : '';
-                $jobTitle = $colMap['job_title'] ? trim((string)($row[$colMap['job_title']] ?? '')) : '';
-                $dept = $colMap['dept'] ? trim((string)($row[$colMap['dept']] ?? '')) : '';
-                $subDept = $colMap['sub_dept'] ? trim((string)($row[$colMap['sub_dept']] ?? '')) : '';
+                $pic = $colMap['pic'] ? trim((string) ($row[$colMap['pic']] ?? '')) : '';
+                $jobTitle = $colMap['job_title'] ? trim((string) ($row[$colMap['job_title']] ?? '')) : '';
+                $dept = $colMap['dept'] ? trim((string) ($row[$colMap['dept']] ?? '')) : '';
+                $subDept = $colMap['sub_dept'] ? trim((string) ($row[$colMap['sub_dept']] ?? '')) : '';
 
                 if ($pic === '' && $jobTitle === '') {
                     $skipped++;
@@ -485,7 +486,7 @@ try {
 
                 $isActive = true;
                 if ($colMap['is_active'] && isset($row[$colMap['is_active']])) {
-                    $actStr = strtolower(trim((string)$row[$colMap['is_active']]));
+                    $actStr = strtolower(trim((string) $row[$colMap['is_active']]));
                     if (in_array($actStr, ['inactive', 'nonaktif', 'inaktif', '0', 'false', 'tidak', 'n', 'no', 'disabled'], true)) {
                         $isActive = false;
                     }
@@ -551,7 +552,7 @@ try {
             $input = $_POST;
         }
 
-        $id = !empty($input['id']) ? (int)$input['id'] : null;
+        $id = !empty($input['id']) ? (int) $input['id'] : null;
         $isActive = filter_var($input['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
         if (!$id) {
@@ -588,7 +589,7 @@ try {
             $input = $_POST;
         }
 
-        $id = !empty($input['id']) ? (int)$input['id'] : null;
+        $id = !empty($input['id']) ? (int) $input['id'] : null;
         $dept = trim($input['dept'] ?? '');
         $subDept = trim($input['sub_dept'] ?? '');
         $pic = trim($input['pic'] ?? '');
@@ -636,7 +637,7 @@ try {
             $stmt->bindValue(':job_title', $jobTitle);
             $stmt->bindValue(':is_active', $isActive, PDO::PARAM_BOOL);
             $stmt->execute();
-            $id = (int)$db->lastInsertId();
+            $id = (int) $db->lastInsertId();
             $msg = 'Data Circular Sign PIC berhasil ditambahkan!';
         }
 
@@ -653,7 +654,7 @@ try {
             $input = $_POST;
         }
 
-        $id = (int)($input['id'] ?? 0);
+        $id = (int) ($input['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'ID data tidak valid!']);

@@ -112,14 +112,15 @@ try {
     if ($category === 'all') {
         // No dept filter for all category
     } elseif ($category === 'pmd' || $category === 'monthly_pmd') {
-        $whereCatParts[] = "sr.dept = 'PMD'";
+        $whereCatParts[] = "(sr.dept IN ('PMD', 'DNO', 'DSO') OR COALESCE(sr.divisi, '') = 'PMD')";
     } else {
-        $whereCatParts[] = "sr.dept != 'PMD'";
+        $whereCatParts[] = "(sr.dept NOT IN ('PMD', 'DNO', 'DSO') AND COALESCE(sr.divisi, '') != 'PMD')";
     }
 
     $whereCatSql = "WHERE " . implode(' AND ', $whereCatParts);
     $siteStmt = $db->query("
         SELECT id, category, regional, dept, sub_dept, sitecode, name_site, info, group_type,
+               COALESCE(sr.divisi, '') as divisi,
                COALESCE(is_active, TRUE) as is_active, COALESCE(is_counted, TRUE) as is_counted
         FROM site_regional sr
         $whereCatSql
@@ -143,7 +144,9 @@ try {
     $validSitecodes = [];
     foreach ($rawCatSites as $s) {
         $sc = strtoupper(trim($s['sitecode'] ?? ''));
-        $isPmd = (strtoupper(trim($s['dept'] ?? '')) === 'PMD');
+        $div = strtoupper(trim($s['divisi'] ?? ''));
+        $dept = strtoupper(trim($s['dept'] ?? ''));
+        $isPmd = ($div === 'PMD' || in_array($dept, ['PMD', 'DNO', 'DSO']));
 
         if ($isPmd) {
             $effGroup = 'monthly';

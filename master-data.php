@@ -118,6 +118,9 @@ try {
             <a href="reports.php" class="nav-link" id="tab-reports">
                 Reports
             </a>
+            <a href="berita-acara.php" class="nav-link" id="tab-berita-acara">
+                Berita Acara
+            </a>
             <button class="nav-link active" data-page="master-data" id="tab-master-data">
                 Master Data
             </button>
