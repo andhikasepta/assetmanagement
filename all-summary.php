@@ -192,132 +192,233 @@ $csrfToken = getCsrfToken();
                             </span>
                         </div>
                     </div>
+                    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;" data-html2canvas-ignore="true">
+                        <button type="button" class="btn btn-primary btn-generate-png" id="btn-generate-all-executive-summary-page"
+                            onclick="App.generateExecutiveSummaryPng('card-executive-summary')"
+                            data-html2canvas-ignore="true"
+                            style="<?= $isLoggedIn ? 'display: inline-flex;' : 'display: none;' ?> align-items: center; gap: 0.45rem; padding: 0.42rem 0.85rem; font-size: 12.5px; font-weight: 600; border-radius: 6px; background: #0284c7; border: 1px solid #0284c7; color: #ffffff; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.2);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Generate</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body" style="padding: 1.25rem;">
-                    <!-- ── Executive Summary: 3 Cards Inline (Achievement, Result DB, Status DB) ── -->
-                    <div class="executive-all-inline-row" id="card-executive-db-analysis">
-
-                        <!-- ── Card 1: Summary Achievement (All Sites) ── -->
-                        <div class="executive-db-col" id="col-achievement"
-                            style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
-                                <div>
-                                    <h3
-                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                        Summary Achievement (All Sites)
-                                    </h3>
-                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;"
-                                        id="kpi-all-subtext">
-                                        Avg All Sites (0 Sites)
-                                    </div>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <span id="kpi-all-status" style="display: none;"></span>
-                                    <div class="kpi-split-trend" id="kpi-all-trend"></div>
+                    <!-- ── Summary Achievement (All Sites) ── -->
+                    <div id="col-achievement">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                            <div>
+                                <h3
+                                    style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                    Summary Achievement (All Sites)
+                                </h3>
+                                <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;"
+                                    id="kpi-all-subtext">
+                                    Avg All Sites (0 Sites)
                                 </div>
                             </div>
-                            <div class="db-status-card"
-                                style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.03em;">
-                                        PHYSICAL ACHIEVEMENT</div>
-                                    <span class="so-status-badge"
-                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">
-                                        All Sites
-                                    </span>
-                                </div>
-                                <div style="font-size: 22px; font-weight: 800; color: #0284c7; margin-top: 4px;"
-                                    id="kpi-all-achievement">0%</div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <span id="kpi-all-status" style="display: none;"></span>
+                                <div class="kpi-split-trend" id="kpi-all-trend"></div>
                             </div>
                         </div>
-
-                        <!-- ── Card 2: Result DB Analysis (All Sites) ── -->
-                        <div class="executive-db-col" id="col-result-db-analysis"
-                            style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
-                                <div>
-                                    <h3
-                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                        Result DB Analysis (All Sites)
-                                    </h3>
-                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
-                                        Total data DB seluruh site dibanding periode sebelumnya
-                                    </div>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <span class="db-grand-trend" id="db-grand-trend"></span>
-                                    <span class="so-status-badge"
-                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
-                                        Total DB: <span id="db-analysis-grand-total">0</span> QTY
-                                    </span>
-                                </div>
+                        <div class="db-status-card"
+                            style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 12px; font-weight: 700; color: #475569; letter-spacing: 0.03em;">
+                                    PHYSICAL ACHIEVEMENT</div>
+                                <span class="so-status-badge"
+                                    style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 3px 10px; border-radius: 6px;">
+                                    All Sites
+                                </span>
                             </div>
-                            <div class="db-status-card"
-                                style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div
-                                        style="font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.03em;">
-                                        TOTAL RESULT DB</div>
-                                    <span class="db-trend-indicator" id="all-db-card-trend"></span>
-                                </div>
-                                <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;"
-                                    id="all-db-val-total">0</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #0284c7; margin-top: 6px;"
+                                id="kpi-all-achievement">0%</div>
+                        </div>
+                    </div>
+
+                    <!-- ── Card: Grafik Rekapitulasi Stock Opname (All Sites) ─────── -->
+                    <div class="card" id="all-card-rekap-chart" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                        <div class="card-header"
+                            style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h2 class="card-title" id="all-rekap-chart-title">Monthly Target Achievement (All
+                                    Sites)
+                                </h2>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                                <span class="badge" id="all-rekap-chart-badge"
+                                    style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px;">
+                                    All Sites
+                                </span>
                             </div>
                         </div>
+                        <div class="card-body" style="padding: 1.25rem 1rem 1rem 1rem; position: relative;">
+                            <div style="position: relative; height: 320px; width: 100%;">
+                                <canvas id="all-chart-rekap-average"></canvas>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- ── Card 3: Status Penyelesaian DB Summary ── -->
-                        <div class="executive-db-col" id="col-status-db-analysis"
-                            style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
-                                <div>
-                                    <h3
-                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
-                                        Status Penyelesaian DB (All Sites)
-                                    </h3>
-                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
-                                        Total data DB seluruh site dibanding periode sebelumnya
+                    <!-- ── Card: Report Hasil Stock Opname (All Data) ─────────── -->
+                    <div class="card" id="card-hasil-so-all" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                        <div class="card-header"
+                            style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h2 class="card-title">Report Hasil Stock Opname (All Data)</h2>
+                                <p class="card-subtitle">Hasil pencapaian Stock Opname untuk seluruh site</p>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                                <!-- Dept Filter -->
+                                <select id="all-hasil-filter-dept" class="form-control unified-filter-select"
+                                    onchange="AllSummaryApp.onAllHasilDeptChange()" style="width: auto;">
+                                    <option value="all" selected>Semua DEPT</option>
+                                </select>
+
+                                <!-- Subdept Filter -->
+                                <select id="all-hasil-filter-subdept" class="form-control unified-filter-select"
+                                    onchange="AllSummaryApp.onAllHasilSubDeptChange()" style="width: auto;">
+                                    <option value="all" selected>Semua Sub Dept</option>
+                                </select>
+
+                                <!-- Status Filter -->
+                                <select id="hasil-so-filter-status" class="form-control unified-filter-select"
+                                    onchange="AllSummaryApp.applyHasilFilter()" style="width: auto;">
+                                    <option value="all">Semua Status</option>
+                                    <option value="tercapai">Tercapai</option>
+                                    <option value="tidak_tercapai">Tidak Tercapai</option>
+                                    <option value="no_data">Belum Ada Data</option>
+                                </select>
+
+                                <!-- Tampilkan Row Data (Page Size) -->
+                                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                    <label for="hasil-so-page-size"
+                                        style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
+                                    <select id="hasil-so-page-size" class="form-control unified-filter-select"
+                                        onchange="AllSummaryApp.changeHasilPageSize(this.value)" style="width: auto;">
+                                        <option value="10" selected>10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="all">Semua</option>
+                                    </select>
+                                </div>
+
+                                <!-- Search Input -->
+                                <input type="search" id="hasil-so-search"
+                                    class="table-search-input unified-search-input" placeholder="Search..."
+                                    oninput="AllSummaryApp.applyHasilFilter()" style="max-width: 200px;">
+                            </div>
+                        </div>
+                        <div class="card-body" style="padding: 1rem 1.25rem;">
+                            <div class="so-subdept-layout">
+                                <!-- Left: Compact Shrunk Table -->
+                                <div class="so-subdept-table-wrapper">
+                                    <div class="table-responsive"
+                                        style="max-height: 480px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                        <table class="table so-subdept-table reconciliation-table"
+                                            style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px;">
+                                            <thead>
+                                                <tr
+                                                    style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
+                                                    <th rowspan="2"
+                                                        style="width: 110px; text-align: center; vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        SITE CODE</th>
+                                                    <th rowspan="2"
+                                                        style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        NAME SITE</th>
+                                                    <th rowspan="2"
+                                                        style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        DEPT / SUB DEPT</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        RESULT MATCH</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        RESULT PHYSIC</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        RESULT DB</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        TOTAL PHYSICAL</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        PENCAPAIAN</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        DEFISIT TARGET</th>
+                                                    <th rowspan="2"
+                                                        style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 140px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                                        STATUS</th>
+                                                </tr>
+                                                <tr
+                                                    style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        Physical (QTY)</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        Physical (QTY)</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        Physical (QTY)</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        Target (QTY)</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        %</th>
+                                                    <th
+                                                        style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                                        %</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="hasil-so-table-body">
+                                                <tr>
+                                                    <td colspan="10"
+                                                        style="text-align: center; padding: 2rem; color: #94a3b8;">
+                                                        Memuat data Report Stock Opname...
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <!-- Table Pagination Footer -->
+                                    <div class="table-pagination-footer"
+                                        style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                        <div id="hasil-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
+                                        <div class="pagination-controls" id="hasil-so-pagination-controls"></div>
                                     </div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <span class="db-grand-trend" id="all-db-status-grand-trend"></span>
-                                    <span class="so-status-badge"
-                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
-                                        Total DB: <span id="all-db-status-grand-total">0</span> QTY
-                                    </span>
-                                </div>
-                            </div>
-                            <div
-                                style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem;">
-                                <div class="db-status-card"
-                                    style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
-                                    <div
-                                        style="font-size: 11px; font-weight: 700; color: #16a34a; letter-spacing: 0.03em;">
-                                        SOLVED</div>
-                                    <div style="font-size: 20px; font-weight: 800; color: #15803d; margin-top: 4px;"
-                                        id="db-status-val-solved">0</div>
-                                </div>
-                                <div class="db-status-card"
-                                    style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
-                                    <div
-                                        style="font-size: 11px; font-weight: 700; color: #d97706; letter-spacing: 0.03em;">
-                                        UNSOLVED</div>
-                                    <div style="font-size: 20px; font-weight: 800; color: #b45309; margin-top: 4px;"
-                                        id="db-status-val-unsolved">0</div>
-                                </div>
-                                <div class="db-status-card"
-                                    style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
-                                    <div
-                                        style="font-size: 11px; font-weight: 700; color: #2563eb; letter-spacing: 0.03em;">
-                                        NEW DB</div>
-                                    <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; margin-top: 4px;"
-                                        id="db-status-val-new">0</div>
+
+                                <!-- Right: Pie / Donut Chart for Tercapai vs Tidak Tercapai -->
+                                <div class="so-subdept-chart-wrapper">
+                                    <div class="so-pie-card">
+                                        <div class="so-pie-header">
+                                            <h3
+                                                style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                                                Status Pencapaian</h3>
+                                        </div>
+                                        <div class="so-pie-canvas-box">
+                                            <canvas id="all-chart-hasil-so-pie"></canvas>
+                                        </div>
+                                        <div class="so-pie-stats" id="all-hasil-pie-stats">
+                                            <div
+                                                style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.5rem;">
+                                                Memuat grafik...
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
 
@@ -404,6 +505,7 @@ $csrfToken = getCsrfToken();
                 </div>
             </div>
 
+
             <!-- ── Card: Trend Line Graphics (Count All - Not Per Dept or Subdept) ── -->
             <div class="card" id="card-trend-all-wrapper" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                 <div class="card-header"
@@ -458,162 +560,29 @@ $csrfToken = getCsrfToken();
                 </div>
             </div>
 
-            <!-- ── Card: Report Hasil Stock Opname (All Data) ─────────── -->
-            <div class="card" id="card-hasil-so-all" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2 class="card-title">Report Hasil Stock Opname (All Data)</h2>
-                        <p class="card-subtitle">Hasil pencapaian Stock Opname untuk seluruh site</p>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                        <!-- Dept Filter -->
-                        <select id="all-hasil-filter-dept" class="form-control unified-filter-select"
-                            onchange="AllSummaryApp.onAllHasilDeptChange()" style="width: auto;">
-                            <option value="all" selected>Semua DEPT</option>
-                        </select>
-
-                        <!-- Subdept Filter -->
-                        <select id="all-hasil-filter-subdept" class="form-control unified-filter-select"
-                            onchange="AllSummaryApp.onAllHasilSubDeptChange()" style="width: auto;">
-                            <option value="all" selected>Semua Sub Dept</option>
-                        </select>
-
-                        <!-- Status Filter -->
-                        <select id="hasil-so-filter-status" class="form-control unified-filter-select"
-                            onchange="AllSummaryApp.applyHasilFilter()" style="width: auto;">
-                            <option value="all">Semua Status</option>
-                            <option value="tercapai">Tercapai</option>
-                            <option value="tidak_tercapai">Tidak Tercapai</option>
-                            <option value="no_data">Belum Ada Data</option>
-                        </select>
-
-                        <!-- Tampilkan Row Data (Page Size) -->
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <label for="hasil-so-page-size"
-                                style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
-                            <select id="hasil-so-page-size" class="form-control unified-filter-select"
-                                onchange="AllSummaryApp.changeHasilPageSize(this.value)" style="width: auto;">
-                                <option value="10" selected>10</option>
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                                <option value="all">Semua</option>
-                            </select>
-                        </div>
-
-                        <!-- Search Input -->
-                        <input type="search" id="hasil-so-search" class="table-search-input unified-search-input"
-                            placeholder="Search..." oninput="AllSummaryApp.applyHasilFilter()"
-                            style="max-width: 200px;">
-                    </div>
-                </div>
-                <div class="card-body" style="padding: 1rem 1.25rem;">
-                    <div class="so-subdept-layout">
-                        <!-- Left: Compact Shrunk Table -->
-                        <div class="so-subdept-table-wrapper">
-                            <div class="table-responsive"
-                                style="max-height: 480px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
-                                <table class="table so-subdept-table reconciliation-table"
-                                    style="margin-bottom: 0; width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px;">
-                                    <thead>
-                                        <tr
-                                            style="background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">
-                                            <th rowspan="2"
-                                                style="width: 110px; text-align: center; vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                SITE CODE</th>
-                                            <th rowspan="2"
-                                                style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                NAME SITE</th>
-                                            <th rowspan="2"
-                                                style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                DEPT / SUB DEPT</th>
-                                            <th
-                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                RESULT MATCH</th>
-                                            <th
-                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                RESULT PHYSIC</th>
-                                            <th
-                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                RESULT DB</th>
-                                            <th
-                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                TOTAL PHYSICAL</th>
-                                            <th
-                                                style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                PENCAPAIAN</th>
-                                            <th rowspan="2"
-                                                style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 140px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                                                STATUS</th>
-                                        </tr>
-                                        <tr
-                                            style="background: #f8fafc; font-size: 10px; color: #64748b; border-bottom: 2px solid #cbd5e1;">
-                                            <th
-                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                Physical (QTY)</th>
-                                            <th
-                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                Physical (QTY)</th>
-                                            <th
-                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                Physical (QTY)</th>
-                                            <th
-                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                Target (QTY)</th>
-                                            <th
-                                                style="text-align: center; padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
-                                                %</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="hasil-so-table-body">
-                                        <tr>
-                                            <td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">
-                                                Memuat data Report SO...
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <!-- Table Pagination Footer -->
-                            <div class="table-pagination-footer"
-                                style="margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
-                                <div id="hasil-so-table-info">Menampilkan 0 sampai 0 dari 0 data</div>
-                                <div class="pagination-controls" id="hasil-so-pagination-controls"></div>
-                            </div>
-                        </div>
-
-                        <!-- Right: Pie / Donut Chart for Tercapai vs Tidak Tercapai -->
-                        <div class="so-subdept-chart-wrapper">
-                            <div class="so-pie-card">
-                                <div class="so-pie-header">
-                                    <h3 style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
-                                        Status Pencapaian</h3>
-                                </div>
-                                <div class="so-pie-canvas-box">
-                                    <canvas id="all-chart-hasil-so-pie"></canvas>
-                                </div>
-                                <div class="so-pie-stats" id="all-hasil-pie-stats">
-                                    <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 0.5rem;">
-                                        Memuat grafik...
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Card: Rekapitulasi Status DB (All Data) ───────────── -->
+            <!-- ── Card: DB Analysis & Status Penyelesaian (All Sites) ── -->
             <div class="card" id="card-rekap-status-db" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
+                <div class="card-header"
+                    style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
                     <div>
-                        <h2 class="card-title">Rekapitulasi Status Penyelesaian DB (All Data)</h2>
-                        <p class="card-subtitle">Perbandingan status DB (Solved / Unsolved / New DB) seluruh site</p>
+                        <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                            <h2 class="card-title"
+                                style="margin: 0; font-size: 15.5px; font-weight: 700; color: #0f172a;">
+                                DB Analysis &amp; Rekapitulasi Status Penyelesaian (All Sites)
+                            </h2>
+                            <span id="all-db-analysis-period-badge" class="badge"
+                                style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
+                                September 2026
+                            </span>
+                        </div>
+                        <p class="card-subtitle" style="margin-top: 3px; font-size: 11.5px; color: #64748b;">
+                            Total data DB dan status tindak lanjut seluruh site dibanding periode sebelumnya
+                        </p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
                         <!-- Dept Filter -->
-                        <select id="all-rdb-filter-dept" class="form-control unified-filter-select"
-                            style="width: auto;" onchange="AllSummaryApp.onAllRdbDeptChange()">
+                        <select id="all-rdb-filter-dept" class="form-control unified-filter-select" style="width: auto;"
+                            onchange="AllSummaryApp.onAllRdbDeptChange()">
                             <option value="all" selected>Semua DEPT</option>
                         </select>
 
@@ -637,7 +606,8 @@ $csrfToken = getCsrfToken();
                             <label for="all-rdb-page-size"
                                 style="font-size: 13px; font-weight: 600; color: #475569; margin: 0; white-space: nowrap;">Tampilkan</label>
                             <select id="all-rdb-page-size" class="form-control unified-filter-select"
-                                onchange="AllSummaryApp.changeAllRekapDbStatusPageSize(this.value)" style="width: auto;">
+                                onchange="AllSummaryApp.changeAllRekapDbStatusPageSize(this.value)"
+                                style="width: auto;">
                                 <option value="10" selected>10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -652,6 +622,250 @@ $csrfToken = getCsrfToken();
                             style="max-width: 200px;">
                     </div>
                 </div>
+
+                <!-- 1-Row Ringkas: 5-Segment Unified Metric Strip for All Sites -->
+                <div class="card-body"
+                    style="padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.85rem;">
+                        <!-- Metric 1: TOTAL DATA DB -->
+                        <div
+                            style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span
+                                    style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em;">TOTAL
+                                    DATA DB</span>
+                                <div id="all-db-card-trend"><span class="db-grand-trend" id="all-db-grand-trend"></span>
+                                </div>
+                            </div>
+                            <div
+                                style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px; flex-wrap: wrap;">
+                                <span id="all-db-val-total"
+                                    style="font-size: 1.4rem; font-weight: 800; color: #0f172a;">0</span>
+                                <span style="font-size: 13px; font-weight: 600; color: #64748b;">QTY</span>
+                                <span style="display: none;" id="all-db-analysis-grand-total">0</span>
+                            </div>
+                            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                                Total Status: <strong style="color: #0f172a;"><span
+                                        id="all-db-summary-stat-status-total">0</span> QTY</strong>
+                            </div>
+                        </div>
+
+                        <!-- Metric 2: TINGKAT PENYELESAIAN (PROGRESS) -->
+                        <div
+                            style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span
+                                    style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em;">PENYELESAIAN</span>
+                                <span id="all-db-summary-rate-text"
+                                    style="font-size: 1.35rem; font-weight: 800; color: #15803d; line-height: 1;">0.00%</span>
+                            </div>
+                            <!-- Multi-segment Progress Bar -->
+                            <div
+                                style="height: 10px; background: #e2e8f0; border-radius: 9999px; overflow: hidden; display: flex; width: 100%; margin: 6px 0 4px 0;">
+                                <div id="all-db-summary-bar-solved"
+                                    style="width: 0%; background: #16a34a; transition: width 0.4s ease;" title="Solved">
+                                </div>
+                                <div id="all-db-summary-bar-unsolved"
+                                    style="width: 0%; background: #ea580c; transition: width 0.4s ease;"
+                                    title="Unsolved"></div>
+                                <div id="all-db-summary-bar-new"
+                                    style="width: 0%; background: #2563eb; transition: width 0.4s ease;" title="New DB">
+                                </div>
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #64748b;">
+                                <span style="display: inline-flex; align-items: center; gap: 3px;">
+                                    <span
+                                        style="width: 6px; height: 6px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
+                                    Solved
+                                </span>
+                                <span style="display: inline-flex; align-items: center; gap: 3px;">
+                                    <span
+                                        style="width: 6px; height: 6px; border-radius: 50%; background: #ea580c; display: inline-block;"></span>
+                                    Unsolved
+                                </span>
+                                <span style="display: inline-flex; align-items: center; gap: 3px;">
+                                    <span
+                                        style="width: 6px; height: 6px; border-radius: 50%; background: #2563eb; display: inline-block;"></span>
+                                    New DB
+                                </span>
+                            </div>
+                            <span style="display: none;" id="all-db-summary-rate-badge">0.00% Solved</span>
+                        </div>
+
+                        <!-- Metric 3: SOLVED DB -->
+                        <div
+                            style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.85rem 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span
+                                    style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.03em;">SOLVED
+                                    DB</span>
+                                <span id="all-db-status-grand-trend"></span>
+                            </div>
+                            <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                <span id="all-db-summary-val-solved"
+                                    style="font-size: 1.4rem; font-weight: 800; color: #16a34a;">0</span>
+                                <span style="display: none;" id="all-db-status-val-solved">0</span>
+                                <span id="all-db-summary-pct-solved"
+                                    style="font-size: 11px; font-weight: 600; color: #15803d;">(0.00%)</span>
+                            </div>
+                            <div style="font-size: 11px; color: #166534; margin-top: 2px;">Terselesaikan</div>
+                        </div>
+
+                        <!-- Metric 4: UNSOLVED DB -->
+                        <div
+                            style="background: #ffffff; border: 1px solid #fecaca; border-radius: 8px; padding: 0.85rem 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span
+                                    style="font-size: 11px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.03em;">UNSOLVED
+                                    DB</span>
+                            </div>
+                            <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                <span id="all-db-summary-val-unsolved"
+                                    style="font-size: 1.4rem; font-weight: 800; color: #dc2626;">0</span>
+                                <span style="display: none;" id="all-db-status-val-unsolved">0</span>
+                                <span id="all-db-summary-pct-unsolved"
+                                    style="font-size: 11px; font-weight: 600; color: #b91c1c;">(0.00%)</span>
+                            </div>
+                            <div style="font-size: 11px; color: #991b1b; margin-top: 2px;">Belum Selesai</div>
+                        </div>
+
+                        <!-- Metric 5: NEW DB -->
+                        <div
+                            style="background: #ffffff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.85rem 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span
+                                    style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.03em;">NEW
+                                    DB</span>
+                            </div>
+                            <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 4px;">
+                                <span id="all-db-summary-val-new"
+                                    style="font-size: 1.4rem; font-weight: 800; color: #2563eb;">0</span>
+                                <span style="display: none;" id="all-db-status-val-new">0</span>
+                                <span id="all-db-summary-pct-new"
+                                    style="font-size: 11px; font-weight: 600; color: #1d4ed8;">(0.00%)</span>
+                            </div>
+                            <div style="font-size: 11px; color: #1e40af; margin-top: 2px;">Data Baru</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optional Collapsible Breakdown Wilayah & Resolusi Status (All Sites) -->
+                <div
+                    style="padding: 0.65rem 1.25rem; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div
+                        style="font-size: 12px; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="all-btn-toggle-db-breakdown"
+                        onclick="(window.AllSummaryApp &amp;&amp; typeof window.AllSummaryApp.toggleDbBreakdownPanel === 'function') ? AllSummaryApp.toggleDbBreakdownPanel() : (window.AllSummaryApp_toggleDbBreakdownPanel ? window.AllSummaryApp_toggleDbBreakdownPanel() : (function(btn){ var p = document.getElementById('all-db-breakdown-panel'); var t = document.getElementById('all-db-breakdown-toggle-text'); if(p){ var hid = (p.style.display === 'none' || !p.style.display); p.style.display = hid ? 'block' : 'none'; if(t) t.textContent = hid ? 'Sembunyikan Breakdown ▲' : 'Tampilkan Breakdown ▼'; } })(this));"
+                        style="font-size: 11.5px; padding: 3px 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                        style="font-size: 11.5px; padding: 3px 12px; border-radius: 6px; font-weight: 600; display:
+                        inline-flex; align-items: center; gap: 4px;">
+                        <span id="all-db-breakdown-toggle-text">Tampilkan Breakdown ▼</span>
+                    </button>
+                </div>
+
+                <!-- Collapsible Breakdown Panel -->
+                <div id="all-db-breakdown-panel"
+                    style="display: none; padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div class="executive-db-row" id="card-executive-db-analysis">
+                        <!-- ── Card 2: Result DB Analysis (All Sites) ── -->
+                        <div class="executive-db-col" id="col-result-db-analysis"
+                            style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                                <div>
+                                    <h3
+                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        Result DB Analysis (All Sites)
+                                    </h3>
+                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                        Total data DB seluruh site dibanding periode sebelumnya
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span class="db-grand-trend" id="db-grand-trend"></span>
+                                    <span class="so-status-badge" c
+                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                        Total DB: <span id="db-analysis-grand-total">0</span> QTY
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="db-status-card"
+                                style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div
+                                        style="font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.03em;">
+                                        TOTAL RESULT DB</div>
+                                    <span class="db-trend-indicator" id="all-db-card-trend"></span>
+                                </div>
+                                <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px;"
+                                    id="all-db-val-total">0</div>
+                            </div>
+                        </div>
+
+                        <!-- ── Card 3: Status Penyelesaian DB Summary ── -->
+                        <div class="executive-db-col" id="col-status-db-analysis"
+                            style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.65rem;">
+                                <div>
+                                    <h3
+                                        style="margin: 0; font-size: 14.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        Status Penyelesaian DB (All Sites)
+                                    </h3>
+                                    <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+                                        Total data DB seluruh site dibanding periode sebelumnya
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span class="db-grand-trend" id="all-db-status-grand-trend"></span>
+                                    <span class="so-status-badge"
+                                        style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">
+                                        Total: <span id="all-db-status-grand-total">0</span> QTY
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem;">
+                                <div class="db-status-card"
+                                    style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
+                                    <div
+                                        style="font-size: 11px; font-weight: 700; color: #16a34a; letter-spacing: 0.03em;">
+                                        SOLVED</div>
+                                    <div style="font-size: 20px; font-weight: 800; color: #15803d; margin-top: 4px;"
+                                        id="db-status-val-solved">0</div>
+                                </div>
+                                <div class="db-status-card"
+                                    style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
+                                    <div
+                                        style="font-size: 11px; font-weight: 700; color: #d97706; letter-spacing: 0.03em;">
+                                        UNSOLVED</div>
+                                    <div style="font-size: 20px; font-weight: 800; color: #b45309; margin-top: 4px;"
+                                        id="db-status-val-unsolved">0</div>
+                                </div>
+                                <div class="db-status-card"
+                                    style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem 0.65rem; text-align: center;">
+                                    <div
+                                        style="font-size: 11px; font-weight: 700; color: #2563eb; letter-spacing: 0.03em;">
+                                        NEW DB</div>
+                                    <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; margin-top: 4px;"
+                                        id="db-status-val-new">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table View -->
                 <div class="card-body" style="padding: 1rem;">
                     <div class="table-responsive"
                         style="max-height: 400px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
@@ -686,7 +900,8 @@ $csrfToken = getCsrfToken();
 
             <!-- ── Card: Rekapitulasi 2026 (All Sites) ──────────────── -->
             <div class="card" id="card-rekapitulasi" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
+                <div class="card-header"
+                    style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
                     <div>
                         <h2 class="card-title">Rekapitulasi Stock Opname (All Data)</h2>
                         <p class="card-subtitle">Rekapitulasi persentase seluruh site per bulan</p>
@@ -781,7 +996,8 @@ $csrfToken = getCsrfToken();
 
             <!-- ── Card: Site Movements & Logs ─────────────────────── -->
             <div class="card" id="card-site-movements" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-                <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
+                <div class="card-header"
+                    style="flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;">
                     <div>
                         <h2 class="card-title">Pergerakan & Log Site Master Data</h2>
                         <p class="card-subtitle">Log mutasi dan perubahan status master site</p>
@@ -869,6 +1085,7 @@ $csrfToken = getCsrfToken();
 
     <!-- Scripts -->
     <script src="assets/js/chart.umd.min.js"></script>
+    <script src="assets/js/html2canvas.min.js"></script>
     <script src="assets/js/all_summary.js?v=<?= filemtime(__DIR__ . '/assets/js/all_summary.js') ?>"></script>
 
 </body>

@@ -521,7 +521,7 @@ for ($i = 0; $i < $rowCount; $i++) {
         if ($rawVal !== null && $rawVal !== '' && is_numeric($rawVal)) {
             $valFloat = (float) $rawVal;
             $sheet->setCellValue($coord, $valFloat / 100);
-            $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('0%');
+            $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('0.00%');
 
             $colors = getCellColorStyles($valFloat, $rowIsPmd);
             $sheet->getStyle($coord)->applyFromArray([
@@ -586,9 +586,9 @@ foreach (array_keys($monthCols) as $m) {
     $cnt = $monthTotals[$m]['count'];
 
     if ($cnt > 0) {
-        $avgVal = round($monthTotals[$m]['sum'] / $cnt);
+        $avgVal = round($monthTotals[$m]['sum'] / $cnt, 2);
         $sheet->setCellValue($coord, $avgVal / 100);
-        $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('0%');
+        $sheet->getStyle($coord)->getNumberFormat()->setFormatCode('0.00%');
 
         $colors = getCellColorStyles($avgVal, $isPmd);
         $sheet->getStyle($coord)->applyFromArray([

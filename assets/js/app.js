@@ -154,6 +154,10 @@ const App = (() => {
     let chartTrendDept = null;
     let chartTrendSubDept = null;
     let chartTrendPmd = null;
+    let currentTrendSubDeptFilter = 'CSO';
+    let currentTrendPmdSiteFilter = 'all';
+    let lastTrendJsonData = null;
+    let chartRekapAverage = null;
 
     function resetMasterFilters() {
         const monthFilter = document.getElementById('filter-month');
@@ -263,7 +267,7 @@ const App = (() => {
         keepCleanUrl();
 
         let initialPage = window.AUTH_USER ? 'all-summary' : 'summary';
-        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'weekly-summary' || window.INITIAL_PAGE === 'reports' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'master-data-weekly' || window.INITIAL_PAGE === 'user-management' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
+        if (window.INITIAL_PAGE && (window.INITIAL_PAGE === 'all-summary' || window.INITIAL_PAGE === 'weekly-summary' || window.INITIAL_PAGE === 'reports' || window.INITIAL_PAGE === 'berita-acara' || window.INITIAL_PAGE === 'master-data' || window.INITIAL_PAGE === 'master-data-weekly' || window.INITIAL_PAGE === 'user-management' || window.INITIAL_PAGE === 'summary' || window.INITIAL_PAGE === 'login')) {
             if (window.INITIAL_PAGE === 'login') {
                 initialPage = window.AUTH_USER ? 'all-summary' : 'login';
             } else {
@@ -271,7 +275,7 @@ const App = (() => {
             }
         } else {
             const savedPage = sessionStorage.getItem('active_page');
-            if (savedPage && (savedPage === 'all-summary' || savedPage === 'weekly-summary' || savedPage === 'reports' || savedPage === 'master-data' || savedPage === 'master-data-weekly' || savedPage === 'user-management' || savedPage === 'summary' || savedPage === 'login')) {
+            if (savedPage && (savedPage === 'all-summary' || savedPage === 'weekly-summary' || savedPage === 'reports' || savedPage === 'berita-acara' || savedPage === 'master-data' || savedPage === 'master-data-weekly' || savedPage === 'user-management' || savedPage === 'summary' || savedPage === 'login')) {
                 if (savedPage === 'login') {
                     initialPage = window.AUTH_USER ? 'all-summary' : 'login';
                 } else {
@@ -283,10 +287,12 @@ const App = (() => {
             const perms = window.AUTH_USER.permissions || {};
             const canAll = perms.can_access_all_summary !== false;
             const canWk = perms.can_access_weekly_summary !== false;
+            const canRep = perms.can_access_reports !== false;
+            const canBA = perms.can_access_berita_acara !== false;
             const canMst = perms.can_access_master_data !== false;
             const canMstWk = perms.can_access_master_data_weekly !== false;
             const canUserMgmt = perms.can_access_user_management !== false;
-            initialPage = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))));
+            initialPage = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canRep ? 'reports' : (canBA ? 'berita-acara' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))))));
         }
 
         // Restore active SO Type & Category from sessionStorage
@@ -348,7 +354,7 @@ const App = (() => {
     function keepCleanUrl() {
         try {
             let path = window.location.pathname;
-            let cleanPath = path.replace(/(index|login|summary|all-summary|weekly-summary|reports|master-data-weekly|master-data|user-management)\.php.*$/i, '');
+            let cleanPath = path.replace(/(index|login|summary|all-summary|weekly-summary|reports|berita-acara|master-data-weekly|master-data|user-management)\.php.*$/i, '');
             if (!cleanPath.endsWith('/')) {
                 cleanPath += '/';
             }
@@ -378,7 +384,7 @@ const App = (() => {
         }
         const tabBeritaAcara = document.getElementById('tab-berita-acara');
         if (tabBeritaAcara) {
-            tabBeritaAcara.style.display = perms.can_access_reports !== false ? '' : 'none';
+            tabBeritaAcara.style.display = perms.can_access_berita_acara !== false ? '' : 'none';
         }
         const tabMasterData = document.getElementById('tab-master-data');
         if (tabMasterData) {
@@ -392,6 +398,11 @@ const App = (() => {
         if (tabUserManagement) {
             tabUserManagement.style.display = perms.can_access_user_management !== false ? '' : 'none';
         }
+
+        // Toggle Generate PNG buttons
+        document.querySelectorAll('.btn-generate-png').forEach(b => {
+            b.style.display = window.AUTH_USER ? 'inline-flex' : 'none';
+        });
 
         // Master Data (Monthly) Buttons: Add / Import
         document.querySelectorAll('[data-uac="master-add-import"]').forEach(el => {
@@ -448,16 +459,17 @@ const App = (() => {
     function navigateTo(page, isInit = false) {
         if (!page) page = 'summary';
 
-        // Summary page is removed on session logged in
-        if (page === 'summary' && window.AUTH_USER) {
+        // On initial landing without explicit page chosen, admin defaults to all-summary
+        if (isInit && page === 'summary' && window.AUTH_USER && !sessionStorage.getItem('active_page')) {
             const perms = window.AUTH_USER.permissions || {};
             const canAll = perms.can_access_all_summary !== false;
             const canWk = perms.can_access_weekly_summary !== false;
             const canRep = perms.can_access_reports !== false;
+            const canBA = perms.can_access_berita_acara !== false;
             const canMst = perms.can_access_master_data !== false;
             const canMstWk = perms.can_access_master_data_weekly !== false;
             const canUserMgmt = perms.can_access_user_management !== false;
-            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canRep ? 'reports' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary')))));
+            page = canAll ? 'all-summary' : (canWk ? 'weekly-summary' : (canRep ? 'reports' : (canBA ? 'berita-acara' : (canMst ? 'master-data' : (canMstWk ? 'master-data-weekly' : (canUserMgmt ? 'user-management' : 'all-summary'))))));
         }
 
         // Protected pages require authenticated session
@@ -496,7 +508,7 @@ const App = (() => {
                 else if (perms.can_access_master_data !== false) page = 'master-data';
                 else if (perms.can_access_master_data_weekly !== false) page = 'master-data-weekly';
                 else page = 'user-management';
-            } else if (page === 'berita-acara' && perms.can_access_reports === false) {
+            } else if (page === 'berita-acara' && perms.can_access_berita_acara === false) {
                 if (perms.can_access_all_summary !== false) page = 'all-summary';
                 else if (perms.can_access_weekly_summary !== false) page = 'weekly-summary';
                 else if (perms.can_access_reports !== false) page = 'reports';
@@ -612,37 +624,43 @@ const App = (() => {
     // ── Quick Access Sidebar & Smooth Scroll Navigation ────────
     const QUICK_ACCESS_ITEMS_SUMMARY = [
         { id: 'card-executive-summary', title: 'Executive Summary' },
-        { id: 'card-executive-catatan', title: 'Catatan & Evaluasi' },
-        { id: 'card-executive-db-analysis', title: 'Result DB Analysis' },
+
+
         { id: 'card-scorecard-summary', title: 'Score Card Summary' },
         { id: 'card-trend-dept-wrapper', title: 'Trend Line Chart' },
-        { id: 'card-hasil-so-subdept', title: 'Report Hasil SO' },
+
+        { id: 'card-result-db-chart', title: 'Result DB Analysis (Chart)' },
         { id: 'card-rekap-status-db', title: 'Status Penyelesaian DB' },
-        { id: 'card-rekapitulasi', title: 'Rekapitulasi' },
+
+        { id: 'card-rekapitulasi', title: 'Tabel Rekapitulasi' },
         { id: 'card-site-movements', title: 'Log Pergerakan Site' }
     ];
 
     const QUICK_ACCESS_ITEMS_ALL_SUMMARY = [
         { id: 'all-card-executive-summary', title: 'Executive Summary (All)' },
-        { id: 'all-card-executive-db-analysis', title: 'Result DB Analysis (All)' },
+
         { id: 'all-card-scorecard-summary', title: 'Score Card Summary (All)' },
         { id: 'all-card-trend-all-wrapper', title: 'Trend Chart (All Sites)' },
-        { id: 'card-hasil-so-all', title: 'Report Hasil SO (All)' },
-        { id: 'all-card-rekap-status-db', title: 'Status DB (All)' },
-        { id: 'all-card-rekapitulasi', title: 'Rekapitulasi (All)' },
+
+        { id: 'all-card-rekap-status-db', title: 'DB Analysis & Status DB (All)' },
+
+        { id: 'all-card-rekapitulasi', title: 'Tabel Rekapitulasi (All)' },
         { id: 'all-card-site-movements', title: 'Log Pergerakan Site' }
     ];
 
     const QUICK_ACCESS_ITEMS_WEEKLY_SUMMARY = [
         { id: 'weekly-card-executive-summary', title: 'Executive Summary (Weekly)' },
         { id: 'weekly-card-scorecard-summary', title: 'Score Card Summary (Weekly)' },
-        { id: 'weekly-card-hasil-so', title: 'Report SO (Weekly)' }
+        { id: 'weekly-card-hasil-so', title: 'Report Stock Opname (Weekly)' }
     ];
 
     const QUICK_ACCESS_ITEMS_REPORTS = [
         { id: 'card-generate-report', title: 'Generate Report' },
-        { id: 'card-pending-report', title: 'Pending Report' },
-        { id: 'card-closed-report', title: 'Closed Report' }
+        { id: 'card-verification-report', title: 'Verification Report' }
+    ];
+
+    const QUICK_ACCESS_ITEMS_BERITA_ACARA = [
+        { id: 'card-berita-acara-table', title: 'Daftar Berita Acara Tindak Lanjut DB' }
     ];
 
     const QUICK_ACCESS_ITEMS_USER_MANAGEMENT = [
@@ -696,6 +714,9 @@ const App = (() => {
         const container = document.getElementById('quick-access-nav-list');
         if (!container) return;
 
+        let html = '';
+
+        // Quick Access Section (Card Shortcuts for the active page)
         let items = QUICK_ACCESS_ITEMS_SUMMARY;
         if (page === 'all-summary') {
             items = QUICK_ACCESS_ITEMS_ALL_SUMMARY;
@@ -703,6 +724,8 @@ const App = (() => {
             items = QUICK_ACCESS_ITEMS_WEEKLY_SUMMARY;
         } else if (page === 'reports') {
             items = QUICK_ACCESS_ITEMS_REPORTS;
+        } else if (page === 'berita-acara') {
+            items = QUICK_ACCESS_ITEMS_BERITA_ACARA;
         } else if (page === 'master-data') {
             items = QUICK_ACCESS_ITEMS_MASTER;
         } else if (page === 'master-data-weekly') {
@@ -711,7 +734,6 @@ const App = (() => {
             items = QUICK_ACCESS_ITEMS_USER_MANAGEMENT;
         }
 
-        let html = '';
         items.forEach(item => {
             html += `
                 <a class="quick-access-item" href="javascript:void(0)" onclick="App.scrollToCard('${item.id}');">
@@ -897,6 +919,13 @@ const App = (() => {
         if (btnNavLogout) btnNavLogout.style.display = 'none';
         if (btnNavLogin) btnNavLogin.style.display = 'none';
 
+        const btnGen = document.getElementById('btn-generate-executive-summary');
+        if (btnGen) btnGen.style.display = 'none';
+        const btnGenAll = document.getElementById('btn-generate-all-executive-summary');
+        if (btnGenAll) btnGenAll.style.display = 'none';
+        const btnGenWk = document.getElementById('btn-generate-weekly-executive-summary');
+        if (btnGenWk) btnGenWk.style.display = 'none';
+
         // Clear local auth session state
         window.AUTH_USER = null;
 
@@ -904,10 +933,14 @@ const App = (() => {
             await fetch('logout.php', { method: 'POST' });
         } catch (e) { }
 
-        // Clear local storage and set logout flag
+        // Clear local storage and set logout flag (preserve landing dismissed state so overlay doesn't reappear)
         try {
+            const landingDismissed = sessionStorage.getItem('amora_landing_dismissed');
             sessionStorage.clear();
             sessionStorage.setItem('logout_toast', 'true');
+            if (landingDismissed) {
+                sessionStorage.setItem('amora_landing_dismissed', landingDismissed);
+            }
         } catch (e) { }
 
         // Clean reload to ensure server session is completely destroyed and fresh guest CSRF token is loaded
@@ -3725,7 +3758,7 @@ const App = (() => {
 
     function getPctColor(val, isPmd = false) {
         if (val === null || val === undefined || isNaN(val)) return '#64748b';
-        const num = Math.round(parseFloat(val));
+        const num = parseFloat(val);
         if (isPmd) {
             return num >= 98 ? '#16a34a' : '#dc2626';
         }
@@ -3740,7 +3773,7 @@ const App = (() => {
 
     function getPctClass(val, isPmd = false) {
         if (val === null || val === undefined || isNaN(val)) return 'pct-none';
-        const num = Math.round(parseFloat(val));
+        const num = parseFloat(val);
         if (isPmd) {
             return num >= 98 ? 'pct-green' : 'pct-red';
         }
@@ -3849,6 +3882,13 @@ const App = (() => {
                 ? `Monthly Physical % (Jan - Dec ${curYear})`
                 : `Quarterly Physical % (Q1 - Q4 ${curYear})`;
         });
+
+        // Update Rekap Chart Title (Monthly vs Quarterly)
+        const chartTitleEl = document.getElementById('rekap-chart-title');
+        if (chartTitleEl) {
+            const prefix = (summarySOType === 'quarterly') ? 'Quarterly' : 'Monthly';
+            chartTitleEl.textContent = `${prefix} Target Achievement ${rekapYear || curYear}`;
+        }
 
         // Quarterly has 2 Category tabs: Outlet Subarep and Warehouse HUB
         const catSlider = document.getElementById('summary-cat-slider-card');
@@ -4199,14 +4239,14 @@ const App = (() => {
 
         if (isIt || isTekno) {
             let reportName = isIt ? 'IT Coorporate' : ((summarySOType === 'quarterly') ? 'Warehouse Tekno (Quarterly)' : 'Warehouse Tekno');
-            if (titleEl) titleEl.textContent = `Report SO ${reportName}`;
+            if (titleEl) titleEl.textContent = `Report Stock Opname ${reportName}`;
             if (subtitleEl) subtitleEl.textContent = `Pencapaian dan Hasil Stock Opname ${reportName}`;
             if (deptFilterContainer) deptFilterContainer.style.display = 'none';
             if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'none';
             if (statusFilterContainer) statusFilterContainer.style.display = 'flex';
             if (statusSelect) statusSelect.value = 'all';
         } else if (isPmd) {
-            if (titleEl) titleEl.textContent = 'Report SO PMD';
+            if (titleEl) titleEl.textContent = 'Report Stock Opname PMD';
             if (subtitleEl) subtitleEl.textContent = 'Pencapaian dan Hasil Stock Opname PMD';
             if (deptFilterContainer) deptFilterContainer.style.display = 'none';
             if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'flex';
@@ -4227,7 +4267,7 @@ const App = (() => {
             if (summaryCategory === 'outlet_subarep') reportName = 'Outlet Subarep (Quarterly)';
             else if (isHub) reportName = (summarySOType === 'quarterly') ? 'Warehouse HUB (Quarterly)' : 'Warehouse HUB';
 
-            if (titleEl) titleEl.textContent = `Report SO ${reportName}`;
+            if (titleEl) titleEl.textContent = `Report Stock Opname ${reportName}`;
             if (subtitleEl) subtitleEl.textContent = `Pencapaian dan Hasil Stock Opname ${reportName}`;
             if (deptFilterContainer) deptFilterContainer.style.display = 'flex';
             if (subdeptFilterContainer) subdeptFilterContainer.style.display = 'flex';
@@ -4382,12 +4422,14 @@ const App = (() => {
             } else if (execPeriodBadge) {
                 execPeriodBadge.textContent = pLabel;
             }
+            const dbPeriodBadge = document.getElementById('db-analysis-period-badge');
+            if (dbPeriodBadge) dbPeriodBadge.textContent = pLabel;
         }
 
         // Update achievement card helper
         const updateAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmd = false, customTarget = null) => {
             const rawPct = item && item.pct !== null && item.pct !== undefined ? parseFloat(item.pct) : 0;
-            const pct = Math.round(rawPct);
+            const pct = rawPct;
             const count = item?.count || 0;
             const total = item?.total_sites || 0;
             let targetThreshold = 85;
@@ -4400,7 +4442,7 @@ const App = (() => {
 
             const valEl = document.getElementById(valId);
             if (valEl) {
-                valEl.textContent = `${pct}%`;
+                valEl.textContent = `${pct.toFixed(2)}%`;
                 valEl.style.color = color;
             }
 
@@ -4427,9 +4469,9 @@ const App = (() => {
                 } else {
                     let diff = null;
                     if (item && item.diff_pct !== undefined && item.diff_pct !== null) {
-                        diff = Math.round(Number(item.diff_pct));
+                        diff = Number(item.diff_pct);
                     } else if (item && item.prev_pct !== undefined && item.prev_pct !== null && item.pct !== null && item.pct !== undefined) {
-                        diff = Math.round(Number(item.pct)) - Math.round(Number(item.prev_pct));
+                        diff = Number(item.pct) - Number(item.prev_pct);
                     }
 
                     if (diff === null) {
@@ -4439,7 +4481,7 @@ const App = (() => {
                         const isDown = diff < 0;
                         const sign = isUp ? '+' : '';
                         const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
-                        const formattedDiff = `${sign}${diff}%`;
+                        const formattedDiff = `${sign}${diff.toFixed(2)}%`;
 
                         // Solid triangle style: up (green) if > 0, down (red) if < 0
                         const triangleSvg = isUp
@@ -4617,7 +4659,7 @@ const App = (() => {
                 const sKey = subKey.toLowerCase();
                 const sData = subDeptsData[sKey] || {};
                 const rawPct = sData.pct !== undefined && sData.pct !== null ? parseFloat(sData.pct) : 0;
-                const pct = Math.round(rawPct);
+                const pct = rawPct;
                 const count = sData.count || 0;
                 const total = sData.total_sites || 0;
                 const targetThreshold = (summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate') ? 98 : 85;
@@ -4625,7 +4667,7 @@ const App = (() => {
 
                 const valEl = document.getElementById(`kpi-subdept-val-${sKey}`);
                 if (valEl) {
-                    valEl.textContent = `${pct}%`;
+                    valEl.textContent = `${pct.toFixed(2)}%`;
                     valEl.style.color = color;
                 }
 
@@ -4641,9 +4683,9 @@ const App = (() => {
                     } else {
                         let diff = null;
                         if (sData && sData.diff_pct !== undefined && sData.diff_pct !== null) {
-                            diff = Math.round(Number(sData.diff_pct));
+                            diff = Number(sData.diff_pct);
                         } else if (sData && sData.prev_pct !== undefined && sData.prev_pct !== null && sData.pct !== null && sData.pct !== undefined) {
-                            diff = Math.round(Number(sData.pct)) - Math.round(Number(sData.prev_pct));
+                            diff = Number(sData.pct) - Number(sData.prev_pct);
                         }
 
                         if (diff === null) {
@@ -4653,7 +4695,7 @@ const App = (() => {
                             const isDown = diff < 0;
                             const sign = isUp ? '+' : '';
                             const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
-                            const formattedDiff = `${sign}${diff}%`;
+                            const formattedDiff = `${sign}${diff.toFixed(2)}%`;
                             const triangleSvg = isUp
                                 ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
                                 : (isDown ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
@@ -4861,11 +4903,32 @@ const App = (() => {
         });
 
         updateDbAnalysisGrandTotalBadge();
+        renderResultDbChart(currentDbAnalysisData);
+        if (currentDbAnalysisData) {
+            const curSolved = Number(currentDbAnalysisData.solved || 0);
+            const curUnsolved = Number(currentDbAnalysisData.unsolved || 0);
+            const curNew = Number(currentDbAnalysisData.new_db || 0);
+            const curTotal = curSolved + curUnsolved + curNew;
+            const curRate = curTotal > 0 ? ((curSolved / curTotal) * 100) : 0;
+            renderDbResolutionGauge(curRate, currentDbAnalysisData);
+        }
     }
 
     function setDbAnalysisDept() {
         syncDbAnalysisVisibility();
     }
+
+    function toggleDbBreakdownPanel() {
+        const panel = document.getElementById('db-breakdown-panel');
+        const text = document.getElementById('db-breakdown-toggle-text');
+        if (!panel) return;
+        const isHidden = (panel.style.display === 'none' || panel.style.display === '' || window.getComputedStyle(panel).display === 'none');
+        panel.style.display = isHidden ? 'block' : 'none';
+        if (text) {
+            text.textContent = isHidden ? 'Sembunyikan Breakdown ▲' : 'Tampilkan Breakdown ▼';
+        }
+    }
+    window.toggleDbBreakdownPanel = toggleDbBreakdownPanel;
 
     function getDbPrevPeriodLabel() {
         if (!currentDbAnalysisData || !currentDbAnalysisData.previous_period) return 'periode sebelumnya';
@@ -4989,7 +5052,7 @@ const App = (() => {
         let totalQty = 0;
         let activeItem = null;
         if (isPmd) {
-            activeItem = currentDbAnalysisData.pmd || {};
+            activeItem = currentDbAnalysisData.pmd || currentDbAnalysisData.national || {};
             totalQty = activeItem.qty || 0;
         } else if (isIt || isTekno || isHub) {
             activeItem = currentDbAnalysisData.national || {};
@@ -5039,7 +5102,7 @@ const App = (() => {
             }
 
             const statusTrendBadgeHtml = renderStatusTrendBadge(diffStatusTotal, prevStatusTotal, false, 'unsolved');
-            ['db-status-grand-trend', 'all-db-status-grand-trend'].forEach(id => {
+            ['db-status-grand-trend', 'all-db-status-grand-trend', 'strip-metric-db-grand-trend'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = statusTrendBadgeHtml;
             });
@@ -5050,28 +5113,90 @@ const App = (() => {
         if (gUnsolvedEl) gUnsolvedEl.textContent = formatQty(activeItem?.unsolved || 0);
         if (gNewEl) gNewEl.textContent = formatQty(activeItem?.new_db || 0);
 
-        // Trend badges for Status top cards
-        const trendSolved = document.getElementById('db-trend-solved');
-        const trendUnsolved = document.getElementById('db-trend-unsolved');
-        const trendNew = document.getElementById('db-trend-new');
-        if (trendSolved) trendSolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_solved, activeItem?.prev_solved, false, 'solved');
-        if (trendUnsolved) trendUnsolved.innerHTML = renderStatusTrendBadge(activeItem?.diff_unsolved, activeItem?.prev_unsolved, false, 'unsolved');
-        if (trendNew) trendNew.innerHTML = renderStatusTrendBadge(activeItem?.diff_new_db, activeItem?.prev_new_db, false, 'new_db');
+        // Trend badges for Status top cards and strip metrics
+        ['db-trend-solved', 'strip-metric-trend-solved'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = renderStatusTrendBadge(activeItem?.diff_solved, activeItem?.prev_solved, false, 'solved');
+        });
+        ['db-trend-unsolved', 'strip-metric-trend-unsolved'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = renderStatusTrendBadge(activeItem?.diff_unsolved, activeItem?.prev_unsolved, false, 'unsolved');
+        });
+        ['db-trend-new', 'strip-metric-trend-new'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = renderStatusTrendBadge(activeItem?.diff_new_db, activeItem?.prev_new_db, false, 'new_db');
+        });
 
         // Sites under value for Status top cards
         const subtextSolved = document.getElementById('db-subtext-solved');
         const subtextUnsolved = document.getElementById('db-subtext-unsolved');
         const subtextNew = document.getElementById('db-subtext-new');
-        let totalScopeSites = 58;
-        if (isPmd) totalScopeSites = 6;
-        else if (isIt) totalScopeSites = 2;
-        else if (isHub) totalScopeSites = 4;
-        else if (isTekno) totalScopeSites = (summarySOType === 'quarterly') ? 4 : 2;
-        else totalScopeSites = activeItem?.total_sites || 58;
+        let totalScopeSites = 55;
+        if (isPmd) totalScopeSites = activeItem?.total_sites || 7;
+        else if (isIt) totalScopeSites = activeItem?.total_sites || 2;
+        else if (isHub) totalScopeSites = activeItem?.total_sites || 4;
+        else if (isTekno) totalScopeSites = activeItem?.total_sites || ((summarySOType === 'quarterly') ? 4 : 2);
+        else totalScopeSites = activeItem?.total_sites || ((summarySOType === 'quarterly') ? 16 : 55);
 
         if (subtextSolved) subtextSolved.textContent = `${activeItem?.solved_sites || 0}/${totalScopeSites} Sites`;
         if (subtextUnsolved) subtextUnsolved.textContent = `${activeItem?.unsolved_sites || 0}/${totalScopeSites} Sites`;
         if (subtextNew) subtextNew.textContent = `${activeItem?.new_db_sites || 0}/${totalScopeSites} Sites`;
+
+        // Update Column 3: Ringkasan DB Analysis & Status
+        const solvedRate = totalStatusDb > 0 ? ((statusSolved / totalStatusDb) * 100) : 0;
+        const unsolvedRate = totalStatusDb > 0 ? ((statusUnsolved / totalStatusDb) * 100) : 0;
+        const newDbRate = totalStatusDb > 0 ? ((statusNew / totalStatusDb) * 100) : 0;
+
+        const elSummaryRateBadge = document.getElementById('db-summary-rate-badge');
+        if (elSummaryRateBadge) elSummaryRateBadge.textContent = `${solvedRate.toFixed(2)}% Solved`;
+
+        const elSummaryRateText = document.getElementById('db-summary-rate-text');
+        if (elSummaryRateText) elSummaryRateText.textContent = `${solvedRate.toFixed(2)}%`;
+
+        const elBarSolved = document.getElementById('db-summary-bar-solved');
+        if (elBarSolved) elBarSolved.style.width = `${Math.min(100, solvedRate)}%`;
+
+        const elBarUnsolved = document.getElementById('db-summary-bar-unsolved');
+        if (elBarUnsolved) elBarUnsolved.style.width = `${Math.min(100, unsolvedRate)}%`;
+
+        const elBarNew = document.getElementById('db-summary-bar-new');
+        if (elBarNew) elBarNew.style.width = `${Math.min(100, newDbRate)}%`;
+
+        const elSumTotal = document.getElementById('db-summary-grand-total');
+        if (elSumTotal) elSumTotal.textContent = Number(totalQty).toLocaleString();
+
+        const elSumTrend = document.getElementById('db-summary-grand-trend');
+        const elGrandTrend = document.getElementById('db-grand-trend');
+        if (elSumTrend && elGrandTrend) elSumTrend.innerHTML = elGrandTrend.innerHTML;
+
+        const elSumValSolved = document.getElementById('db-summary-val-solved');
+        if (elSumValSolved) elSumValSolved.textContent = formatQty(statusSolved);
+        const elSumPctSolved = document.getElementById('db-summary-pct-solved');
+        if (elSumPctSolved) elSumPctSolved.textContent = `(${solvedRate.toFixed(2)}%)`;
+
+        const elSumValUnsolved = document.getElementById('db-summary-val-unsolved');
+        if (elSumValUnsolved) elSumValUnsolved.textContent = formatQty(statusUnsolved);
+        const elSumPctUnsolved = document.getElementById('db-summary-pct-unsolved');
+        if (elSumPctUnsolved) elSumPctUnsolved.textContent = `(${unsolvedRate.toFixed(2)}%)`;
+
+        const elSumValNew = document.getElementById('db-summary-val-new');
+        if (elSumValNew) elSumValNew.textContent = formatQty(statusNew);
+        const elSumPctNew = document.getElementById('db-summary-pct-new');
+        if (elSumPctNew) elSumPctNew.textContent = `(${newDbRate.toFixed(2)}%)`;
+
+        const elSumStatTotal = document.getElementById('db-summary-stat-status-total');
+        if (elSumStatTotal) elSumStatTotal.textContent = Number(totalStatusDb).toLocaleString();
+
+        const elSumCoverage = document.getElementById('db-summary-val-coverage');
+        if (elSumCoverage) {
+            const sSites = activeItem?.solved_sites || 0;
+            const uSites = activeItem?.unsolved_sites || 0;
+            const nSites = activeItem?.new_db_sites || 0;
+            const maxSites = Math.max(sSites, uSites, nSites);
+            elSumCoverage.textContent = `${maxSites}/${totalScopeSites} Sites`;
+        }
+
+        renderDbResolutionGauge(solvedRate, activeItem || {});
     }
 
     function updateDbAnalysis(data) {
@@ -5291,6 +5416,507 @@ const App = (() => {
         if (teknoNew) teknoNew.innerHTML = renderTeknoSubStatus('new_db', '#2563eb');
 
         updateDbAnalysisGrandTotalBadge();
+        renderResultDbChart(currentDbAnalysisData);
+        if (currentDbAnalysisData) {
+            const curSolved = Number(currentDbAnalysisData.solved || 0);
+            const curUnsolved = Number(currentDbAnalysisData.unsolved || 0);
+            const curNew = Number(currentDbAnalysisData.new_db || 0);
+            const curTotal = curSolved + curUnsolved + curNew;
+            const curRate = curTotal > 0 ? ((curSolved / curTotal) * 100) : 0;
+            renderDbResolutionGauge(curRate, currentDbAnalysisData);
+        }
+    }
+
+    // ── Result DB Analysis (Breakdown Wilayah - Bar Chart) ──────
+    let chartResultDbAnalysis = null;
+    let resultDbChartWilayahFilter = 'all';
+
+    function onResultDbChartFilterChange(val) {
+        resultDbChartWilayahFilter = val || 'all';
+        renderResultDbChart(currentDbAnalysisData);
+    }
+
+    function renderResultDbChart(data) {
+        const canvas = document.getElementById('chart-result-db-analysis');
+        if (!canvas) return;
+
+        const dbData = data || currentDbAnalysisData || {};
+
+        // Update Period Badge
+        const periodBadge = document.getElementById('chart-rdb-period-badge');
+        const filterMonth = document.getElementById('summary-filter-month')?.value;
+        const filterYear = document.getElementById('summary-filter-year')?.value || 2026;
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        if (periodBadge) {
+            const mText = filterMonth && monthNames[parseInt(filterMonth, 10)] ? monthNames[parseInt(filterMonth, 10)] : (filterMonth ? `Bulan ${filterMonth}` : 'Semua Bulan');
+            periodBadge.textContent = `${mText} ${filterYear}`;
+        }
+
+        // Update Wilayah Filter Select options dynamically
+        const filterSelect = document.getElementById('chart-rdb-filter-wilayah');
+        if (filterSelect && (filterSelect.getAttribute('data-active-cat') !== summaryCategory || filterSelect.getAttribute('data-active-so') !== summarySOType)) {
+            filterSelect.setAttribute('data-active-cat', summaryCategory);
+            filterSelect.setAttribute('data-active-so', summarySOType);
+            let optionsHtml = '<option value="all" selected>Semua Wilayah</option>';
+            if (summaryCategory === 'pmd') {
+                optionsHtml = '<option value="all" selected>Semua Dept</option><option value="DNO">DNO</option><option value="DSO">DSO</option>';
+            } else if (summaryCategory === 'it_coorporate') {
+                optionsHtml = '<option value="all" selected>Semua Site</option><option value="50002001384">OUTLET OPTI TBS</option><option value="50002003133">IT CORP ARCADIA LT 4</option>';
+            } else if (summaryCategory === 'warehouse_tekno') {
+                optionsHtml = '<option value="all" selected>Semua Site Tekno</option>';
+                const teknoSites = dbData.sites || {};
+                Object.values(teknoSites).forEach(s => {
+                    const sc = s.sitecode || '';
+                    const nm = (s.name_site || sc).replace('WAREHOUSE TEKNO', 'TEKNO').trim();
+                    optionsHtml += `<option value="${sc}">${escapeHtml(nm)}</option>`;
+                });
+            } else if (summaryCategory === 'warehouse_hub') {
+                optionsHtml = '<option value="all" selected>Semua Sub Dept Hub</option><option value="NSO">NSO</option><option value="SSO">SSO</option><option value="EKO">EKO</option><option value="EJO">EJO</option>';
+            } else {
+                if (summarySOType === 'quarterly') {
+                    optionsHtml = '<option value="all" selected>Semua Wilayah</option><option value="WRO">WRO (CSO, NSO, SSO)</option><option value="ERO">ERO (BNO, EJO, MPO, SMO)</option>';
+                } else {
+                    optionsHtml = '<option value="all" selected>Semua Wilayah</option><option value="WRO">WRO (CSO, NSO, SSO)</option><option value="CRO">CRO (CJDO, EKO, WJO, WKO)</option><option value="ERO">ERO (BNO, EJO, MPO, SMO)</option>';
+                }
+            }
+            filterSelect.innerHTML = optionsHtml;
+            resultDbChartWilayahFilter = 'all';
+        }
+
+        const subData = dbData.sub_depts || {};
+        let items = [];
+
+        if (summaryCategory === 'pmd') {
+            items = [
+                { code: 'DNO', name: 'DNO', dept: 'PMD', color: '#8b5cf6', data: subData.dno || dbData.dno || {} },
+                { code: 'DSO', name: 'DSO', dept: 'PMD', color: '#a855f7', data: subData.dso || dbData.dso || {} }
+            ];
+            if (resultDbChartWilayahFilter !== 'all') {
+                items = items.filter(it => it.code === resultDbChartWilayahFilter);
+            }
+        } else if (summaryCategory === 'it_coorporate') {
+            const sites = dbData.sites || {};
+            items = [
+                { code: '50002001384', name: 'OPTI TBS', dept: 'IT', color: '#059669', data: sites['50002001384'] || {} },
+                { code: '50002003133', name: 'IT ARCADIA LT 4', dept: 'IT', color: '#0d9488', data: sites['50002003133'] || {} }
+            ];
+            if (resultDbChartWilayahFilter !== 'all') {
+                items = items.filter(it => it.code === resultDbChartWilayahFilter);
+            }
+        } else if (summaryCategory === 'warehouse_tekno') {
+            const sites = dbData.sites || {};
+            items = Object.values(sites).map(s => ({
+                code: s.sitecode || s.name_site,
+                name: (s.name_site || s.sitecode || '').replace('WAREHOUSE TEKNO', 'TEKNO').trim(),
+                dept: 'TEKNO',
+                color: '#0891b2',
+                data: s
+            }));
+            if (resultDbChartWilayahFilter !== 'all') {
+                items = items.filter(it => it.code === resultDbChartWilayahFilter);
+            }
+        } else if (summaryCategory === 'warehouse_hub') {
+            items = [
+                { code: 'NSO', name: 'NSO', dept: 'WRO', color: '#3b82f6', data: subData.nso || {} },
+                { code: 'SSO', name: 'SSO', dept: 'WRO', color: '#3b82f6', data: subData.sso || {} },
+                { code: 'EKO', name: 'EKO', dept: 'CRO', color: '#f59e0b', data: subData.eko || {} },
+                { code: 'EJO', name: 'EJO', dept: 'ERO', color: '#10b981', data: subData.ejo || {} }
+            ];
+            if (resultDbChartWilayahFilter !== 'all') {
+                items = items.filter(it => it.dept === resultDbChartWilayahFilter || it.code === resultDbChartWilayahFilter);
+            }
+        } else {
+            // Outlet Regional default (11 Wilayah)
+            items = [
+                { code: 'CSO', name: 'CSO', dept: 'WRO', color: '#3b82f6', data: subData.cso || {} },
+                { code: 'NSO', name: 'NSO', dept: 'WRO', color: '#3b82f6', data: subData.nso || {} },
+                { code: 'SSO', name: 'SSO', dept: 'WRO', color: '#3b82f6', data: subData.sso || {} },
+                { code: 'CJDO', name: 'CJDO', dept: 'CRO', color: '#f59e0b', data: subData.cjdo || {} },
+                { code: 'EKO', name: 'EKO', dept: 'CRO', color: '#f59e0b', data: subData.eko || {} },
+                { code: 'WJO', name: 'WJO', dept: 'CRO', color: '#f59e0b', data: subData.wjo || {} },
+                { code: 'WKO', name: 'WKO', dept: 'CRO', color: '#f59e0b', data: subData.wko || {} },
+                { code: 'BNO', name: 'BNO', dept: 'ERO', color: '#10b981', data: subData.bno || {} },
+                { code: 'EJO', name: 'EJO', dept: 'ERO', color: '#10b981', data: subData.ejo || {} },
+                { code: 'MPO', name: 'MPO', dept: 'ERO', color: '#10b981', data: subData.mpo || {} },
+                { code: 'SMO', name: 'SMO', dept: 'ERO', color: '#10b981', data: subData.smo || {} }
+            ];
+            if (summarySOType === 'quarterly') {
+                items = items.filter(it => it.dept !== 'CRO');
+            }
+            if (resultDbChartWilayahFilter !== 'all') {
+                items = items.filter(it => it.dept === resultDbChartWilayahFilter || it.code === resultDbChartWilayahFilter);
+            }
+        }
+
+        const labels = items.map(it => it.name || it.code);
+        const curVals = items.map(it => Number(it.data?.qty || 0));
+        const prevVals = items.map(it => Number(it.data?.prev_qty || 0));
+
+        let curPeriodLabel = 'Periode Ini';
+        if (filterMonth && monthNames[parseInt(filterMonth, 10)]) {
+            curPeriodLabel = `${monthNames[parseInt(filterMonth, 10)]} ${filterYear}`;
+        } else if (filterYear) {
+            curPeriodLabel = `Tahun ${filterYear}`;
+        }
+
+        let prevPeriodLabel = (typeof getDbPrevPeriodLabel === 'function') ? getDbPrevPeriodLabel() : 'Periode Lalu';
+        if (!prevPeriodLabel || prevPeriodLabel === 'periode sebelumnya') {
+            prevPeriodLabel = 'Periode Lalu';
+        }
+
+        if (chartResultDbAnalysis) {
+            chartResultDbAnalysis.destroy();
+            chartResultDbAnalysis = null;
+        }
+
+        // Custom plugin to guarantee paired bars are always strictly side-by-side (adjacent) regardless of category count
+        const pairedBarsPlugin = {
+            id: 'pairedBarsPlugin',
+            afterUpdate(chart) {
+                positionPairedBars(chart);
+            },
+            beforeDatasetsDraw(chart) {
+                positionPairedBars(chart);
+            }
+        };
+
+        function positionPairedBars(chart) {
+            const { scales: { x } } = chart;
+            if (!x) return;
+            const meta0 = chart.getDatasetMeta(0);
+            const meta1 = chart.getDatasetMeta(1);
+            if (!meta0 || !meta1) return;
+
+            const hide0 = meta0.hidden || false;
+            const hide1 = meta1.hidden || false;
+            const count = Math.max(meta0.data?.length || 0, meta1.data?.length || 0);
+            if (count === 0) return;
+
+            // Responsive bar thickness and gap between the 2 paired bars
+            let barW = count <= 2 ? 42 : (count <= 4 ? 30 : (count <= 8 ? 24 : 18));
+            let gap = count <= 2 ? 6 : (count <= 4 ? 5 : 4);
+            if (window.innerWidth < 640) {
+                barW = Math.max(14, Math.round(barW * 0.7));
+                gap = Math.max(2, Math.round(gap * 0.7));
+            }
+
+            for (let i = 0; i < count; i++) {
+                const catX = x.getPixelForTick(i);
+                if (catX === undefined || isNaN(catX)) continue;
+
+                const b0 = meta0.data ? meta0.data[i] : null;
+                const b1 = meta1.data ? meta1.data[i] : null;
+
+                if (!hide0 && !hide1) {
+                    if (b0) {
+                        b0.x = catX - (barW / 2 + gap / 2);
+                        b0.width = barW;
+                    }
+                    if (b1) {
+                        b1.x = catX + (barW / 2 + gap / 2);
+                        b1.width = barW;
+                    }
+                } else if (!hide0 && hide1) {
+                    if (b0) {
+                        b0.x = catX;
+                        b0.width = barW;
+                    }
+                } else if (hide0 && !hide1) {
+                    if (b1) {
+                        b1.x = catX;
+                        b1.width = barW;
+                    }
+                }
+            }
+        }
+
+        const catCount = labels.length;
+        const initialBarW = catCount <= 2 ? 42 : (catCount <= 4 ? 30 : (catCount <= 8 ? 24 : 18));
+
+        const ctx = canvas.getContext('2d');
+        chartResultDbAnalysis = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: `Periode Lalu (${prevPeriodLabel})`,
+                        data: prevVals,
+                        backgroundColor: '#93c5fd',
+                        hoverBackgroundColor: '#60a5fa',
+                        borderColor: 'transparent',
+                        borderWidth: 0,
+                        barThickness: initialBarW,
+                        borderRadius: {
+                            topLeft: 6,
+                            topRight: 6,
+                            bottomLeft: 0,
+                            bottomRight: 0
+                        },
+                        borderSkipped: 'bottom'
+                    },
+                    {
+                        label: `Periode Ini (${curPeriodLabel})`,
+                        data: curVals,
+                        backgroundColor: '#3b66ff',
+                        hoverBackgroundColor: '#2551ec',
+                        borderColor: 'transparent',
+                        borderWidth: 0,
+                        barThickness: initialBarW,
+                        borderRadius: {
+                            topLeft: 6,
+                            topRight: 6,
+                            bottomLeft: 0,
+                            bottomRight: 0
+                        },
+                        borderSkipped: 'bottom'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                layout: {
+                    padding: {
+                        top: 10,
+                        right: 16,
+                        bottom: 6,
+                        left: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#f1f5f9',
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        },
+                        ticks: {
+                            callback: val => Number(val).toLocaleString(),
+                            color: '#94a3b8',
+                            font: { size: 11, family: 'Inter, -apple-system, sans-serif' }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        },
+                        ticks: {
+                            font: { size: 11, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                            color: '#475569'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'rectRounded',
+                            boxWidth: 9,
+                            boxHeight: 9,
+                            padding: 16,
+                            font: {
+                                size: 11.5,
+                                weight: '600',
+                                family: 'Inter, -apple-system, sans-serif'
+                            },
+                            color: '#475569'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleFont: { size: 12, weight: '700', family: 'Inter, -apple-system, sans-serif' },
+                        bodyFont: { size: 11.5, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        usePointStyle: true,
+                        callbacks: {
+                            title: (tooltipItems) => {
+                                const idx = tooltipItems[0]?.dataIndex;
+                                const it = items[idx];
+                                return `${it?.name || it?.code || ''} (${it?.dept || ''})`;
+                            },
+                            label: (context) => {
+                                const val = Number(context.raw || 0);
+                                return ` ${context.dataset.label}: ${val.toLocaleString()} QTY`;
+                            },
+                            afterBody: (tooltipItems) => {
+                                if (!tooltipItems || tooltipItems.length === 0) return [];
+                                const idx = tooltipItems[0].dataIndex;
+                                const it = items[idx];
+                                const cur = Number(it?.data?.qty || 0);
+                                const prev = Number(it?.data?.prev_qty || 0);
+                                const diff = cur - prev;
+                                const sign = diff > 0 ? '+' : '';
+                                const trendArrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '—');
+                                const lines = [];
+                                if (it?.data?.prev_qty !== undefined && it?.data?.prev_qty !== null) {
+                                    lines.push(` Selisih: ${trendArrow} ${sign}${diff.toLocaleString()} QTY`);
+                                }
+                                if (it?.data?.total_sites) {
+                                    lines.push(` Sites: ${it?.data?.count || 0}/${it?.data?.total_sites}`);
+                                }
+                                return lines;
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [pairedBarsPlugin]
+        });
+    }
+
+    // ── Database Resolution Breakdown (Semi-Circular Target Arch Gauge) ──
+    let chartDbResolutionGauge = null;
+
+    function renderDbResolutionGauge(solvedRate, activeItem = {}) {
+        const canvas = document.getElementById('chart-db-resolution-gauge');
+        if (!canvas) return;
+
+        const rate = Math.max(0, Math.min(100, Number(solvedRate || 0)));
+        const remaining = 100 - rate;
+
+        // Sync period badge
+        const periodBadge = document.getElementById('db-gauge-period-badge');
+        const filterMonth = document.getElementById('summary-filter-month')?.value;
+        const filterYear = document.getElementById('summary-filter-year')?.value || 2026;
+        const monthNames = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        if (periodBadge) {
+            const mText = filterMonth && monthNames[parseInt(filterMonth, 10)] ? monthNames[parseInt(filterMonth, 10)] : (filterMonth ? `Bulan ${filterMonth}` : 'Semua Bulan');
+            periodBadge.textContent = `${mText} ${filterYear}`;
+        }
+
+        // Center Percentage Text
+        const pctEl = document.getElementById('db-gauge-pct');
+        if (pctEl) pctEl.textContent = `${rate.toFixed(2)}%`;
+
+        // Trend Pill Badge
+        const trendEl = document.getElementById('db-gauge-trend');
+        if (trendEl) {
+            let diffRate = null;
+            const prevTotal = Number(activeItem.prev_total_status ?? (Number(activeItem.prev_solved || 0) + Number(activeItem.prev_unsolved || 0) + Number(activeItem.prev_new_db || 0)));
+            if (prevTotal > 0 && activeItem.prev_solved !== undefined && activeItem.prev_solved !== null) {
+                const prevRate = (Number(activeItem.prev_solved) / prevTotal) * 100;
+                diffRate = rate - prevRate;
+            } else if (activeItem.diff_solved !== undefined && activeItem.diff_solved !== null) {
+                diffRate = Number(activeItem.diff_solved);
+            }
+
+            if (diffRate !== null && !isNaN(diffRate)) {
+                const isUp = diffRate > 0;
+                const isDown = diffRate < 0;
+                const sign = isUp ? '+' : '';
+                trendEl.textContent = `${sign}${diffRate.toFixed(1)}%`;
+                if (isUp) {
+                    trendEl.style.background = '#ecfdf5';
+                    trendEl.style.color = '#10b981';
+                } else if (isDown) {
+                    trendEl.style.background = '#fef2f2';
+                    trendEl.style.color = '#dc2626';
+                } else {
+                    trendEl.style.background = '#f1f5f9';
+                    trendEl.style.color = '#64748b';
+                }
+            } else {
+                trendEl.textContent = '+0%';
+                trendEl.style.background = '#f1f5f9';
+                trendEl.style.color = '#64748b';
+            }
+        }
+
+        // Narrative Summary Text
+        const solvedQty = Number(activeItem.solved || 0);
+        const unsolvedQty = Number(activeItem.unsolved || 0);
+        const newDbQty = Number(activeItem.new_db || 0);
+        const totalQty = solvedQty + unsolvedQty + newDbQty;
+
+        const descEl = document.getElementById('db-gauge-desc');
+        if (descEl) {
+            if (totalQty > 0) {
+                descEl.innerHTML = `Sebanyak <strong style="color: #0f172a;">${solvedQty.toLocaleString('id-ID')}</strong> dari <strong style="color: #0f172a;">${totalQty.toLocaleString('id-ID')}</strong> data DB telah terselesaikan.`;
+            } else {
+                descEl.textContent = 'Belum ada data resolusi DB pada periode ini.';
+            }
+        }
+
+        const subtextEl = document.getElementById('db-gauge-subtext');
+        if (subtextEl) {
+            if (rate >= 80) {
+                subtextEl.textContent = 'Excellent progress! Keep up your good work!';
+                subtextEl.style.color = '#10b981';
+            } else if (rate >= 50) {
+                subtextEl.textContent = 'Good momentum, terus tingkatkan penyelesaian!';
+                subtextEl.style.color = '#0284c7';
+            } else {
+                subtextEl.textContent = 'Keep up your good work!';
+                subtextEl.style.color = '#94a3b8';
+            }
+        }
+
+        // Mini Status Tags
+        const sTag = document.getElementById('db-gauge-tag-solved');
+        if (sTag) sTag.textContent = solvedQty.toLocaleString('id-ID');
+        const uTag = document.getElementById('db-gauge-tag-unsolved');
+        if (uTag) uTag.textContent = unsolvedQty.toLocaleString('id-ID');
+        const nTag = document.getElementById('db-gauge-tag-new');
+        if (nTag) nTag.textContent = newDbQty.toLocaleString('id-ID');
+
+        // Draw / Update Semicircle Gauge
+        const chartData = rate <= 0 ? [0.001, 99.999] : (rate >= 100 ? [100, 0.001] : [rate, remaining]);
+
+        if (chartDbResolutionGauge) {
+            chartDbResolutionGauge.data.datasets[0].data = chartData;
+            chartDbResolutionGauge.update();
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        chartDbResolutionGauge = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: ['#3b66ff', '#f1f5f9'],
+                    borderWidth: 0,
+                    borderRadius: [10, 10],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                rotation: -90,
+                circumference: 180,
+                cutout: '80%',
+                layout: {
+                    padding: { top: 6, bottom: 0, left: 8, right: 8 }
+                },
+                animation: {
+                    animateRotate: true,
+                    duration: 800
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
     }
 
     // ── Site Movement History & Comparison Logs ──────────────────
@@ -5650,8 +6276,8 @@ const App = (() => {
         } else if (masterMonthEl && masterMonthEl.value && masterMonthEl.value !== '') {
             rdbStatusMonth = parseInt(masterMonthEl.value, 10);
         } else {
-            // Default to latest month (9) if master filter is "Semua Bulan"
-            rdbStatusMonth = 9;
+            // Default to empty string so API uses dynamic latest month from database
+            rdbStatusMonth = '';
         }
 
         if (deptSelect) rdbStatusDept = deptSelect.value;
@@ -5748,9 +6374,9 @@ const App = (() => {
             const unsolvedCount = parseInt(stats.unsolved_count || 0, 10);
             const newDbCount = parseInt(stats.new_db_count || 0, 10);
 
-            const solvedPct = totalItems > 0 ? ((solvedCount / totalItems) * 100).toFixed(1) : 0;
-            const unsolvedPct = totalItems > 0 ? ((unsolvedCount / totalItems) * 100).toFixed(1) : 0;
-            const newDbPct = totalItems > 0 ? ((newDbCount / totalItems) * 100).toFixed(1) : 0;
+            const solvedPct = totalItems > 0 ? ((solvedCount / totalItems) * 100).toFixed(2) : '0.00';
+            const unsolvedPct = totalItems > 0 ? ((unsolvedCount / totalItems) * 100).toFixed(2) : '0.00';
+            const newDbPct = totalItems > 0 ? ((newDbCount / totalItems) * 100).toFixed(2) : '0.00';
 
             const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -5791,6 +6417,29 @@ const App = (() => {
             if (elNewDbPct) elNewDbPct.textContent = `(${newDbPct}%)`;
             const elNewDbNbv = document.getElementById('rdb-metric-new-db-nbv');
             if (elNewDbNbv) elNewDbNbv.textContent = `Total NBV : ${formatRp(stats.new_db_nbv)}`;
+
+            // Sync Metric 2 (Progress Bar & Rate)
+            const elSummaryRateText = document.getElementById('db-summary-rate-text');
+            if (elSummaryRateText) elSummaryRateText.textContent = `${solvedPct}%`;
+            const elSummaryRateBadge = document.getElementById('db-summary-rate-badge');
+            if (elSummaryRateBadge) elSummaryRateBadge.textContent = `${solvedPct}% Solved`;
+            const elBarSolved = document.getElementById('db-summary-bar-solved');
+            if (elBarSolved) elBarSolved.style.width = `${Math.min(100, parseFloat(solvedPct))}%`;
+            const elBarUnsolved = document.getElementById('db-summary-bar-unsolved');
+            if (elBarUnsolved) elBarUnsolved.style.width = `${Math.min(100, parseFloat(unsolvedPct))}%`;
+            const elBarNew = document.getElementById('db-summary-bar-new');
+            if (elBarNew) elBarNew.style.width = `${Math.min(100, parseFloat(newDbPct))}%`;
+            const elSummaryStatTotal = document.getElementById('db-summary-stat-status-total');
+            if (elSummaryStatTotal) elSummaryStatTotal.textContent = totalItems.toLocaleString('id-ID');
+
+            renderDbResolutionGauge(Number(solvedPct), {
+                solved: solvedCount,
+                unsolved: unsolvedCount,
+                new_db: newDbCount,
+                prev_solved: stats.prev_solved,
+                prev_total_status: stats.prev_total_status,
+                diff_solved: stats.diff_solved
+            });
 
             // Render Flat View Table
             renderRekapDbStatusFlat(json.data || [], json.period);
@@ -7206,7 +7855,7 @@ const App = (() => {
         }
 
         const labels = ['Very Good', 'Good', 'Moderate', 'Poor', 'Very Poor'];
-        const colors = ['#047857', '#0284c7', '#d97706', '#ea580c', '#b91c1c'];
+        const colors = ['#16a34a', '#0284c7', '#d97706', '#ea580c', '#dc2626'];
         const data = counts ? [
             counts.very_good || 0,
             counts.good || 0,
@@ -7223,11 +7872,11 @@ const App = (() => {
         const elP = document.getElementById('sc-stat-p');
         const elVp = document.getElementById('sc-stat-vp');
 
-        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
-        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
-        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${Math.round((data[2] / total) * 100)}%)` : '0 sites (0%)';
-        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${Math.round((data[3] / total) * 100)}%)` : '0 sites (0%)';
-        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${Math.round((data[4] / total) * 100)}%)` : '0 sites (0%)';
+        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${((data[0] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${((data[1] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${((data[2] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${((data[3] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${((data[4] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -7299,7 +7948,7 @@ const App = (() => {
                             title: () => '',
                             label: (context) => {
                                 const val = context.parsed;
-                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(2) : '0.00';
                                 return `${context.label}: ${val} site (${pct}%)`;
                             }
                         }
@@ -7322,7 +7971,7 @@ const App = (() => {
         }
 
         const labels = ['Executed', 'Not Executed'];
-        const colors = ['#047857', '#b91c1c'];
+        const colors = ['#16a34a', '#dc2626'];
         const data = counts ? [
             counts.executed || 0,
             counts.not_executed || 0
@@ -7333,8 +7982,8 @@ const App = (() => {
         const elExec = document.getElementById('sc-stat-exec');
         const elNotExec = document.getElementById('sc-stat-not-exec');
 
-        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
-        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
+        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${((data[0] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${((data[1] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -7406,7 +8055,7 @@ const App = (() => {
                             title: () => '',
                             label: (context) => {
                                 const val = context.parsed;
-                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(2) : '0.00';
                                 return `${context.label}: ${val} site (${pct}%)`;
                             }
                         }
@@ -7554,7 +8203,7 @@ const App = (() => {
             if (rows.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                        <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
                             No data.
                         </td>
                     </tr>
@@ -7584,7 +8233,7 @@ const App = (() => {
             rows.forEach((r) => {
                 let isTercapai = false;
                 if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
-                    const pct = Math.round(parseFloat(r.total_physic_pct));
+                    const pct = parseFloat(r.total_physic_pct);
                     if (isTarget98) {
                         isTercapai = (pct >= 98);
                     } else {
@@ -7642,7 +8291,7 @@ const App = (() => {
                 const filterLabel = statusFilter === 'tercapai' ? 'Tercapai' : 'Tidak Tercapai';
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                        <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
                             Tidak ada data dengan status <strong>${escapeHtml(filterLabel)}</strong>.
                         </td>
                     </tr>
@@ -7663,11 +8312,17 @@ const App = (() => {
                 const targetQty = Number(r.total_physic_target || 0).toLocaleString();
 
                 let pctDisplay = '-';
+                let defisitDisplay = '-';
+                let defisitColor = 'color: #64748b; font-weight: 600;';
                 let statusHtml = '<span class="so-status-badge status-none">Belum Ada Data</span>';
 
                 if (r.has_data && r.total_physic_pct !== null && r.total_physic_pct !== undefined) {
-                    const pct = Math.round(parseFloat(r.total_physic_pct));
-                    pctDisplay = `${pct}%`;
+                    const pct = parseFloat(r.total_physic_pct);
+                    pctDisplay = `${pct.toFixed(2)}%`;
+
+                    const defisit = 100 - pct;
+                    defisitDisplay = `${defisit.toFixed(2)}%`;
+                    defisitColor = defisit > 0 ? 'color: #dc2626; font-weight: 700;' : 'color: #16a34a; font-weight: 700;';
 
                     let statusText = 'Tidak Tercapai';
                     let statusClass = 'status-red';
@@ -7719,6 +8374,7 @@ const App = (() => {
                         <td class="text-center" style="color: #64748b;">${dbQty}</td>
                         <td class="text-center" style="color: #64748b; font-weight: 600;">${targetQty}</td>
                         <td class="text-center" style="font-weight: 600;">${pctDisplay}</td>
+                        <td class="text-center" style="${defisitColor}">${defisitDisplay}</td>
                         <td class="col-status" style="text-align: initial;">${statusHtml}</td>
                     </tr>
                 `;
@@ -7758,8 +8414,11 @@ const App = (() => {
                 const totalPhysic = sPhysic.toLocaleString();
                 const totalDb = sDb.toLocaleString();
                 const totalTarget = sTarget.toLocaleString();
-                const avgPct = countWithData > 0 ? Math.round(sPct / countWithData) : 0;
-                const avgDisplay = `${avgPct}%`;
+                const avgPct = countWithData > 0 ? (sPct / countWithData) : 0;
+                const avgDisplay = `${avgPct.toFixed(2)}%`;
+                const avgDefisit = countWithData > 0 ? (100 - avgPct) : 0;
+                const avgDefisitDisplay = countWithData > 0 ? `${avgDefisit.toFixed(2)}%` : '-';
+                const avgDefisitColor = avgDefisit > 0 ? 'color: #dc2626;' : 'color: #16a34a;';
 
                 let overallText = 'Belum Ada Data';
                 let overallStatusClass = 'status-none';
@@ -7827,6 +8486,7 @@ const App = (() => {
                         <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalDb}</td>
                         <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${totalTarget}</td>
                         <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${avgDisplay}</td>
+                        <td class="text-center" style="${avgDefisitColor} font-weight: 700; padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1;">${avgDefisitDisplay}</td>
                         <td class="col-status" style="padding: 0.75rem 0.5rem; position: sticky; bottom: 0; background: #f8fafc; z-index: 5; border-top: 2px solid #cbd5e1; text-align: initial;">${overallStatusHtml}</td>
                     </tr>
                 `;
@@ -7940,6 +8600,10 @@ const App = (() => {
                 valA = (a.has_data && a.total_physic_pct !== null && a.total_physic_pct !== undefined) ? parseFloat(a.total_physic_pct) : -1;
                 valB = (b.has_data && b.total_physic_pct !== null && b.total_physic_pct !== undefined) ? parseFloat(b.total_physic_pct) : -1;
                 return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
+            } else if (subdeptSortCol === 'defisit') {
+                valA = (a.has_data && a.total_physic_pct !== null && a.total_physic_pct !== undefined) ? (100 - parseFloat(a.total_physic_pct)) : 999;
+                valB = (b.has_data && b.total_physic_pct !== null && b.total_physic_pct !== undefined) ? (100 - parseFloat(b.total_physic_pct)) : 999;
+                return subdeptSortDir === 'asc' ? valA - valB : valB - valA;
             } else if (subdeptSortCol === 'status') {
                 valA = a._isTercapai ? 1 : 0;
                 valB = b._isTercapai ? 1 : 0;
@@ -8047,7 +8711,7 @@ const App = (() => {
                         callbacks: {
                             label: function (context) {
                                 const val = context.raw || 0;
-                                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(2) : '0.00';
                                 return ` ${context.label}: ${val} sites (${pct}%)`;
                             }
                         }
@@ -8058,8 +8722,8 @@ const App = (() => {
         });
 
         if (statsContainer) {
-            const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
-            const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
+            const pctTercapai = total > 0 ? ((tercapai / total) * 100).toFixed(2) : '0.00';
+            const pctTidak = total > 0 ? ((tidakTercapai / total) * 100).toFixed(2) : '0.00';
             const isCat98 = (isTarget98 !== null)
                 ? !!isTarget98
                 : (summaryCategory === 'pmd' || summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate' || summaryCategory === 'it_corporate');
@@ -8129,7 +8793,42 @@ const App = (() => {
 
         function applyTrendJsonData(json) {
             if (!json || !json.success) return;
-            const months = json.months || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            lastTrendJsonData = json;
+            const rawMonths = json.months || (summarySOType === 'quarterly' ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+
+            // Find last month/quarter index that has actual data across all series
+            const allSeriesArrays = [];
+            if (json.national_trend) allSeriesArrays.push(json.national_trend);
+            if (json.dept_trends) Object.values(json.dept_trends).forEach(v => allSeriesArrays.push(v));
+            if (json.subdept_trends) Object.values(json.subdept_trends).forEach(v => allSeriesArrays.push(v?.values || v));
+            if (json.pmd_subdept_trends) Object.values(json.pmd_subdept_trends).forEach(v => allSeriesArrays.push(v));
+            if (json.it_corporate_trend) allSeriesArrays.push(json.it_corporate_trend);
+            if (json.it_site_trends) Object.values(json.it_site_trends).forEach(v => allSeriesArrays.push(v));
+            if (json.tekno_site_trends) Object.values(json.tekno_site_trends).forEach(v => allSeriesArrays.push(v));
+
+            let maxDataIdx = -1;
+            allSeriesArrays.forEach(arr => {
+                if (Array.isArray(arr)) {
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        if (arr[i] !== null && arr[i] !== undefined && !isNaN(arr[i])) {
+                            if (i > maxDataIdx) maxDataIdx = i;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            const months = (maxDataIdx >= 0)
+                ? rawMonths.slice(0, maxDataIdx + 1)
+                : rawMonths;
+
+            const endMonthLabel = months[months.length - 1] || (summarySOType === 'quarterly' ? 'Q4' : 'Dec');
+            const startMonthLabel = months[0] || (summarySOType === 'quarterly' ? 'Q1' : 'Jan');
+            document.querySelectorAll('.trend-chart-subtitle').forEach(el => {
+                el.textContent = (summarySOType === 'monthly')
+                    ? `Monthly Physical % (${startMonthLabel} - ${endMonthLabel} ${targetYear})`
+                    : `Quarterly Physical % (${startMonthLabel} - ${endMonthLabel} ${targetYear})`;
+            });
 
             // Helper to convert hex color to rgba
             const hexToRgba = (hex, alpha = 0.2) => {
@@ -8144,6 +8843,19 @@ const App = (() => {
                 return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             };
 
+            // Helper to create vertical area linear gradient (matches modern dashboard UI)
+            const getAreaGradient = (ctx, chartArea, hexColor, topAlpha = 0.22, bottomAlpha = 0.0) => {
+                if (!ctx || !chartArea) return hexToRgba(hexColor, topAlpha);
+                try {
+                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    gradient.addColorStop(0, hexToRgba(hexColor, topAlpha));
+                    gradient.addColorStop(1, hexToRgba(hexColor, bottomAlpha));
+                    return gradient;
+                } catch (e) {
+                    return hexToRgba(hexColor, topAlpha);
+                }
+            };
+
             // Helper to apply highlight state to a chart
             const applyChartHighlight = (chart, targetIndex) => {
                 chart._highlightedIndex = targetIndex;
@@ -8151,63 +8863,73 @@ const App = (() => {
                     const origColor = ds._origBorderColor || ds.borderColor;
                     const meta = chart.getDatasetMeta ? chart.getDatasetMeta(idx) : null;
 
+                    const isDeptChart = (chart === chartTrendDept);
                     if (targetIndex === null || targetIndex === undefined) {
-                        // Restored state: all datasets visible with normal points
+                        // Restored state: all datasets visible with smooth area gradient & clean idle lines (no points)
                         ds.borderColor = origColor;
-                        ds.backgroundColor = origColor;
-                        ds.borderWidth = ds._origBorderWidth || 2;
-                        ds.pointRadius = ds._origPointRadius || 2;
-                        ds.radius = ds._origPointRadius || 2;
-                        ds.pointHoverRadius = ds._origPointHoverRadius || 5;
-                        ds.hoverRadius = ds._origPointHoverRadius || 5;
-                        ds.pointHitRadius = 5;
-                        ds.pointBackgroundColor = origColor;
-                        ds.pointBorderColor = origColor;
-                        ds.pointBorderWidth = 1;
+                        ds.fill = true;
+                        ds.borderWidth = ds._origBorderWidth || 2.5;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 6;
+                        ds.hoverRadius = 6;
+                        ds.pointHitRadius = 12;
+                        ds.pointHoverBackgroundColor = origColor;
+                        ds.pointHoverBorderColor = '#ffffff';
+                        ds.pointHoverBorderWidth = 2.5;
+                        ds.backgroundColor = function (context) {
+                            const c = context.chart;
+                            const { ctx, chartArea } = c || {};
+                            return getAreaGradient(ctx, chartArea, origColor, isDeptChart ? 0.22 : 0.10, 0.0);
+                        };
 
                         if (meta && meta.data) {
                             meta.data.forEach(pt => {
                                 if (!pt.options) pt.options = {};
-                                pt.options.radius = ds._origPointRadius || 2;
-                                pt.options.hoverRadius = ds._origPointHoverRadius || 5;
-                                pt.options.hitRadius = 5;
-                                pt.options.borderWidth = 1;
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 6;
+                                pt.options.hitRadius = 12;
+                                pt.options.borderWidth = 2.5;
                                 pt.options.backgroundColor = origColor;
-                                pt.options.borderColor = origColor;
+                                pt.options.borderColor = '#ffffff';
                             });
                         }
                     } else if (idx === targetIndex) {
-                        // Highlighted dataset: focused line with its dots still appearing!
-                        const focusRadius = ds._origPointRadius ? Math.max(ds._origPointRadius, 4) : 4;
-                        const focusHoverRadius = ds._origPointHoverRadius ? Math.max(ds._origPointHoverRadius, 6) : 6;
+                        // Highlighted dataset: focused line with glowing gradient and hover dots
                         ds.borderColor = origColor;
-                        ds.backgroundColor = origColor;
-                        ds.borderWidth = 3.6;
-                        ds.pointRadius = focusRadius;
-                        ds.radius = focusRadius;
-                        ds.pointHoverRadius = focusHoverRadius;
-                        ds.hoverRadius = focusHoverRadius;
-                        ds.pointHitRadius = 8;
-                        ds.pointBackgroundColor = origColor;
-                        ds.pointBorderColor = '#ffffff';
-                        ds.pointBorderWidth = 1.5;
+                        ds.fill = true;
+                        ds.borderWidth = 3.5;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 7;
+                        ds.hoverRadius = 7;
+                        ds.pointHitRadius = 14;
+                        ds.pointHoverBackgroundColor = origColor;
+                        ds.pointHoverBorderColor = '#ffffff';
+                        ds.pointHoverBorderWidth = 2.5;
+                        ds.backgroundColor = function (context) {
+                            const c = context.chart;
+                            const { ctx, chartArea } = c || {};
+                            return getAreaGradient(ctx, chartArea, origColor, 0.28, 0.0);
+                        };
 
                         if (meta && meta.data) {
                             meta.data.forEach(pt => {
                                 if (!pt.options) pt.options = {};
-                                pt.options.radius = focusRadius;
-                                pt.options.hoverRadius = focusHoverRadius;
-                                pt.options.hitRadius = 8;
-                                pt.options.borderWidth = 1.5;
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 7;
+                                pt.options.hitRadius = 14;
+                                pt.options.borderWidth = 2.5;
                                 pt.options.backgroundColor = origColor;
                                 pt.options.borderColor = '#ffffff';
                             });
                         }
                     } else {
-                        // Other datasets: invisible grey line, dots completely invisible!
+                        // Other datasets: muted transparent line, no points
                         const dimColor = hexToRgba(origColor, 0.12);
                         ds.borderColor = dimColor;
-                        ds.backgroundColor = dimColor;
+                        ds.fill = false;
+                        ds.backgroundColor = 'transparent';
                         ds.borderWidth = 1;
                         ds.pointRadius = 0;
                         ds.radius = 0;
@@ -8239,7 +8961,9 @@ const App = (() => {
                 'CRO': ['CJDO', 'EKO', 'WJO', 'WKO'],
                 'ERO': ['BNO', 'EJO', 'MPO', 'SMO'],
                 'WRO': ['CSO', 'NSO', 'SSO'],
-                'PMD': ['DNO', 'DSO']
+                'PMD': ['DNO', 'DSO'],
+                'DNO': ['OUTLET BWA BANTEN', 'OUTLET BWA MERUYA', 'OUTLET CDA', 'OUTLET NEA'],
+                'DSO': ['OUTLET BDA KELINKIT', 'OUTLET SAST', 'OUTLET SEOA']
             };
 
             // Helper to sync subdept chart with the selected DEPT group
@@ -8253,53 +8977,61 @@ const App = (() => {
                     const meta = chart.getDatasetMeta ? chart.getDatasetMeta(idx) : null;
 
                     if (!allowedSubs) {
-                        // Restored state: all lines normal
+                        // Restored state: all lines normal with subtle gradient and clean idle lines (no points)
                         ds.borderColor = origColor;
-                        ds.backgroundColor = origColor;
+                        ds.fill = true;
                         ds.borderWidth = ds._origBorderWidth || 2;
-                        ds.pointRadius = ds._origPointRadius || 2;
-                        ds.radius = ds._origPointRadius || 2;
-                        ds.pointHoverRadius = ds._origPointHoverRadius || 5;
-                        ds.hoverRadius = ds._origPointHoverRadius || 5;
-                        ds.pointHitRadius = 5;
-                        ds.pointBackgroundColor = origColor;
-                        ds.pointBorderColor = origColor;
-                        ds.pointBorderWidth = 1;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 6;
+                        ds.hoverRadius = 6;
+                        ds.pointHitRadius = 12;
+                        ds.pointHoverBackgroundColor = origColor;
+                        ds.pointHoverBorderColor = '#ffffff';
+                        ds.pointHoverBorderWidth = 2.5;
+                        ds.backgroundColor = function (context) {
+                            const c = context.chart;
+                            const { ctx, chartArea } = c || {};
+                            return getAreaGradient(ctx, chartArea, origColor, 0.10, 0.0);
+                        };
 
                         if (meta && meta.data) {
                             meta.data.forEach(pt => {
                                 if (!pt.options) pt.options = {};
-                                pt.options.radius = ds._origPointRadius || 2;
-                                pt.options.hoverRadius = ds._origPointHoverRadius || 5;
-                                pt.options.hitRadius = 5;
-                                pt.options.borderWidth = 1;
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 6;
+                                pt.options.hitRadius = 12;
+                                pt.options.borderWidth = 2.5;
                                 pt.options.backgroundColor = origColor;
-                                pt.options.borderColor = origColor;
+                                pt.options.borderColor = '#ffffff';
                             });
                         }
                     } else if (allowedSubs.includes(ds.label)) {
-                        // In the selected DEPT group: emphasized!
-                        const focusRadius = 4;
-                        const focusHoverRadius = 6;
+                        // In the selected DEPT group: emphasized with glowing gradient!
                         ds.borderColor = origColor;
-                        ds.backgroundColor = origColor;
-                        ds.borderWidth = 3.2;
-                        ds.pointRadius = focusRadius;
-                        ds.radius = focusRadius;
-                        ds.pointHoverRadius = focusHoverRadius;
-                        ds.hoverRadius = focusHoverRadius;
-                        ds.pointHitRadius = 8;
-                        ds.pointBackgroundColor = origColor;
-                        ds.pointBorderColor = '#ffffff';
-                        ds.pointBorderWidth = 1.5;
+                        ds.fill = true;
+                        ds.borderWidth = 3;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 6.5;
+                        ds.hoverRadius = 6.5;
+                        ds.pointHitRadius = 14;
+                        ds.pointHoverBackgroundColor = origColor;
+                        ds.pointHoverBorderColor = '#ffffff';
+                        ds.pointHoverBorderWidth = 2.5;
+                        ds.backgroundColor = function (context) {
+                            const c = context.chart;
+                            const { ctx, chartArea } = c || {};
+                            return getAreaGradient(ctx, chartArea, origColor, 0.22, 0.0);
+                        };
 
                         if (meta && meta.data) {
                             meta.data.forEach(pt => {
                                 if (!pt.options) pt.options = {};
-                                pt.options.radius = focusRadius;
-                                pt.options.hoverRadius = focusHoverRadius;
-                                pt.options.hitRadius = 8;
-                                pt.options.borderWidth = 1.5;
+                                pt.options.radius = 0;
+                                pt.options.hoverRadius = 6.5;
+                                pt.options.hitRadius = 14;
+                                pt.options.borderWidth = 2.5;
                                 pt.options.backgroundColor = origColor;
                                 pt.options.borderColor = '#ffffff';
                             });
@@ -8308,7 +9040,8 @@ const App = (() => {
                         // Dimmed lines outside the selected DEPT group
                         const dimColor = hexToRgba(origColor, 0.12);
                         ds.borderColor = dimColor;
-                        ds.backgroundColor = dimColor;
+                        ds.fill = false;
+                        ds.backgroundColor = 'transparent';
                         ds.borderWidth = 1;
                         ds.pointRadius = 0;
                         ds.radius = 0;
@@ -8339,9 +9072,11 @@ const App = (() => {
                 const subBadge = document.getElementById('trend-subdept-badge');
                 const subSubtitle = document.getElementById('trend-subdept-subtitle');
                 const yearVal = document.getElementById('summary-filter-year')?.value || 2026;
+                const endMonthLabel = months[months.length - 1] || (summarySOType === 'quarterly' ? 'Q4' : 'Dec');
+                const startMonthLabel = months[0] || (summarySOType === 'quarterly' ? 'Q1' : 'Jan');
                 const defaultSubtitle = (summarySOType === 'monthly')
-                    ? `Monthly Physical % (Jan - Dec ${yearVal})`
-                    : `Quarterly Physical % (Q1 - Q4 ${yearVal})`;
+                    ? `Monthly Physical % (${startMonthLabel} - ${endMonthLabel} ${yearVal})`
+                    : `Quarterly Physical % (${startMonthLabel} - ${endMonthLabel} ${yearVal})`;
 
                 if (subBadge) {
                     if (deptKey) {
@@ -8420,11 +9155,41 @@ const App = (() => {
                 }
             };
 
-            // Common Chart Options Builder with Dashed Target Line
+            // Common Chart Options Builder with Modern Area Gradients, Clean Idle Lines & Crosshair Guideline
             const createChartConfig = (datasets, targetVal = (isPmd ? 98 : 85), isDept = false) => {
                 if (datasets && Array.isArray(datasets)) {
                     datasets.forEach(ds => {
+                        if (Array.isArray(ds.data) && ds.data.length > months.length) {
+                            ds.data = ds.data.slice(0, months.length);
+                        }
                         ds.clip = false;
+                        ds.fill = true;
+                        ds.tension = 0.35;
+                        ds.borderWidth = ds.borderWidth || 2.5;
+                        ds.pointRadius = 0;
+                        ds.radius = 0;
+                        ds.pointHoverRadius = 6;
+                        ds.hoverRadius = 6;
+                        ds.pointHitRadius = 12;
+
+                        const baseColor = ds._origBorderColor || ds.borderColor;
+                        const fillAlpha = isDept ? 0.22 : 0.10;
+                        ds._fillAlpha = fillAlpha;
+                        ds._origBorderColor = baseColor;
+                        ds._origBorderWidth = ds.borderWidth;
+                        ds._origPointRadius = 0;
+                        ds._origPointHoverRadius = 6;
+
+                        ds.pointHoverBackgroundColor = baseColor;
+                        ds.pointHoverBorderColor = '#ffffff';
+                        ds.pointHoverBorderWidth = 2.5;
+
+                        ds.backgroundColor = function (context) {
+                            const c = context.chart;
+                            const { ctx, chartArea } = c || {};
+                            return getAreaGradient(ctx, chartArea, baseColor, ds._fillAlpha || fillAlpha, 0.0);
+                        };
+                        ds._origBackgroundColor = ds.backgroundColor;
                     });
                 }
                 return {
@@ -8486,7 +9251,7 @@ const App = (() => {
                         layout: {
                             padding: {
                                 top: 26,
-                                right: 14,
+                                right: 80,
                                 bottom: 6,
                                 left: 6
                             }
@@ -8519,11 +9284,12 @@ const App = (() => {
                                     }
                                 },
                                 labels: {
-                                    boxWidth: 12,
-                                    boxHeight: 12,
+                                    boxWidth: 8,
+                                    boxHeight: 8,
                                     usePointStyle: true,
-                                    padding: 12,
-                                    font: { size: 11, weight: '600' },
+                                    pointStyle: 'circle',
+                                    padding: 14,
+                                    font: { size: 11, weight: '600', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
                                     generateLabels: function (chart) {
                                         const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
                                         defaultLabels.sort((a, b) => a.datasetIndex - b.datasetIndex);
@@ -8568,16 +9334,20 @@ const App = (() => {
                                 }
                             },
                             tooltip: {
-                                backgroundColor: 'rgba(15, 23, 42, 0.94)',
-                                titleColor: '#fff',
-                                bodyColor: '#e2e8f0',
-                                borderColor: '#334155',
+                                backgroundColor: '#ffffff',
+                                titleColor: '#0f172a',
+                                titleFont: { size: 12, weight: '700', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                bodyColor: '#334155',
+                                bodyFont: { size: 11.5, weight: '500', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                borderColor: '#e2e8f0',
                                 borderWidth: 1,
+                                cornerRadius: 8,
                                 padding: 10,
                                 boxPadding: 4,
                                 usePointStyle: true,
-                                footerColor: '#fca5a5',
-                                footerFont: { size: 10, weight: '600' },
+                                displayColors: true,
+                                footerColor: '#dc2626',
+                                footerFont: { size: 10.5, weight: '600', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
                                 footerMarginTop: 6,
                                 filter: function (tooltipItem) {
                                     const chart = tooltipItem.chart;
@@ -8602,20 +9372,34 @@ const App = (() => {
                                     return (b.parsed.y || 0) - (a.parsed.y || 0);
                                 },
                                 callbacks: {
+                                    labelPointStyle: function () {
+                                        return {
+                                            pointStyle: 'circle',
+                                            rotation: 0
+                                        };
+                                    },
+                                    labelColor: function (context) {
+                                        const color = context.dataset._origBorderColor || context.dataset.borderColor;
+                                        return {
+                                            borderColor: color,
+                                            backgroundColor: color,
+                                            borderWidth: 0
+                                        };
+                                    },
                                     label: function (context) {
                                         const chart = context.chart;
                                         const highlighted = chart ? chart._highlightedIndex : null;
                                         let label = context.dataset.label || '';
                                         if (label) label += ': ';
                                         if (context.parsed.y !== null && context.parsed.y !== undefined) {
-                                            label += Math.round(context.parsed.y) + '%';
+                                            label += Number(context.parsed.y).toFixed(2) + '%';
                                         } else {
                                             label += '-';
                                         }
                                         if (highlighted !== null && highlighted !== undefined && context.datasetIndex === highlighted) {
                                             label = '● ' + label + ' (Focused)';
                                         }
-                                        return label;
+                                        return ' ' + label;
                                     },
                                     footer: function () {
                                         return `Target: ${targetVal}%`;
@@ -8625,10 +9409,16 @@ const App = (() => {
                         },
                         scales: {
                             x: {
-                                grid: { display: false },
+                                grid: {
+                                    display: false,
+                                    drawBorder: false
+                                },
+                                border: {
+                                    display: false
+                                },
                                 ticks: {
                                     color: '#64748b',
-                                    font: { size: 10, weight: '500' }
+                                    font: { size: 11, weight: '500', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }
                                 }
                             },
                             y: {
@@ -8636,90 +9426,107 @@ const App = (() => {
                                 max: 100,
                                 ticks: {
                                     stepSize: 25,
-                                    color: '#64748b',
-                                    font: { size: 10 },
+                                    color: '#94a3b8',
+                                    font: { size: 10.5, family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
                                     callback: val => val + '%'
                                 },
                                 grid: {
-                                    color: '#f1f5f9'
+                                    color: '#f1f5f9',
+                                    drawBorder: false
+                                },
+                                border: {
+                                    display: false
                                 }
                             }
                         }
                     },
-                    plugins: [{
-                        id: 'trendTargetLinePlugin',
-                        afterDraw(chart) {
-                            const target = chart.config.options?.plugins?.trendTargetLine?.value;
-                            if (target === undefined || target === null) return;
+                    plugins: [
+                        {
+                            id: 'crosshairLinePlugin',
+                            afterDatasetsDraw(chart) {
+                                let activeElements = [];
+                                if (chart.tooltip && typeof chart.tooltip.getActiveElements === 'function') {
+                                    activeElements = chart.tooltip.getActiveElements();
+                                } else if (typeof chart.getActiveElements === 'function') {
+                                    activeElements = chart.getActiveElements();
+                                }
+                                if (!activeElements || activeElements.length === 0) return;
 
-                            const { ctx, chartArea, scales: { x, y } } = chart;
-                            if (!chartArea || !x || !y) return;
+                                const activePoint = activeElements[0];
+                                const { ctx, chartArea } = chart;
+                                if (!activePoint || !chartArea) return;
 
-                            const yPixel = y.getPixelForValue(target);
-                            if (isNaN(yPixel)) return;
+                                const x = activePoint.element ? activePoint.element.x : null;
+                                if (x === null || isNaN(x)) return;
 
-                            ctx.save();
-
-                            // 1. Draw dashed line across the chart width
-                            ctx.beginPath();
-                            ctx.setLineDash([5, 4]);
-                            ctx.strokeStyle = '#dc2626';
-                            ctx.lineWidth = 1.5;
-                            ctx.moveTo(chartArea.left, yPixel);
-                            ctx.lineTo(chartArea.right, yPixel);
-                            ctx.stroke();
-
-                            // 2. Target Label Badge on the right
-                            const text = `Target ${target}%`;
-                            ctx.font = '600 10px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
-                            const textMetrics = ctx.measureText(text);
-                            const textWidth = textMetrics.width;
-                            const padX = 6;
-                            const badgeHeight = 17;
-                            const badgeWidth = textWidth + padX * 2;
-                            const badgeX = chartArea.right - badgeWidth - 2;
-
-                            let badgeY = yPixel - badgeHeight / 2;
-                            if (badgeY < chartArea.top - 2) {
-                                badgeY = chartArea.top - 2;
-                            } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
-                                badgeY = chartArea.bottom - badgeHeight;
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.setLineDash([3, 3]);
+                                ctx.strokeStyle = '#cbd5e1';
+                                ctx.lineWidth = 1.2;
+                                ctx.moveTo(x, chartArea.top);
+                                ctx.lineTo(x, chartArea.bottom);
+                                ctx.stroke();
+                                ctx.restore();
                             }
+                        },
+                        {
+                            id: 'trendTargetLinePlugin',
+                            afterDraw(chart) {
+                                const target = chart.config.options?.plugins?.trendTargetLine?.value;
+                                if (target === undefined || target === null) return;
 
-                            // Soft pill background (white with crisp red border)
-                            ctx.setLineDash([]);
-                            ctx.fillStyle = '#ffffff';
-                            ctx.strokeStyle = '#dc2626';
-                            ctx.lineWidth = 1;
+                                const { ctx, chartArea, scales: { x, y } } = chart;
+                                if (!chartArea || !x || !y) return;
 
-                            const r = 3;
-                            ctx.beginPath();
-                            if (ctx.roundRect) {
-                                ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, r);
-                            } else {
-                                ctx.moveTo(badgeX + r, badgeY);
-                                ctx.lineTo(badgeX + badgeWidth - r, badgeY);
-                                ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY, badgeX + badgeWidth, badgeY + r);
-                                ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight - r);
-                                ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY + badgeHeight, badgeX + badgeWidth - r, badgeY + badgeHeight);
-                                ctx.lineTo(badgeX + r, badgeY + badgeHeight);
-                                ctx.quadraticCurveTo(badgeX, badgeY + badgeHeight, badgeX, badgeY + badgeHeight - r);
-                                ctx.lineTo(badgeX, badgeY + r);
-                                ctx.quadraticCurveTo(badgeX, badgeY, badgeX + r, badgeY);
+                                const yPixel = y.getPixelForValue(target);
+                                if (isNaN(yPixel)) return;
+
+                                ctx.save();
+
+                                // 1. Draw dashed line across the chart width
+                                ctx.beginPath();
+                                ctx.setLineDash([5, 4]);
+                                ctx.strokeStyle = '#dc2626';
+                                ctx.lineWidth = 1.5;
+                                ctx.moveTo(chartArea.left, yPixel);
+                                ctx.lineTo(chartArea.right, yPixel);
+                                ctx.stroke();
+
+                                // 2. Target Label Badge in the right padding area (matching Monthly Target Achievement)
+                                const text = `TARGET ${target}%`;
+                                ctx.setLineDash([]);
+                                ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                                const textWidth = ctx.measureText(text).width;
+                                const padX = 6;
+                                const badgeHeight = 17;
+                                const badgeWidth = textWidth + padX * 2;
+                                const badgeX = Math.min(chartArea.right + 6, chart.width - badgeWidth - 4);
+
+                                let badgeY = yPixel - badgeHeight / 2;
+                                if (badgeY < chartArea.top - 2) {
+                                    badgeY = chartArea.top - 2;
+                                } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
+                                    badgeY = chartArea.bottom - badgeHeight;
+                                }
+
+                                ctx.fillStyle = '#dc2626';
+                                if (ctx.roundRect) {
+                                    ctx.beginPath();
+                                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 3);
+                                    ctx.fill();
+                                } else {
+                                    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+                                }
+
+                                ctx.fillStyle = '#ffffff';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, badgeX + badgeWidth / 2, yPixel);
+
+                                ctx.restore();
                             }
-                            ctx.closePath();
-                            ctx.fill();
-                            ctx.stroke();
-
-                            // Badge text
-                            ctx.fillStyle = '#dc2626';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.5);
-
-                            ctx.restore();
-                        }
-                    }]
+                        }]
                 };
             };
 
@@ -8736,10 +9543,10 @@ const App = (() => {
                 deptDatasets.push({
                     label: 'IT Coorporate',
                     data: values,
-                    borderColor: '#059669',
-                    backgroundColor: '#059669',
-                    _origBorderColor: '#059669',
-                    _origBackgroundColor: '#059669',
+                    borderColor: '#2563eb',
+                    backgroundColor: '#2563eb',
+                    _origBorderColor: '#2563eb',
+                    _origBackgroundColor: '#2563eb',
                     _origBorderWidth: 3,
                     _origPointRadius: 4,
                     _origPointHoverRadius: 6,
@@ -8750,45 +9557,101 @@ const App = (() => {
                     spanGaps: true
                 });
             } else if (isTekno) {
-                const values = json.tekno_trend || [];
-                deptDatasets.push({
-                    label: 'Warehouse Tekno',
-                    data: values,
-                    borderColor: '#0891b2',
-                    backgroundColor: '#0891b2',
-                    _origBorderColor: '#0891b2',
-                    _origBackgroundColor: '#0891b2',
-                    _origBorderWidth: 3,
-                    _origPointRadius: 4,
-                    _origPointHoverRadius: 6,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    tension: 0.3,
-                    spanGaps: true
-                });
+                if (summarySOType === 'quarterly') {
+                    const teknoQuarterlyColors = {
+                        'BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO': '#2563eb',
+                        'STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO': '#0ea5e9',
+                        'STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO': '#6366f1',
+                        'PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO': '#64748b'
+                    };
+                    const siteData = json.tekno_site_trends || {};
+                    for (const [siteLabel, color] of Object.entries(teknoQuarterlyColors)) {
+                        const vals = siteData[siteLabel] || [];
+                        deptDatasets.push({
+                            label: siteLabel,
+                            data: vals,
+                            borderColor: color,
+                            backgroundColor: color,
+                            _origBorderColor: color,
+                            _origBackgroundColor: color,
+                            _origBorderWidth: 2.5,
+                            _origPointRadius: 4,
+                            _origPointHoverRadius: 6,
+                            borderWidth: 2.5,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            tension: 0.3,
+                            spanGaps: true
+                        });
+                    }
+                } else {
+                    const gudangValues = (json.tekno_site_trends && json.tekno_site_trends['GUDANG WAREHOUSE TEKNO']) || [];
+                    deptDatasets.push({
+                        label: 'GUDANG WAREHOUSE TEKNO',
+                        data: gudangValues,
+                        borderColor: '#2563eb',
+                        backgroundColor: '#2563eb',
+                        _origBorderColor: '#2563eb',
+                        _origBackgroundColor: '#2563eb',
+                        _origBorderWidth: 3,
+                        _origPointRadius: 4,
+                        _origPointHoverRadius: 6,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
 
-                const khususValues = (json.tekno_site_trends && json.tekno_site_trends['PENYIMPANAN PERANGKAT KHUSUS T TEKNO']) || [];
-                deptDatasets.push({
-                    label: 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO',
-                    data: khususValues,
-                    borderColor: '#8b5cf6',
-                    backgroundColor: '#8b5cf6',
-                    _origBorderColor: '#8b5cf6',
-                    _origBackgroundColor: '#8b5cf6',
-                    _origBorderWidth: 2.5,
-                    _origPointRadius: 4,
-                    _origPointHoverRadius: 6,
-                    borderWidth: 2.5,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    tension: 0.3,
-                    spanGaps: true
-                });
+                    const khususValues = (json.tekno_site_trends && json.tekno_site_trends['PENYIMPANAN PERANGKAT KHUSUS T TEKNO']) || [];
+                    deptDatasets.push({
+                        label: 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO',
+                        data: khususValues,
+                        borderColor: '#6366f1',
+                        backgroundColor: '#6366f1',
+                        _origBorderColor: '#6366f1',
+                        _origBackgroundColor: '#6366f1',
+                        _origBorderWidth: 2.5,
+                        _origPointRadius: 4,
+                        _origPointHoverRadius: 6,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                }
+            } else if (isPmd) {
+                // Divisi PMD departments: DNO and DSO
+                const pmdDeptColors = {
+                    'DNO': '#2563eb', // Royal Blue
+                    'DSO': '#60a5fa'  // Soft Sky Blue
+                };
+                for (const [deptKey, color] of Object.entries(pmdDeptColors)) {
+                    const values = (json.pmd_subdept_trends && json.pmd_subdept_trends[deptKey])
+                        || (json.dept_trends && json.dept_trends[deptKey])
+                        || [];
+                    deptDatasets.push({
+                        label: deptKey,
+                        data: values,
+                        borderColor: color,
+                        backgroundColor: color,
+                        _origBorderColor: color,
+                        _origBackgroundColor: color,
+                        _origBorderWidth: 2.5,
+                        _origPointRadius: 4,
+                        _origPointHoverRadius: 6,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                }
             } else {
-                const deptColors = isPmd
-                    ? { 'PMD': '#8b5cf6' }
-                    : (summarySOType === 'quarterly' ? { 'ERO': '#3b82f6', 'WRO': '#10b981' } : { 'CRO': '#f59e0b', 'ERO': '#3b82f6', 'WRO': '#10b981' });
+                const deptColors = (summarySOType === 'quarterly'
+                    ? { 'ERO': '#6366f1', 'WRO': '#0ea5e9' }
+                    : { 'CRO': '#2563eb', 'ERO': '#6366f1', 'WRO': '#0ea5e9' });
 
                 for (const [deptKey, color] of Object.entries(deptColors)) {
                     const values = json.dept_trends ? (json.dept_trends[deptKey] || []) : [];
@@ -8817,13 +9680,13 @@ const App = (() => {
             // 2. Render Card 2: Sub DEPT / Site Trends
             if (isIt) {
                 const itSitePalette = {
-                    'OUTLET OPTI TBS': '#059669',
-                    'IT CORPORATE - ARCADIA LT 4': '#3b82f6'
+                    'OUTLET OPTI TBS': '#2563eb',
+                    'IT CORPORATE - ARCADIA LT 4': '#60a5fa'
                 };
                 const subDeptDatasets = [];
                 const siteData = json.it_site_trends || {};
                 for (const [siteLabel, values] of Object.entries(siteData)) {
-                    const color = itSitePalette[siteLabel] || '#059669';
+                    const color = itSitePalette[siteLabel] || '#2563eb';
                     subDeptDatasets.push({
                         label: siteLabel,
                         data: values || [],
@@ -8849,41 +9712,60 @@ const App = (() => {
                 if (chartTrendSubDept) { chartTrendSubDept.destroy(); chartTrendSubDept = null; }
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else if (!isPmd) {
-                // Render Card 2: Sub DEPT Trends (Outlet Regional)
-                const subDeptPalette = [
-                    '#ef4444', // CJDO (red)
-                    '#f97316', // EKO (orange)
-                    '#f59e0b', // WJO (amber)
-                    '#84cc16', // WKO (lime)
-                    '#10b981', // BNO (emerald)
-                    '#06b6d4', // EJO (cyan)
-                    '#0284c7', // MPO (sky)
-                    '#3b82f6', // SMO (blue)
-                    '#6366f1', // CSO (indigo)
-                    '#a855f7', // NSO (purple)
-                    '#ec4899', // SSO (pink)
-                ];
-
-                const subDeptDatasets = [];
+                // Render Card 3: Sub DEPT Trends (Outlet Regional)
+                // Filterable as standalone line graph, sharing the CSO palette color (#2563eb)
+                const csoPaletteColor = '#2563eb'; // Royal Blue (CSO Palette Color)
+                const subDeptSelect = document.getElementById('trend-subdept-filter-select');
                 let subEntries = Object.entries(json.subdept_trends || {});
                 if (summaryCategory === 'warehouse_hub') {
                     subEntries = subEntries.filter(([subKey]) => !['CSO', 'BNO', 'MPO', 'SMO'].includes(subKey));
                 }
-                subEntries.forEach(([subKey, item], idx) => {
-                    const color = subDeptPalette[idx % subDeptPalette.length];
+
+                if (subDeptSelect) {
+                    const availableKeys = subEntries.map(([k]) => k);
+                    let sel = currentTrendSubDeptFilter || 'CSO';
+                    if (sel !== 'all' && !availableKeys.includes(sel)) {
+                        sel = availableKeys.includes('CSO') ? 'CSO' : (availableKeys[0] || 'all');
+                    }
+                    currentTrendSubDeptFilter = sel;
+
+                    let optHtml = `<option value="all"${sel === 'all' ? ' selected' : ''}>Semua Sub Dept</option>`;
+                    availableKeys.forEach(k => {
+                        optHtml += `<option value="${k}"${k === sel ? ' selected' : ''}>${k}</option>`;
+                    });
+                    subDeptSelect.innerHTML = optHtml;
+                }
+
+                // Subtitle update
+                const subDeptSubtitle = document.getElementById('trend-subdept-subtitle');
+                if (subDeptSubtitle) {
+                    const isAll = (currentTrendSubDeptFilter === 'all');
+                    const subLabel = isAll ? ' — All Sub Depts' : ` — ${currentTrendSubDeptFilter}`;
+                    subDeptSubtitle.textContent = (summarySOType === 'monthly')
+                        ? `Monthly Physical % (Jan - Dec ${targetYear})${subLabel}`
+                        : `Quarterly Physical % (${targetYear})${subLabel}`;
+                }
+
+                const subDeptDatasets = [];
+                let entriesToPlot = subEntries;
+                if (currentTrendSubDeptFilter && currentTrendSubDeptFilter !== 'all') {
+                    entriesToPlot = subEntries.filter(([k]) => k === currentTrendSubDeptFilter);
+                }
+
+                entriesToPlot.forEach(([subKey, item]) => {
                     subDeptDatasets.push({
                         label: subKey,
                         data: item.values || [],
-                        borderColor: color,
-                        backgroundColor: color,
-                        _origBorderColor: color,
-                        _origBackgroundColor: color,
-                        _origBorderWidth: 2,
-                        _origPointRadius: 2,
-                        _origPointHoverRadius: 5,
-                        borderWidth: 2,
-                        pointRadius: 2,
-                        pointHoverRadius: 5,
+                        borderColor: csoPaletteColor,
+                        backgroundColor: csoPaletteColor,
+                        _origBorderColor: csoPaletteColor,
+                        _origBackgroundColor: csoPaletteColor,
+                        _origBorderWidth: 2.5,
+                        _origPointRadius: (entriesToPlot.length === 1 ? 4 : 2),
+                        _origPointHoverRadius: 6,
+                        borderWidth: 2.5,
+                        pointRadius: (entriesToPlot.length === 1 ? 4 : 0),
+                        pointHoverRadius: 6,
                         tension: 0.3,
                         spanGaps: true
                     });
@@ -8893,32 +9775,63 @@ const App = (() => {
                 chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 85));
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else {
-                // Render Card 3: PMD Sub DEPT Trends
-                const pmdColors = {
-                    'DNO': '#8b5cf6', // Purple
-                    'DSO': '#06b6d4', // Cyan
+                // Render Card 2: PMD Dept Trends (All 7 PMD Sites)
+                const pmdSitePalette = {
+                    'OUTLET BWA BANTEN': '#2563eb',   // Royal Blue (DNO)
+                    'OUTLET BWA MERUYA': '#3b82f6',   // Vivid Blue (DNO)
+                    'OUTLET CDA': '#60a5fa',          // Sky Blue (DNO)
+                    'OUTLET NEA': '#0284c7',          // Ocean Blue (DNO)
+                    'OUTLET BDA KELINKIT': '#4338ca', // Deep Indigo (DSO)
+                    'OUTLET SAST': '#6366f1',         // Indigo (DSO)
+                    'OUTLET SEOA': '#818cf8'          // Soft Indigo (DSO)
                 };
 
+                const pmdSiteSelect = document.getElementById('trend-pmd-site-filter');
+                const siteData = json.pmd_site_trends || {};
+                const siteEntries = Object.entries(siteData);
+
+                if (pmdSiteSelect) {
+                    const sel = currentTrendPmdSiteFilter || 'all';
+                    let optHtml = `<option value="all"${sel === 'all' ? ' selected' : ''}>Semua Site (7 Sites)</option>`;
+                    siteEntries.forEach(([siteName]) => {
+                        optHtml += `<option value="${siteName}"${siteName === sel ? ' selected' : ''}>${siteName}</option>`;
+                    });
+                    pmdSiteSelect.innerHTML = optHtml;
+                }
+
+                // Subtitle update
+                const pmdSubtitle = document.getElementById('trend-pmd-subtitle');
+                if (pmdSubtitle) {
+                    const isAll = (currentTrendPmdSiteFilter === 'all');
+                    const siteLabel = isAll ? ' — 7 Sites' : ` — ${currentTrendPmdSiteFilter}`;
+                    pmdSubtitle.textContent = `Monthly Physical % (Jan - Dec ${targetYear})${siteLabel}`;
+                }
+
+                let entriesToPlot = siteEntries;
+                if (currentTrendPmdSiteFilter && currentTrendPmdSiteFilter !== 'all') {
+                    entriesToPlot = siteEntries.filter(([name]) => name === currentTrendPmdSiteFilter);
+                }
+
                 const pmdDatasets = [];
-                for (const [subKey, values] of Object.entries(json.pmd_subdept_trends || {})) {
-                    const color = pmdColors[subKey] || '#3b82f6';
+                entriesToPlot.forEach(([siteLabel, values]) => {
+                    const color = pmdSitePalette[siteLabel] || '#2563eb';
                     pmdDatasets.push({
-                        label: subKey,
+                        label: siteLabel,
                         data: values || [],
                         borderColor: color,
                         backgroundColor: color,
                         _origBorderColor: color,
                         _origBackgroundColor: color,
-                        _origBorderWidth: 2.5,
-                        _origPointRadius: 4,
+                        _origBorderWidth: 2.4,
+                        _origPointRadius: (entriesToPlot.length === 1 ? 4 : 2),
                         _origPointHoverRadius: 6,
-                        borderWidth: 2.5,
-                        pointRadius: 4,
+                        borderWidth: 2.4,
+                        pointRadius: (entriesToPlot.length === 1 ? 4 : 0),
                         pointHoverRadius: 6,
                         tension: 0.3,
                         spanGaps: true
                     });
-                }
+                });
 
                 if (chartTrendPmd) chartTrendPmd.destroy();
                 chartTrendPmd = new Chart(pmdCanvas.getContext('2d'), createChartConfig(pmdDatasets, 98));
@@ -9297,7 +10210,7 @@ const App = (() => {
         }
         const num = parseFloat(val);
         const cls = getPctClass(num, isPmd);
-        return `<span class="pct-badge ${cls}">${Math.round(num)}%</span>`;
+        return `<span class="pct-badge ${cls}">${num.toFixed(2)}%</span>`;
     }
 
     function renderRekapTable() {
@@ -9331,6 +10244,7 @@ const App = (() => {
                 </tr>
             `;
             if (tfoot) tfoot.innerHTML = '';
+            renderRekapAverageChart([], isQuarterlyRekap, (summaryCategory === 'pmd' || rekapLevel2 === 'pmd'));
             if (infoEl) infoEl.textContent = 'Showing 0 to 0 of 0 entries';
             if (controlsEl) controlsEl.innerHTML = '';
             return;
@@ -9369,6 +10283,8 @@ const App = (() => {
         tbody.innerHTML = html;
 
         // Render Footer (Average per month)
+        const monthlyChartData = [];
+        const MONTH_NAMES_SHORT = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
         if (tfoot) {
             let footHtml = `
                 <tr>
@@ -9379,8 +10295,9 @@ const App = (() => {
             const isFiltered = (rekapDeptFilter !== 'all' || rekapSubDeptFilter !== 'all' || Boolean(rekapSearchQuery));
             for (const m of visibleMonths) {
                 let avg = null;
+                let count = 0;
+                let sum = 0;
                 if (isFiltered) {
-                    let sum = 0, count = 0;
                     filteredRekapRows.forEach(r => {
                         if (r.months && r.months[m] !== null && r.months[m] !== undefined && r.months[m] !== '') {
                             sum += parseFloat(r.months[m]);
@@ -9390,12 +10307,30 @@ const App = (() => {
                     avg = count > 0 ? (sum / count) : null;
                 } else {
                     avg = rekapMonthAverages ? rekapMonthAverages[m] : null;
+                    filteredRekapRows.forEach(r => {
+                        if (r.months && r.months[m] !== null && r.months[m] !== undefined && r.months[m] !== '') {
+                            count++;
+                        }
+                    });
                 }
+                const label = isQuarterlyRekap
+                    ? ({ 3: 'Q1 (MAR)', 6: 'Q2 (JUN)', 9: 'Q3 (SEP)', 12: 'Q4 (DEC)' }[m] || `M${m}`)
+                    : (MONTH_NAMES_SHORT[m] || `M${m}`);
+
+                monthlyChartData.push({
+                    month: m,
+                    label: label,
+                    avg: avg !== null ? parseFloat(avg) : null,
+                    count: count,
+                    total: totalItems
+                });
                 footHtml += `<td class="text-center" style="padding: 8px 6px;">${formatPctBadge(avg, isPmdCategory)}</td>`;
             }
             footHtml += '</tr>';
             tfoot.innerHTML = footHtml;
         }
+
+        renderRekapAverageChart(monthlyChartData, isQuarterlyRekap, isPmdCategory);
 
         // Update info text
         if (infoEl) {
@@ -9436,6 +10371,290 @@ const App = (() => {
                 controlsEl.innerHTML = btnsHtml;
             }
         }
+    }
+
+
+    function renderRekapAverageChart(monthlyData, isQuarterly, isPmdCategory) {
+        const canvas = document.getElementById('chart-rekap-average');
+        if (!canvas) return;
+
+        if (chartRekapAverage) {
+            chartRekapAverage.destroy();
+            chartRekapAverage = null;
+        }
+
+        const isTarget98 = (isPmdCategory || summaryCategory === 'pmd' || summaryCategory === 'warehouse_tekno' || summaryCategory === 'it_coorporate');
+        const targetVal = isTarget98 ? 98 : 85;
+
+        const chartTitleEl = document.getElementById('rekap-chart-title');
+        const isQ = (isQuarterly || summarySOType === 'quarterly');
+        const prefix = isQ ? 'Quarterly' : 'Monthly';
+        if (chartTitleEl) chartTitleEl.textContent = `${prefix} Target Achievement ${rekapYear}`;
+
+        const chartBadgeEl = document.getElementById('rekap-chart-badge');
+        if (chartBadgeEl) {
+            let badgeText = 'Outlet Regional';
+            let badgeBg = '#f0fdf4';
+            let badgeFg = '#16a34a';
+            if (summaryCategory === 'pmd' || rekapLevel2 === 'pmd') {
+                badgeText = 'PMD';
+                badgeBg = '#faf5ff';
+                badgeFg = '#9333ea';
+            } else if (summaryCategory === 'outlet_subarep') {
+                badgeText = 'Outlet Subarep';
+                badgeBg = '#f0fdf4';
+                badgeFg = '#16a34a';
+            } else if (summaryCategory === 'warehouse_hub') {
+                badgeText = 'Warehouse HUB';
+                badgeBg = '#eff6ff';
+                badgeFg = '#2563eb';
+            } else if (summaryCategory === 'warehouse_tekno') {
+                badgeText = 'Warehouse Tekno';
+                badgeBg = '#fff7ed';
+                badgeFg = '#c2410c';
+            } else if (summaryCategory === 'it_coorporate') {
+                badgeText = 'IT Corporate';
+                badgeBg = '#f5f3ff';
+                badgeFg = '#7c3aed';
+            }
+            chartBadgeEl.textContent = badgeText;
+            chartBadgeEl.style.background = badgeBg;
+            chartBadgeEl.style.color = badgeFg;
+        }
+
+        const chartSubtitleEl = document.getElementById('rekap-chart-subtitle');
+        if (chartSubtitleEl) {
+            const typeLabel = isQuarterly ? 'Quarter' : 'Bulan';
+            const totalSites = (monthlyData && monthlyData[0]) ? monthlyData[0].total : filteredRekapRows.length;
+            chartSubtitleEl.textContent = `Rata-rata persentase pencapaian fisik per ${typeLabel} (${totalSites.toLocaleString('id-ID')} Sites)`;
+        }
+
+        if (!monthlyData || monthlyData.length === 0) return;
+
+        // Truncate future months/quarters with no data up to the last month/quarter that has data
+        let lastDataIdx = -1;
+        for (let i = monthlyData.length - 1; i >= 0; i--) {
+            const d = monthlyData[i];
+            if (d && d.avg !== null && d.avg !== undefined && !isNaN(d.avg) && d.count > 0) {
+                lastDataIdx = i;
+                break;
+            }
+        }
+        const activeMonthlyData = (lastDataIdx >= 0) ? monthlyData.slice(0, lastDataIdx + 1) : monthlyData;
+
+        const labels = activeMonthlyData.map(d => d.label);
+        const dataValues = activeMonthlyData.map(d => d.avg !== null ? Number(d.avg.toFixed(2)) : null);
+
+        const bgColors = activeMonthlyData.map(d => {
+            if (d.avg === null) return 'rgba(203, 213, 225, 0.45)';
+            if (isTarget98) {
+                return d.avg >= 98 ? '#16a34a' : '#dc2626';
+            } else {
+                if (d.avg >= 85) return '#16a34a';
+                if (d.avg >= 75) return '#ea580c';
+                return '#dc2626';
+            }
+        });
+
+        const borderColors = activeMonthlyData.map(d => {
+            if (d.avg === null) return '#cbd5e1';
+            if (isTarget98) {
+                return d.avg >= 98 ? '#15803d' : '#b91c1c';
+            } else {
+                if (d.avg >= 85) return '#15803d';
+                if (d.avg >= 75) return '#c2410c';
+                return '#b91c1c';
+            }
+        });
+
+        // Bottom value label plugin (crisp, solid font with 2 decimals anchored at bottom)
+        const valueBottomPlugin = {
+            id: 'rekapValueBottomPlugin',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+
+                    meta.data.forEach((barElement, index) => {
+                        const rawVal = dataset.data[index];
+                        if (rawVal === null || rawVal === undefined || isNaN(rawVal)) return;
+
+                        const text = `${Number(rawVal).toFixed(2)}%`;
+                        const { x, y, base } = barElement;
+                        const barHeight = Math.abs(base - y);
+                        const bWidth = barElement.width || 30;
+
+                        ctx.save();
+                        ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+                        const textWidth = ctx.measureText(text).width;
+
+                        if (barHeight >= 20) {
+                            ctx.fillStyle = '#ffffff';
+                            if (bWidth >= textWidth - 2) {
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(text, x, base - 8);
+                            } else {
+                                ctx.translate(x, base - 8);
+                                ctx.rotate(-Math.PI / 2);
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, 0, 0);
+                            }
+                        } else if (barHeight > 0) {
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillStyle = '#475569';
+                            ctx.fillText(text, x, y - 3);
+                        } else {
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillStyle = '#94a3b8';
+                            ctx.fillText(text, x, base - 3);
+                        }
+                        ctx.restore();
+                    });
+                });
+            }
+        };
+
+        // Dashed Target Line Plugin
+        const targetLinePlugin = {
+            id: 'rekapTargetLinePlugin',
+            afterDraw(chart) {
+                const { ctx, chartArea, scales: { y } } = chart;
+                if (!chartArea || !y) return;
+
+                const yPixel = y.getPixelForValue(targetVal);
+                if (isNaN(yPixel)) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 4]);
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(chartArea.left, yPixel);
+                ctx.lineTo(chartArea.right, yPixel);
+                ctx.stroke();
+
+                const text = `TARGET ${targetVal}%`;
+                ctx.setLineDash([]);
+                ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                const textWidth = ctx.measureText(text).width;
+                const padX = 6;
+                const badgeWidth = textWidth + padX * 2;
+                const badgeHeight = 17;
+                const badgeX = Math.min(chartArea.right + 6, chart.width - badgeWidth - 4);
+                const badgeY = yPixel - badgeHeight / 2;
+
+                ctx.fillStyle = '#dc2626';
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 3);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+                }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, badgeX + badgeWidth / 2, yPixel);
+                ctx.restore();
+            }
+        };
+
+        const ctx = canvas.getContext('2d');
+        chartRekapAverage = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Rata-rata Fisik (%)',
+                    data: dataValues,
+                    backgroundColor: bgColors,
+                    borderColor: 'transparent',
+                    borderWidth: 0,
+                    borderRadius: {
+                        topLeft: 6,
+                        topRight: 6,
+                        bottomLeft: 0,
+                        bottomRight: 0
+                    },
+                    borderSkipped: 'bottom',
+                    barPercentage: 0.54,
+                    categoryPercentage: 0.78,
+                    maxBarThickness: 34
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 24,
+                        right: 80,
+                        bottom: 6,
+                        left: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            stepSize: 20,
+                            callback: val => `${val}%`,
+                            color: '#94a3b8',
+                            font: { size: 11, family: 'Inter, -apple-system, sans-serif' }
+                        },
+                        grid: {
+                            color: '#f1f5f9',
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 11, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                            color: '#475569'
+                        },
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleFont: { size: 12, weight: '700', family: 'Inter, -apple-system, sans-serif' },
+                        bodyFont: { size: 11.5, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                        padding: 10,
+                        cornerRadius: 6,
+                        callbacks: {
+                            title: (items) => items[0]?.label || '',
+                            label: (context) => {
+                                const item = activeMonthlyData[context.dataIndex];
+                                if (item && item.avg !== null) {
+                                    return ` Rata-rata: ${item.avg.toFixed(2)}% (${item.count}/${item.total} Sites)`;
+                                }
+                                return ' Belum Ada Data';
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [valueBottomPlugin, targetLinePlugin]
+        });
     }
 
     function goToRekapPage(p) {
@@ -9828,7 +11047,7 @@ const App = (() => {
 
     function formatPercent(n) {
         if (n === null || n === undefined || isNaN(parseFloat(n))) return '-';
-        return `${Math.round(parseFloat(n))}%`;
+        return `${parseFloat(n).toFixed(2)}%`;
     }
 
     function formatCurrency(n) {
@@ -12825,21 +14044,26 @@ const App = (() => {
                 if (tbody) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 3rem; color: #64748b;">
-                                <div style="font-weight: 700; font-size: 14px; color: #334155; margin-bottom: 6px;">Periode Report Belum Tersedia</div>
-                                <div style="font-size: 12.5px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            <td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                                <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-bottom: 4px;">No data.</div>
                             </td>
                         </tr>
                     `;
                 }
                 const elTot = document.getElementById('stat-reports-total-sites');
                 const elGen = document.getElementById('stat-reports-generated');
-                const elSent = document.getElementById('stat-reports-sent');
+                const elNotGen = document.getElementById('stat-reports-not-generated');
                 const elPend = document.getElementById('stat-reports-pending');
+                const elSent = document.getElementById('stat-reports-sent');
+                const elWaitVerif = document.getElementById('stat-reports-waiting-verif');
+                const elVer = document.getElementById('stat-reports-verified');
                 if (elTot) elTot.textContent = '0';
                 if (elGen) elGen.textContent = '0';
-                if (elSent) elSent.textContent = '0';
+                if (elNotGen) elNotGen.textContent = '0';
                 if (elPend) elPend.textContent = '0';
+                if (elSent) elSent.textContent = '0';
+                if (elWaitVerif) elWaitVerif.textContent = '0';
+                if (elVer) elVer.textContent = '0';
                 renderReportsPagination();
                 return;
             }
@@ -12857,13 +14081,18 @@ const App = (() => {
             if (json.stats) {
                 const elTot = document.getElementById('stat-reports-total-sites');
                 const elGen = document.getElementById('stat-reports-generated');
-                const elSent = document.getElementById('stat-reports-sent');
+                const elNotGen = document.getElementById('stat-reports-not-generated');
                 const elPend = document.getElementById('stat-reports-pending');
+                const elSent = document.getElementById('stat-reports-sent');
+                const elWaitVerif = document.getElementById('stat-reports-waiting-verif');
+                const elVer = document.getElementById('stat-reports-verified');
                 if (elTot) elTot.textContent = Number(json.stats.total_sites || 0).toLocaleString('id-ID');
                 if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
+                if (elNotGen) elNotGen.textContent = Number(json.stats.total_not_generated || 0).toLocaleString('id-ID');
+                if (elPend) elPend.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
                 if (elSent) elSent.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
-                const notGeneratedVal = json.stats.total_not_generated !== undefined ? json.stats.total_not_generated : json.stats.total_pending;
-                if (elPend) elPend.textContent = Number(notGeneratedVal || 0).toLocaleString('id-ID');
+                if (elWaitVerif) elWaitVerif.textContent = Number(json.stats.total_uploaded || 0).toLocaleString('id-ID');
+                if (elVer) elVer.textContent = Number(json.stats.total_verified || 0).toLocaleString('id-ID');
             }
 
             // Populate filter dropdowns dynamically based on current so_type
@@ -12897,7 +14126,8 @@ const App = (() => {
             let deptHtml = onlyPMD ? '' : '<option value="all">Semua Departemen</option>';
             depts.forEach(d => {
                 const isSel = (d === curDept) ? 'selected' : '';
-                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(d)}</option>`;
+                const label = (d.toUpperCase() === 'BLANK' || d === '-') ? 'Tanpa DEPT (Blank)' : d;
+                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(label)}</option>`;
             });
             deptEl.innerHTML = deptHtml;
             if (onlyPMD) {
@@ -13320,6 +14550,7 @@ const App = (() => {
     function onReportsDeptChange() {
         const el = document.getElementById('reports-filter-dept');
         reportsState.dept = el ? el.value : 'all';
+        reportsState.sub_dept = 'all';
         reportsState.page = 1;
         loadReportsData(1);
     }
@@ -13458,9 +14689,8 @@ const App = (() => {
                 if (tbody) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
-                                <div style="font-weight: 700; font-size: 13.5px; color: #334155; margin-bottom: 4px;">Periode Report Belum Tersedia</div>
-                                <div style="font-size: 12px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            <td colspan="9" style="text-align: center; padding: 2.5rem; color: #94a3b8;">
+                                <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-bottom: 4px;">No data.</div>
                             </td>
                         </tr>
                     `;
@@ -13477,6 +14707,24 @@ const App = (() => {
             reportsVerifState.data = json.data || [];
             reportsVerifState.total = json.total || 0;
             reportsVerifState.totalPages = json.total_pages || 1;
+
+            // Update stats cards if present
+            if (json.stats) {
+                const elTot = document.getElementById('stat-reports-total-sites');
+                const elGen = document.getElementById('stat-reports-generated');
+                const elNotGen = document.getElementById('stat-reports-not-generated');
+                const elPend = document.getElementById('stat-reports-pending');
+                const elSent = document.getElementById('stat-reports-sent');
+                const elWaitVerif = document.getElementById('stat-reports-waiting-verif');
+                const elVer = document.getElementById('stat-reports-verified');
+                if (elTot) elTot.textContent = Number(json.stats.total_sites || 0).toLocaleString('id-ID');
+                if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
+                if (elNotGen) elNotGen.textContent = Number(json.stats.total_not_generated || 0).toLocaleString('id-ID');
+                if (elPend) elPend.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
+                if (elSent) elSent.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
+                if (elWaitVerif) elWaitVerif.textContent = Number(json.stats.total_uploaded || 0).toLocaleString('id-ID');
+                if (elVer) elVer.textContent = Number(json.stats.total_verified || 0).toLocaleString('id-ID');
+            }
 
             populateReportsVerifDropdowns(json.depts || [], json.sub_depts || []);
             renderReportsVerificationTable();
@@ -13504,7 +14752,8 @@ const App = (() => {
             let deptHtml = onlyPMD ? '' : '<option value="all">Semua DEPT</option>';
             depts.forEach(d => {
                 const isSel = (d === curDept) ? 'selected' : '';
-                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(d)}</option>`;
+                const label = (d.toUpperCase() === 'BLANK' || d === '-') ? 'Tanpa DEPT (Blank)' : d;
+                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(label)}</option>`;
             });
             deptEl.innerHTML = deptHtml;
             if (onlyPMD) {
@@ -13619,7 +14868,7 @@ const App = (() => {
                 `;
                 statusBadgeHtml = `
                     <span class="badge" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">
-                        Menunggu Upload
+                        Pending
                     </span>
                 `;
             } else if (status === 'uploaded') {
@@ -13650,20 +14899,9 @@ const App = (() => {
                 const verifier = escapeHtml(r.verified_by || 'Admin');
                 const verifiedAt = r.verified_at_formatted ? escapeHtml(r.verified_at_formatted) : '';
                 verifActionHtml = `
-                    <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;flex-wrap:nowrap;">
-                        <div style="font-size:11.5px;color:#15803d;line-height:1.3;text-align:left;">
-                            <div style="font-weight:700;display:inline-flex;align-items:center;gap:4px;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                <span>Verified</span>
-                            </div>
-                            <div style="font-size:10.5px;color:#64748b;margin-top:1px;" title="${verifier}">oleh: ${verifier}</div>
-                            <div style="font-size:10px;color:#94a3b8;">${verifiedAt}</div>
-                        </div>
-                        <button type="button" class="btn btn-danger btn-sm" onclick="App.rejectReport('${sitecode}')" title="Reject verifikasi / kembalikan ke Generated (Regenerate aktif)"
-                            style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;font-size:11px;padding:3px 8px;border-radius:5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            <span>Reject</span>
-                        </button>
+                    <div style="font-size:11.5px;color:#1e293b;line-height:1.3;text-align:center;">
+                        <div style="font-weight:600;color:#0f172a;" title="${verifier}">${verifier}</div>
+                        <div style="font-size:10.5px;color:#64748b;margin-top:1px;">${verifiedAt}</div>
                     </div>
                 `;
                 statusBadgeHtml = `
@@ -13751,6 +14989,7 @@ const App = (() => {
     function onReportsVerifDeptChange() {
         const el = document.getElementById('reports-verif-filter-dept');
         reportsVerifState.dept = el ? el.value : 'all';
+        reportsVerifState.sub_dept = 'all';
         reportsVerifState.page = 1;
         loadReportsVerificationData(1);
     }
@@ -14163,18 +15402,21 @@ const App = (() => {
                 if (tbody) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 3rem; color: #64748b;">
-                                <div style="font-weight: 700; font-size: 14px; color: #334155; margin-bottom: 6px;">Periode Report Belum Tersedia</div>
-                                <div style="font-size: 12.5px; color: #64748b;">${escapeHtml(json.locked_message || 'Laporan baru dapat dimunculkan per tanggal 27.')}</div>
+                            <td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                                <div style="font-size: 14px; font-weight: 500; color: #64748b; margin-bottom: 4px;">No data.</div>
                             </td>
                         </tr>
                     `;
                 }
                 const elGen = document.getElementById('stat-ba-generated');
+                const elNotGen = document.getElementById('stat-ba-not-generated');
                 const elPend = document.getElementById('stat-ba-pending');
+                const elWaitVerif = document.getElementById('stat-ba-waiting-verif');
                 const elVer = document.getElementById('stat-ba-verified');
                 if (elGen) elGen.textContent = '0';
+                if (elNotGen) elNotGen.textContent = '0';
                 if (elPend) elPend.textContent = '0';
+                if (elWaitVerif) elWaitVerif.textContent = '0';
                 if (elVer) elVer.textContent = '0';
                 renderBaPagination();
                 return;
@@ -14189,13 +15431,17 @@ const App = (() => {
             baState.total = json.total || 0;
             baState.totalPages = json.total_pages || 1;
 
-            // Update 3 Overview Cards: Generated, Pending, Verified
+            // Update Overview Cards: Generated, Not Generated, Pending, Waiting Verification, Verified
             if (json.stats) {
                 const elGen = document.getElementById('stat-ba-generated');
+                const elNotGen = document.getElementById('stat-ba-not-generated');
                 const elPend = document.getElementById('stat-ba-pending');
+                const elWaitVerif = document.getElementById('stat-ba-waiting-verif');
                 const elVer = document.getElementById('stat-ba-verified');
                 if (elGen) elGen.textContent = Number(json.stats.total_generated || 0).toLocaleString('id-ID');
-                if (elPend) elPend.textContent = Number(json.stats.total_pending !== undefined ? json.stats.total_pending : (json.stats.total_sent || 0)).toLocaleString('id-ID');
+                if (elNotGen) elNotGen.textContent = Number(json.stats.total_not_generated || 0).toLocaleString('id-ID');
+                if (elPend) elPend.textContent = Number(json.stats.total_sent || 0).toLocaleString('id-ID');
+                if (elWaitVerif) elWaitVerif.textContent = Number(json.stats.total_uploaded || 0).toLocaleString('id-ID');
                 if (elVer) elVer.textContent = Number(json.stats.total_verified || 0).toLocaleString('id-ID');
             }
 
@@ -14225,7 +15471,8 @@ const App = (() => {
             let deptHtml = onlyPMD ? '' : '<option value="all">Semua DEPT</option>';
             depts.forEach(d => {
                 const isSel = (d === curDept) ? 'selected' : '';
-                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(d)}</option>`;
+                const label = (d.toUpperCase() === 'BLANK' || d === '-') ? 'Tanpa DEPT (Blank)' : d;
+                deptHtml += `<option value="${escapeHtml(d)}" ${isSel}>${escapeHtml(label)}</option>`;
             });
             deptEl.innerHTML = deptHtml;
             if (onlyPMD) {
@@ -14284,16 +15531,21 @@ const App = (() => {
             // Dokumen Bertanda Tangan
             let docTtdHtml = '';
             if (r.uploaded_file_path && r.uploaded_pdf_url) {
+                // Sesuai permintaan: saat Menunggu Verifikasi, tombol download PDF dihilangkan (hanya Preview). Setelah verified baru ditampilkan.
+                const downloadPdfBtn = (status === 'verified') ? `
+                    <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_download_url}" target="_blank" download title="Unduh Dokumen TTD">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>PDF</span>
+                    </a>
+                ` : '';
+
                 docTtdHtml = `
                     <div style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">
                         <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_pdf_url}" target="_blank" rel="noopener noreferrer" title="Preview Dokumen TTD">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             <span>Preview</span>
                         </a>
-                        <a class="btn-report-action btn-report-preview-style" href="${r.uploaded_download_url}" target="_blank" download title="Unduh Dokumen TTD">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            <span>PDF</span>
-                        </a>
+                        ${downloadPdfBtn}
                     </div>
                 `;
             } else {
@@ -14327,7 +15579,7 @@ const App = (() => {
             } else if (status === 'uploaded') {
                 statusBadgeHtml = `
                     <span class="badge" style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:600;">
-                        Uploaded
+                        Menunggu Verifikasi
                     </span>
                 `;
             } else if (status === 'sent') {
@@ -14421,6 +15673,7 @@ const App = (() => {
     function onBaDeptChange() {
         const el = document.getElementById('ba-filter-dept');
         baState.dept = el ? el.value : 'all';
+        baState.sub_dept = 'all';
         baState.page = 1;
         loadBeritaAcaraData(1);
     }
@@ -14829,6 +16082,12 @@ const App = (() => {
                 uacBadges.push(`<span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Reset Report</span>`);
             }
 
+            if (u.can_access_berita_acara !== false) {
+                uacBadges.push(`<span class="badge" style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Berita Acara</span>`);
+            } else {
+                uacBadges.push(`<span class="badge" style="background: #f1f5f9; color: #94a3b8; font-size: 11px; padding: 2px 7px; border-radius: 6px; text-decoration: line-through;">Berita Acara</span>`);
+            }
+
             if (u.can_access_master_data !== false) {
                 uacBadges.push(`<span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 600;">Master Data</span>`);
             } else {
@@ -14932,6 +16191,8 @@ const App = (() => {
         document.querySelectorAll('.user-uac-dept-checkbox').forEach(cb => { cb.checked = true; });
         const uacReportsResetAdd = document.getElementById('user-uac-reports-reset');
         if (uacReportsResetAdd) uacReportsResetAdd.checked = false;
+        const uacBaAdd = document.getElementById('user-uac-berita-acara');
+        if (uacBaAdd) uacBaAdd.checked = true;
         document.getElementById('user-uac-master-data').checked = true;
         document.getElementById('user-uac-master-data-weekly').checked = true;
         const uacUserMgmtAdd = document.getElementById('user-uac-user-management');
@@ -14971,12 +16232,14 @@ const App = (() => {
         const deptsContainer = document.getElementById('user-uac-reports-depts-container');
         if (deptsContainer) deptsContainer.style.display = (user.can_access_reports !== false) ? 'block' : 'none';
         const rawDepts = user.reports_depts || 'ALL';
-        const userDeptsArr = (rawDepts === 'ALL') ? ['PMD', 'CRO', 'ERO', 'WRO'] : rawDepts.split(',').map(d => d.trim().toUpperCase());
+        const userDeptsArr = (rawDepts === 'ALL') ? ['PMD', 'CRO', 'ERO', 'WRO', 'BLANK', 'BLANKS'] : rawDepts.split(',').map(d => d.trim().toUpperCase());
         document.querySelectorAll('.user-uac-dept-checkbox').forEach(cb => {
             cb.checked = (rawDepts === 'ALL') || userDeptsArr.includes(cb.value.toUpperCase());
         });
         const uacReportsResetEdit = document.getElementById('user-uac-reports-reset');
         if (uacReportsResetEdit) uacReportsResetEdit.checked = (user.can_reset_report === true || isSuperadmin);
+        const uacBaEdit = document.getElementById('user-uac-berita-acara');
+        if (uacBaEdit) uacBaEdit.checked = user.can_access_berita_acara !== false;
         document.getElementById('user-uac-master-data').checked = user.can_access_master_data !== false;
         document.getElementById('user-uac-master-data-weekly').checked = user.can_access_master_data_weekly !== false;
         const uacUserMgmtEdit = document.getElementById('user-uac-user-management');
@@ -15016,8 +16279,8 @@ const App = (() => {
         }
 
         const selectedDepts = Array.from(document.querySelectorAll('.user-uac-dept-checkbox:checked')).map(cb => cb.value.toUpperCase());
-        const allDepts = ['PMD', 'CRO', 'ERO', 'WRO'];
-        const reportsDepts = (selectedDepts.length === 0 || selectedDepts.length === allDepts.length) ? 'ALL' : selectedDepts.join(',');
+        const allCheckboxes = Array.from(document.querySelectorAll('.user-uac-dept-checkbox'));
+        const reportsDepts = (selectedDepts.length === 0 || selectedDepts.length === allCheckboxes.length) ? 'ALL' : selectedDepts.join(',');
 
         const payload = {
             id: id ? parseInt(id, 10) : null,
@@ -15029,6 +16292,7 @@ const App = (() => {
             can_access_reports: document.getElementById('user-uac-reports') ? document.getElementById('user-uac-reports').checked : true,
             reports_depts: reportsDepts,
             can_reset_report: document.getElementById('user-uac-reports-reset') ? document.getElementById('user-uac-reports-reset').checked : false,
+            can_access_berita_acara: document.getElementById('user-uac-berita-acara') ? document.getElementById('user-uac-berita-acara').checked : true,
             can_access_master_data: document.getElementById('user-uac-master-data').checked,
             can_access_master_data_weekly: document.getElementById('user-uac-master-data-weekly').checked,
             can_access_user_management: document.getElementById('user-uac-user-management') ? document.getElementById('user-uac-user-management').checked : true,
@@ -15820,7 +17084,7 @@ const App = (() => {
 
         const reportTitle = document.getElementById('weekly-hasil-so-title');
         if (reportTitle) {
-            reportTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Report SO PMD (Weekly)' : 'Report SO Outlet Regional (Weekly)';
+            reportTitle.textContent = currentWeeklyCategory === 'pmd' ? 'Report Stock Opname PMD (Weekly)' : 'Report Stock Opname Outlet Regional (Weekly)';
         }
 
         const pieTitle = document.getElementById('weekly-pie-title');
@@ -15996,7 +17260,7 @@ const App = (() => {
         // Shared helper matching monthly summary page updateAchCard
         const updateWeeklyAchCard = (valId, subId, trendId, statusId, item, defaultLabel, isPmdCard = false, customTarget = null) => {
             const rawPct = item && item.pct !== null && item.pct !== undefined ? parseFloat(item.pct) : 0;
-            const pct = Math.round(rawPct);
+            const pct = rawPct;
             const count = item?.sites_counted !== undefined ? item.sites_counted : (item?.count || 0);
             const total = item?.total_sites !== undefined ? item.total_sites : (item?.total || 0);
             let threshold = isPmdCard ? 98 : 85;
@@ -16007,7 +17271,7 @@ const App = (() => {
 
             const valEl = document.getElementById(valId);
             if (valEl) {
-                valEl.textContent = `${pct}%`;
+                valEl.textContent = `${pct.toFixed(2)}%`;
                 valEl.style.color = color;
             }
 
@@ -16034,9 +17298,9 @@ const App = (() => {
                 } else {
                     let diff = null;
                     if (item && item.diff_pct !== undefined && item.diff_pct !== null) {
-                        diff = Math.round(Number(item.diff_pct));
+                        diff = Number(item.diff_pct);
                     } else if (item && item.prev_pct !== undefined && item.prev_pct !== null && item.pct !== null && item.pct !== undefined) {
-                        diff = Math.round(Number(item.pct)) - Math.round(Number(item.prev_pct));
+                        diff = Number(item.pct) - Number(item.prev_pct);
                     }
 
                     if (diff === null) {
@@ -16046,7 +17310,7 @@ const App = (() => {
                         const isDown = diff < 0;
                         const sign = isUp ? '+' : '';
                         const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
-                        const formattedDiff = `${sign}${diff}%`;
+                        const formattedDiff = `${sign}${diff.toFixed(2)}%`;
 
                         // Solid triangle style: up (green) if > 0, down (red) if < 0
                         const triangleSvg = isUp
@@ -16071,7 +17335,7 @@ const App = (() => {
             const subDeptsData = achievements.sub_depts || {};
             const sData = subDeptsData[upperKey] || subDeptsData[sKey] || {};
             const rawPct = sData.pct !== undefined && sData.pct !== null ? parseFloat(sData.pct) : 0;
-            const pct = Math.round(rawPct);
+            const pct = rawPct;
             const count = sData.sites_counted !== undefined ? sData.sites_counted : (sData.count || 0);
             const total = sData.total_sites !== undefined ? sData.total_sites : (sData.total || 0);
             const threshold = isPmd ? 98 : 85;
@@ -16079,7 +17343,7 @@ const App = (() => {
 
             const valEl = document.getElementById(`weekly-kpi-subdept-val-${sKey}`);
             if (valEl) {
-                valEl.textContent = `${pct}%`;
+                valEl.textContent = `${pct.toFixed(2)}%`;
                 valEl.style.color = color;
             }
 
@@ -16095,9 +17359,9 @@ const App = (() => {
                 } else {
                     let diff = null;
                     if (sData && sData.diff_pct !== undefined && sData.diff_pct !== null) {
-                        diff = Math.round(Number(sData.diff_pct));
+                        diff = Number(sData.diff_pct);
                     } else if (sData && sData.prev_pct !== undefined && sData.prev_pct !== null && sData.pct !== null && sData.pct !== undefined) {
-                        diff = Math.round(Number(sData.pct)) - Math.round(Number(sData.prev_pct));
+                        diff = Number(sData.pct) - Number(sData.prev_pct);
                     }
 
                     if (diff === null) {
@@ -16107,7 +17371,7 @@ const App = (() => {
                         const isDown = diff < 0;
                         const sign = isUp ? '+' : '';
                         const trendClass = isUp ? 'target-up' : (isDown ? 'target-down' : 'target-neutral');
-                        const formattedDiff = `${sign}${diff}%`;
+                        const formattedDiff = `${sign}${diff.toFixed(2)}%`;
                         const triangleSvg = isUp
                             ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,4 21,20 3,20"/></svg>`
                             : (isDown ? `<svg width="5.5" height="5.5" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><polygon points="12,20 3,4 21,4"/></svg>` : '');
@@ -16300,7 +17564,7 @@ const App = (() => {
         }
 
         const labels = ['Very Good', 'Good', 'Moderate', 'Poor', 'Very Poor'];
-        const colors = ['#047857', '#0284c7', '#d97706', '#ea580c', '#b91c1c'];
+        const colors = ['#16a34a', '#0284c7', '#d97706', '#ea580c', '#dc2626'];
         const data = counts ? [
             counts.very_good || 0,
             counts.good || 0,
@@ -16317,11 +17581,11 @@ const App = (() => {
         const elP = document.getElementById('weekly-sc-stat-p');
         const elVp = document.getElementById('weekly-sc-stat-vp');
 
-        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
-        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
-        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${Math.round((data[2] / total) * 100)}%)` : '0 sites (0%)';
-        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${Math.round((data[3] / total) * 100)}%)` : '0 sites (0%)';
-        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${Math.round((data[4] / total) * 100)}%)` : '0 sites (0%)';
+        if (elVg) elVg.textContent = total > 0 ? `${data[0]} sites (${((data[0] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elG) elG.textContent = total > 0 ? `${data[1]} sites (${((data[1] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elM) elM.textContent = total > 0 ? `${data[2]} sites (${((data[2] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elP) elP.textContent = total > 0 ? `${data[3]} sites (${((data[3] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elVp) elVp.textContent = total > 0 ? `${data[4]} sites (${((data[4] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -16379,7 +17643,7 @@ const App = (() => {
         }
 
         const labels = ['Executed', 'Not Executed'];
-        const colors = ['#047857', '#b91c1c'];
+        const colors = ['#16a34a', '#dc2626'];
         const data = counts ? [
             counts.executed || 0,
             counts.not_executed || 0
@@ -16390,8 +17654,8 @@ const App = (() => {
         const elExec = document.getElementById('weekly-sc-stat-exec');
         const elNotExec = document.getElementById('weekly-sc-stat-not-exec');
 
-        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${Math.round((data[0] / total) * 100)}%)` : '0 sites (0%)';
-        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${Math.round((data[1] / total) * 100)}%)` : '0 sites (0%)';
+        if (elExec) elExec.textContent = total > 0 ? `${data[0]} sites (${((data[0] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
+        if (elNotExec) elNotExec.textContent = total > 0 ? `${data[1]} sites (${((data[1] / total) * 100).toFixed(2)}%)` : '0 sites (0.00%)';
 
         const ctx = canvas.getContext('2d');
         if (total === 0) {
@@ -16792,7 +18056,7 @@ const App = (() => {
                             callbacks: {
                                 label: function (context) {
                                     const val = context.raw || 0;
-                                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(2) : '0.00';
                                     return ` ${context.label}: ${val} sites (${pct}%)`;
                                 }
                             }
@@ -16804,9 +18068,9 @@ const App = (() => {
         }
 
         if (statsContainer) {
-            const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
-            const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
-            const pctNoData = total > 0 ? Math.round((noData / total) * 100) : 0;
+            const pctTercapai = total > 0 ? ((tercapai / total) * 100).toFixed(2) : '0.00';
+            const pctTidak = total > 0 ? ((tidakTercapai / total) * 100).toFixed(2) : '0.00';
+            const pctNoData = total > 0 ? ((noData / total) * 100).toFixed(2) : '0.00';
             const targetPctNum = weeklySummaryData?.achievements?.target_pct !== undefined
                 ? Number(weeklySummaryData.achievements.target_pct)
                 : (currentWeeklyCategory === 'pmd' ? 98.0 : 85.0);
@@ -16903,7 +18167,7 @@ const App = (() => {
         let countNoData = 0;
         baseRows.forEach(r => {
             if (r.has_data && r.pct !== null && r.pct !== undefined) {
-                const rounded = Math.round(parseFloat(r.pct));
+                const rounded = parseFloat(r.pct);
                 if (rounded >= targetPct) {
                     countTercapai++;
                 } else {
@@ -16921,9 +18185,9 @@ const App = (() => {
         let filtered = baseRows.slice();
         if (statusFilter !== 'all') {
             if (statusFilter === 'tercapai') {
-                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && Math.round(parseFloat(r.pct)) >= targetPct);
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && parseFloat(r.pct) >= targetPct);
             } else if (statusFilter === 'tidak_tercapai') {
-                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && Math.round(parseFloat(r.pct)) < targetPct);
+                filtered = filtered.filter(r => r.has_data && r.pct !== null && r.pct !== undefined && parseFloat(r.pct) < targetPct);
             } else if (statusFilter === 'no_data') {
                 filtered = filtered.filter(r => !r.has_data || r.pct === null || r.pct === undefined);
             }
@@ -16931,8 +18195,14 @@ const App = (() => {
 
         // Sorting
         if (weeklyReportSortColumn) {
-            const isNumeric = ['match_qty', 'physic_qty', 'db_qty', 'target_qty', 'pct'].includes(weeklyReportSortColumn);
+            const isNumeric = ['match_qty', 'physic_qty', 'db_qty', 'target_qty', 'pct', 'defisit'].includes(weeklyReportSortColumn);
             filtered.sort((a, b) => {
+                if (weeklyReportSortColumn === 'defisit') {
+                    const valA = (a.has_data && a.pct !== null && a.pct !== undefined) ? (100 - parseFloat(a.pct)) : 999999;
+                    const valB = (b.has_data && b.pct !== null && b.pct !== undefined) ? (100 - parseFloat(b.pct)) : 999999;
+                    return weeklyReportSortDirection === 'asc' ? valA - valB : valB - valA;
+                }
+
                 let valA = a[weeklyReportSortColumn];
                 let valB = b[weeklyReportSortColumn];
 
@@ -16986,8 +18256,8 @@ const App = (() => {
         if (total === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2.5rem; color: #64748b;">
-                        Data Report SO Weekly tidak ditemukan.
+                    <td colspan="10" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                        Data Report Stock Opname Weekly tidak ditemukan.
                     </td>
                 </tr>
             `;
@@ -16998,7 +18268,7 @@ const App = (() => {
         let html = '';
         pageRows.forEach(r => {
             const hasData = r.has_data && r.pct !== null && r.pct !== undefined;
-            const roundedPct = hasData ? Math.round(parseFloat(r.pct)) : null;
+            const roundedPct = hasData ? parseFloat(r.pct) : null;
             const isTercapai = hasData && (roundedPct >= targetPct);
 
             let statusBadge = '';
@@ -17018,6 +18288,13 @@ const App = (() => {
                 ? `<span style="font-weight: 700; color: ${isTercapai ? '#16a34a' : '#dc2626'};">${formatPercent(r.pct)}</span>`
                 : `<span style="color: #94a3b8; font-weight: 500;">-</span>`;
 
+            let defisitDisplay = `<span style="color: #94a3b8; font-weight: 500;">-</span>`;
+            if (hasData) {
+                const defisitVal = 100 - parseFloat(r.pct);
+                const dColor = defisitVal > 0 ? '#dc2626' : '#16a34a';
+                defisitDisplay = `<span style="font-weight: 700; color: ${dColor};">${defisitVal.toFixed(2)}%</span>`;
+            }
+
             html += `
                 <tr>
                     <td class="text-center font-mono" style="font-weight: 600; font-size: 12px; color: #1e293b;">
@@ -17034,6 +18311,7 @@ const App = (() => {
                     <td class="text-center">${hasData ? formatNumber(r.db_qty) : '-'}</td>
                     <td class="text-center" style="font-weight: 600;">${hasData ? formatNumber(r.target_qty) : '-'}</td>
                     <td class="text-center">${pctDisplay}</td>
+                    <td class="text-center">${defisitDisplay}</td>
                     <td class="text-center">${statusBadge}</td>
                 </tr>
             `;
@@ -17056,7 +18334,9 @@ const App = (() => {
             });
 
             const avgPct = countWithData > 0 ? (sumPct / countWithData) : 0;
-            const isOverallTercapai = Math.round(avgPct) >= targetPct;
+            const avgDefisit = countWithData > 0 ? (100 - avgPct) : 0;
+            const avgDefisitDisplay = countWithData > 0 ? `<span style="font-weight: 700; color: ${avgDefisit > 0 ? '#dc2626' : '#16a34a'};">${avgDefisit.toFixed(2)}%</span>` : '-';
+            const isOverallTercapai = avgPct >= targetPct;
             let filterNote = '';
             if (statusFilter === 'tercapai') filterNote = ' - Tercapai';
             else if (statusFilter === 'tidak_tercapai') filterNote = ' - Tidak Tercapai';
@@ -17073,6 +18353,9 @@ const App = (() => {
                     <td class="text-center" style="color: #0f172a; padding: 0.75rem 0.5rem;">${formatNumber(sumTarget)}</td>
                     <td class="text-center" style="font-weight: 700; color: ${countWithData > 0 ? (isOverallTercapai ? '#16a34a' : '#dc2626') : '#64748b'}; padding: 0.75rem 0.5rem;">
                         ${countWithData > 0 ? formatPercent(avgPct) : '-'}
+                    </td>
+                    <td class="text-center" style="padding: 0.75rem 0.5rem;">
+                        ${avgDefisitDisplay}
                     </td>
                     <td class="text-center" style="padding: 0.75rem 0.5rem;">
                         ${countWithData > 0 ? `
@@ -17122,10 +18405,188 @@ const App = (() => {
         container.innerHTML = html;
     }
 
+    async function generateExecutiveSummaryPng(cardId = 'card-executive-summary') {
+        let cardEl = document.getElementById(cardId);
+        if (!cardEl) {
+            cardEl = document.getElementById('card-executive-summary') ||
+                     document.getElementById('all-card-executive-summary') ||
+                     document.getElementById('weekly-card-executive-summary');
+        }
+        if (!cardEl) {
+            if (typeof showToast === 'function') {
+                showToast('error', 'Error', 'Elemen Executive Summary tidak ditemukan.');
+            }
+            return;
+        }
+
+        const btn = cardEl.querySelector('.btn-generate-png') ||
+                    document.getElementById('btn-generate-executive-summary') ||
+                    document.getElementById('btn-generate-all-executive-summary') ||
+                    document.getElementById('btn-generate-all-executive-summary-page') ||
+                    document.getElementById('btn-generate-weekly-executive-summary');
+
+        let originalBtnHtml = '';
+        if (btn) {
+            originalBtnHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></span>
+                <span>Generating...</span>
+            `;
+        }
+
+        try {
+            if (typeof html2canvas === 'undefined') {
+                throw new Error('Library html2canvas belum dimuat.');
+            }
+
+            const html2canvasOpts = {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                ignoreElements: (el) => {
+                    return el.classList.contains('btn-generate-png') ||
+                           el.id === 'btn-generate-executive-summary' ||
+                           el.id === 'btn-generate-all-executive-summary' ||
+                           el.id === 'btn-generate-all-executive-summary-page' ||
+                           el.id === 'btn-generate-weekly-executive-summary' ||
+                           el.getAttribute('data-html2canvas-ignore') === 'true';
+                }
+            };
+
+            // 1. Capture the main Executive Summary card
+            const canvas1 = await html2canvas(cardEl, html2canvasOpts);
+
+            // 2. Identify and capture the associated trend chart
+            // For All Summary: "Grafik Achievement SO" (#card-trend-div-wh-wrapper or #all-card-trend-div-wh-wrapper)
+            // For Executive Summary: Trend Charts Container (#trend-charts-container or .trend-charts-container)
+            const isAllSummary = (cardId && cardId.includes('all')) ||
+                                 (cardEl && cardEl.id && cardEl.id.includes('all')) ||
+                                 (window.location.pathname.includes('all-summary')) ||
+                                 (document.getElementById('section-all-summary') && window.getComputedStyle(document.getElementById('section-all-summary')).display !== 'none');
+
+            let trendEl = null;
+            if (isAllSummary) {
+                trendEl = document.getElementById('all-card-trend-div-wh-wrapper') ||
+                          document.getElementById('card-trend-div-wh-wrapper');
+            } else if (!cardId.includes('weekly')) {
+                trendEl = document.getElementById('trend-charts-container') ||
+                          cardEl.parentElement?.querySelector('.trend-charts-container') ||
+                          document.querySelector('.trend-charts-container');
+            }
+
+            let finalCanvas = canvas1;
+
+            const isElementVisible = (el) => {
+                if (!el) return false;
+                try {
+                    const style = window.getComputedStyle(el);
+                    return style.display !== 'none' && style.visibility !== 'hidden' && (el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0);
+                } catch (e) {
+                    return el.offsetParent !== null;
+                }
+            };
+
+            if (trendEl && isElementVisible(trendEl)) {
+                const canvas2 = await html2canvas(trendEl, html2canvasOpts);
+
+                const scale = html2canvasOpts.scale || 2;
+                const gap = 24 * scale; // Clean 24px gap between cards
+                const combinedWidth = Math.max(canvas1.width, canvas2.width);
+                const combinedHeight = canvas1.height + gap + canvas2.height;
+
+                const combinedCanvas = document.createElement('canvas');
+                combinedCanvas.width = combinedWidth;
+                combinedCanvas.height = combinedHeight;
+                const ctx = combinedCanvas.getContext('2d');
+
+                // Clean enterprise white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, combinedWidth, combinedHeight);
+
+                // Draw Card 1: Executive Summary
+                const x1 = Math.round((combinedWidth - canvas1.width) / 2);
+                ctx.drawImage(canvas1, x1, 0);
+
+                // Draw Card 2: Trend Chart / Grafik Achievement SO
+                const x2 = Math.round((combinedWidth - canvas2.width) / 2);
+                ctx.drawImage(canvas2, x2, canvas1.height + gap);
+
+                finalCanvas = combinedCanvas;
+            }
+
+            // Format clean filename based on current period badge
+            const badgeEl = cardEl.querySelector('#executive-period-badge') ||
+                            cardEl.querySelector('#all-executive-period-badge') ||
+                            cardEl.querySelector('#weekly-executive-period-badge') ||
+                            cardEl.querySelector('.badge');
+            let periodName = badgeEl ? badgeEl.textContent.trim().replace(/[^a-zA-Z0-9_\-]+/g, '_') : '';
+            if (!periodName) {
+                const now = new Date();
+                periodName = `${now.getFullYear()}_${now.getMonth() + 1}`;
+            }
+
+            let cardPrefix = 'Executive_Summary';
+            if (isAllSummary || cardId.includes('all')) cardPrefix = 'Executive_Summary_All';
+            if (cardId.includes('weekly')) cardPrefix = 'Executive_Summary_Weekly';
+
+            const filename = `${cardPrefix}_${periodName}.png`;
+
+            // Download as PNG
+            const dataUrl = finalCanvas.toDataURL('image/png');
+            const downloadLink = document.createElement('a');
+            downloadLink.href = dataUrl;
+            downloadLink.download = filename;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            if (typeof showToast === 'function') {
+                showToast('success', 'Berhasil', `Capture ${filename} berhasil diunduh.`);
+            }
+        } catch (err) {
+            console.error('Error generating executive summary PNG:', err);
+            if (typeof showToast === 'function') {
+                showToast('error', 'Gagal', 'Terjadi kesalahan saat membuat capture PNG: ' + (err.message || 'Error'));
+            } else {
+                alert('Gagal membuat capture PNG: ' + (err.message || 'Error'));
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
     // ── Public Interface ───────────────────────────────────────
+
+    function onTrendSubDeptFilterChange(val) {
+        currentTrendSubDeptFilter = val;
+        if (lastTrendJsonData) {
+            applyTrendJsonData(lastTrendJsonData);
+        } else {
+            renderTrendCharts();
+        }
+    }
+
+    function onTrendPmdSiteFilterChange(val) {
+        currentTrendPmdSiteFilter = val;
+        if (lastTrendJsonData) {
+            applyTrendJsonData(lastTrendJsonData);
+        } else {
+            renderTrendCharts();
+        }
+    }
 
     return {
         init,
+        onTrendSubDeptFilterChange,
+        onTrendPmdSiteFilterChange,
+        generateExecutiveSummaryPng,
+        toggleDbBreakdownPanel,
         navigateTo,
         loadMasterData,
         loadSummaryData,
@@ -17232,6 +18693,8 @@ const App = (() => {
         resetScorecardExecKpi,
         // DB Analysis exports
         setDbAnalysisDept,
+        renderResultDbChart,
+        onResultDbChartFilterChange,
         // Catatan Executive Summary exports
         loadExecutiveNotes,
         loadMasterCatatan,
@@ -17278,6 +18741,9 @@ const App = (() => {
         toggleSubdeptResultsSort,
         toggleMasterCatatanSort,
         toggleExecCatatanSort,
+        renderResultDbChart,
+        onResultDbChartFilterChange,
+        renderDbResolutionGauge,
         // PIC Sites Master Data exports
         loadPicSites,
         renderPicSitesTable,
@@ -17478,9 +18944,10 @@ const App = (() => {
     };
 })();
 
+window.generateExecutiveSummaryPng = App.generateExecutiveSummaryPng;
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', App.init);
 } else {
     App.init();
 }
-

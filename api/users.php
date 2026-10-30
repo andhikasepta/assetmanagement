@@ -39,6 +39,7 @@ try {
                 COALESCE(can_access_reports, TRUE) as can_access_reports,
                 COALESCE(reports_depts, 'ALL') as reports_depts,
                 COALESCE(can_reset_report, FALSE) as can_reset_report,
+                COALESCE(can_access_berita_acara, TRUE) as can_access_berita_acara,
                 COALESCE(can_access_master_data, TRUE) as can_access_master_data,
                 COALESCE(can_access_master_data_weekly, TRUE) as can_access_master_data_weekly,
                 COALESCE(can_access_user_management, TRUE) as can_access_user_management,
@@ -62,6 +63,7 @@ try {
             $u['can_access_reports'] = filter_var($u['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN);
             $u['reports_depts'] = !empty($u['reports_depts']) ? $u['reports_depts'] : 'ALL';
             $u['can_reset_report'] = filter_var($u['can_reset_report'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $u['can_access_berita_acara'] = filter_var($u['can_access_berita_acara'] ?? true, FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data'] = filter_var($u['can_access_master_data'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_master_data_weekly'] = filter_var($u['can_access_master_data_weekly'], FILTER_VALIDATE_BOOLEAN);
             $u['can_access_user_management'] = filter_var($u['can_access_user_management'], FILTER_VALIDATE_BOOLEAN);
@@ -118,6 +120,7 @@ try {
         $reportsDepts = trim($input['reports_depts'] ?? 'ALL');
         if ($reportsDepts === '') $reportsDepts = 'ALL';
         $canResetReport = !empty($input['can_reset_report']);
+        $canAccessBeritaAcara = !empty($input['can_access_berita_acara']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
         $canAccessUserManagement = !empty($input['can_access_user_management']);
@@ -140,6 +143,7 @@ try {
                 can_access_reports,
                 reports_depts,
                 can_reset_report,
+                can_access_berita_acara,
                 can_access_master_data, 
                 can_access_master_data_weekly, 
                 can_access_user_management, 
@@ -158,6 +162,7 @@ try {
                 :can_rep,
                 :rep_depts,
                 :can_reset_rep,
+                :can_ba,
                 :can_md, 
                 :can_md_wk, 
                 :can_usr_mgmt, 
@@ -179,6 +184,7 @@ try {
             ':can_rep'      => $canAccessReports ? 't' : 'f',
             ':rep_depts'    => $reportsDepts,
             ':can_reset_rep'=> $canResetReport ? 't' : 'f',
+            ':can_ba'       => $canAccessBeritaAcara ? 't' : 'f',
             ':can_md'       => $canAccessMasterData ? 't' : 'f',
             ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
             ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -235,6 +241,7 @@ try {
         $reportsDepts = trim($input['reports_depts'] ?? 'ALL');
         if ($reportsDepts === '') $reportsDepts = 'ALL';
         $canResetReport = !empty($input['can_reset_report']);
+        $canAccessBeritaAcara = !empty($input['can_access_berita_acara']);
         $canAccessMasterData = !empty($input['can_access_master_data']);
         $canAccessMasterDataWeekly = !empty($input['can_access_master_data_weekly']);
         $canAccessUserManagement = !empty($input['can_access_user_management']);
@@ -254,6 +261,7 @@ try {
             $canAccessWeeklySummary = true;
             $canAccessReports = true;
             $canResetReport = true;
+            $canAccessBeritaAcara = true;
             $canAccessMasterData = true;
             $canAccessMasterDataWeekly = true;
             $canAccessUserManagement = true;
@@ -276,6 +284,7 @@ try {
                     can_access_reports = :can_rep,
                     reports_depts = :rep_depts,
                     can_reset_report = :can_reset_rep,
+                    can_access_berita_acara = :can_ba,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
                     can_access_user_management = :can_usr_mgmt,
@@ -296,6 +305,7 @@ try {
                 ':can_rep'      => $canAccessReports ? 't' : 'f',
                 ':rep_depts'    => $reportsDepts,
                 ':can_reset_rep'=> $canResetReport ? 't' : 'f',
+                ':can_ba'       => $canAccessBeritaAcara ? 't' : 'f',
                 ':can_md'       => $canAccessMasterData ? 't' : 'f',
                 ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
                 ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -316,6 +326,7 @@ try {
                     can_access_reports = :can_rep,
                     reports_depts = :rep_depts,
                     can_reset_report = :can_reset_rep,
+                    can_access_berita_acara = :can_ba,
                     can_access_master_data = :can_md,
                     can_access_master_data_weekly = :can_md_wk,
                     can_access_user_management = :can_usr_mgmt,
@@ -335,6 +346,7 @@ try {
                 ':can_rep'      => $canAccessReports ? 't' : 'f',
                 ':rep_depts'    => $reportsDepts,
                 ':can_reset_rep'=> $canResetReport ? 't' : 'f',
+                ':can_ba'       => $canAccessBeritaAcara ? 't' : 'f',
                 ':can_md'       => $canAccessMasterData ? 't' : 'f',
                 ':can_md_wk'    => $canAccessMasterDataWeekly ? 't' : 'f',
                 ':can_usr_mgmt' => $canAccessUserManagement ? 't' : 'f',
@@ -358,6 +370,7 @@ try {
                 'can_access_reports'            => $canAccessReports,
                 'reports_depts'                 => $reportsDepts,
                 'can_reset_report'              => $canResetReport,
+                'can_access_berita_acara'       => $canAccessBeritaAcara,
                 'can_access_master_data'        => $canAccessMasterData,
                 'can_access_master_data_weekly' => $canAccessMasterDataWeekly,
                 'can_access_user_management'    => $canAccessUserManagement,

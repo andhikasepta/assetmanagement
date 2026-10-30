@@ -115,13 +115,18 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 return true;
             }
             $allowed = array_values(array_filter(array_map('trim', explode(',', $rawAllowed))));
-            $sStmt = $db->prepare("SELECT UPPER(dept), UPPER(COALESCE(divisi, '')) FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
+            $sStmt = $db->prepare("SELECT UPPER(COALESCE(dept, '')), UPPER(COALESCE(divisi, '')) FROM site_regional WHERE UPPER(sitecode) = UPPER(:sc) LIMIT 1");
             $sStmt->execute([':sc' => $sc]);
             $sRow = $sStmt->fetch(PDO::FETCH_NUM);
             $sDept = $sRow[0] ?? '';
             $sDivisi = $sRow[1] ?? '';
             if (in_array('PMD', $allowed) && ($sDivisi === 'PMD' || in_array($sDept, ['PMD', 'DNO', 'DSO']))) {
                 return true;
+            }
+            if (in_array('BLANK', $allowed) || in_array('BLANKS', $allowed)) {
+                if (($sDept === '' || $sDept === '-') && ($sDivisi === '' || $sDivisi === '-')) {
+                    return true;
+                }
             }
             return in_array($sDept, $allowed);
         };
@@ -177,7 +182,7 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                         'total_pending' => 0
                     ],
                     'is_locked_period' => true,
-                    'locked_message' => "Laporan periode {$periodMonthName} {$year} baru dapat dimunculkan per tanggal 27 {$periodMonthName} {$year}."
+                    'locked_message' => "No data."
                 ]);
                 exit;
             }
@@ -227,6 +232,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 if ($dept !== '' && $dept !== 'all') {
                     if (strtoupper($dept) === 'PMD') {
                         $where[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif (in_array(strtoupper($dept), ['BLANK', 'BLANKS', '-'])) {
+                        $where[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                     } elseif (in_array(strtoupper($dept), $userAllowedDepts)) {
                         $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
                         $params[':dept'] = $dept;
@@ -236,6 +243,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                             $paramKey = ":uad_{$idx}";
                             if ($ad === 'PMD') {
                                 $deptClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                            } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                                $deptClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                             } else {
                                 $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                                 $params[$paramKey] = $ad;
@@ -249,6 +258,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                         $paramKey = ":uad_{$idx}";
                         if ($ad === 'PMD') {
                             $deptClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                        } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                            $deptClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                         } else {
                             $deptClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                             $params[$paramKey] = $ad;
@@ -259,6 +270,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             } elseif ($dept !== '' && $dept !== 'all') {
                 if (strtoupper($dept) === 'PMD') {
                     $where[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                } elseif (in_array(strtoupper($dept), ['BLANK', 'BLANKS', '-'])) {
+                    $where[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                 } else {
                     $where[] = "UPPER(COALESCE(sr.dept, '')) = UPPER(:dept)";
                     $params[':dept'] = $dept;
@@ -268,29 +281,34 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             if ($subDept !== '' && $subDept !== 'all') {
                 if (in_array(strtoupper($subDept), ['DNO', 'DSO'])) {
                     $where[] = "(UPPER(COALESCE(sr.dept, '')) = UPPER(:sub_dept) OR UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept))";
+                    $params[':sub_dept'] = $subDept;
+                } elseif (in_array(strtoupper($subDept), ['BLANK', 'BLANKS', '-'])) {
+                    $where[] = "(sr.sub_dept IS NULL OR TRIM(sr.sub_dept) = '' OR TRIM(sr.sub_dept) = '-')";
                 } else {
                     $where[] = "UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:sub_dept)";
+                    $params[':sub_dept'] = $subDept;
                 }
-                $params[':sub_dept'] = $subDept;
             }
 
             if ($view === 'verification') {
                 $where[] = "gr.status IN ('sent', 'uploaded', 'verified')";
             } elseif ($view === 'berita_acara') {
-                $where[] = "gr.id IS NOT NULL";
+                if ($statusFilter !== 'not_generated') {
+                    $where[] = "gr.id IS NOT NULL";
+                }
             }
 
             if ($statusFilter === 'generated') {
                 $where[] = "(gr.status = 'generated' OR gr.status = 'sent' OR gr.status = 'uploaded' OR gr.status = 'verified')";
             } elseif ($statusFilter === 'not_generated' || $statusFilter === 'pending_generate') {
                 $where[] = "gr.id IS NULL";
-            } elseif ($statusFilter === 'sent') {
+            } elseif ($statusFilter === 'sent' || $statusFilter === 'pending') {
                 $where[] = "gr.status = 'sent'";
-            } elseif ($statusFilter === 'uploaded') {
+            } elseif ($statusFilter === 'uploaded' || $statusFilter === 'menunggu_verifikasi') {
                 $where[] = "gr.status = 'uploaded'";
             } elseif ($statusFilter === 'verified') {
                 $where[] = "gr.status = 'verified'";
-            } elseif ($statusFilter === 'pending' || $statusFilter === 'pending_verification') {
+            } elseif ($statusFilter === 'pending_verification') {
                 $where[] = "(gr.status = 'sent' OR gr.status = 'uploaded')";
             }
 
@@ -323,8 +341,11 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 sr.sitecode,
                 COALESCE(NULLIF(sr.name_site, ''), sr.sitecode) as sitename,
                 COALESCE(sr.divisi, '') as divisi,
-                COALESCE(sr.dept, '-') as dept,
-                COALESCE(sr.sub_dept, '-') as sub_dept,
+                CASE 
+                    WHEN UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO') THEN 'PMD'
+                    ELSE COALESCE(NULLIF(TRIM(sr.dept), ''), '-') 
+                END as dept,
+                COALESCE(NULLIF(TRIM(sr.sub_dept), ''), '-') as sub_dept,
                 sp.pic as pic_name,
                 sp.no_telp as pic_phone,
                 gr.id as report_id,
@@ -393,6 +414,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                     $paramKey = ":duad_{$idx}";
                     if ($ad === 'PMD') {
                         $dClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                        $dClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                     } else {
                         $dClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                         $deptParams[$paramKey] = $ad;
@@ -402,26 +425,30 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             }
 
             $deptStmt = $db->prepare("
-                SELECT DISTINCT sr.dept 
+                SELECT DISTINCT 
+                    CASE 
+                        WHEN UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO') THEN 'PMD'
+                        WHEN sr.dept IS NULL OR TRIM(sr.dept) = '' OR sr.dept = '-' THEN 'BLANK'
+                        ELSE sr.dept 
+                    END as dept_name
                 FROM site_regional sr 
-                WHERE sr.dept IS NOT NULL AND TRIM(sr.dept) != ''
-                  AND ($effectiveGroupSql) = :so_type {$deptExtra}
-                ORDER BY sr.dept ASC
+                WHERE ($effectiveGroupSql) = :so_type {$deptExtra}
+                ORDER BY dept_name ASC
             ");
             $deptStmt->execute($deptParams);
-            $depts = $deptStmt->fetchAll(PDO::FETCH_COLUMN);
-
-            $hasPmd = false;
-            foreach ($depts as $d) {
-                if (in_array(strtoupper($d), ['PMD', 'DNO', 'DSO'])) {
-                    $hasPmd = true;
-                    break;
+            $rawDepts = $deptStmt->fetchAll(PDO::FETCH_COLUMN);
+            $depts = [];
+            foreach ($rawDepts as $d) {
+                $d = trim((string)$d);
+                if ($d === '') continue;
+                if (in_array(strtoupper($d), ['DNO', 'DSO'])) {
+                    $d = 'PMD';
+                }
+                if (!in_array($d, $depts)) {
+                    $depts[] = $d;
                 }
             }
-            if ($hasPmd && !in_array('PMD', $depts)) {
-                $depts[] = 'PMD';
-                sort($depts);
-            }
+            sort($depts);
 
             $subDeptExtra = "";
             $subDeptParams = [':year' => $year, ':month' => $month, ':so_type' => $soType];
@@ -431,12 +458,25 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                     $paramKey = ":sduad_{$idx}";
                     if ($ad === 'PMD') {
                         $sdClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                        $sdClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                     } else {
                         $sdClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                         $subDeptParams[$paramKey] = $ad;
                     }
                 }
                 $subDeptExtra = " AND (" . implode(' OR ', $sdClauses) . ")";
+            }
+
+            if ($dept !== '' && $dept !== 'all') {
+                if (strtoupper($dept) === 'PMD') {
+                    $subDeptExtra .= " AND (UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                } elseif (in_array(strtoupper($dept), ['BLANK', 'BLANKS', '-'])) {
+                    $subDeptExtra .= " AND ((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
+                } else {
+                    $subDeptExtra .= " AND UPPER(COALESCE(sr.dept, '')) = :sd_selected_dept";
+                    $subDeptParams[':sd_selected_dept'] = $dept;
+                }
             }
 
             $subDeptStmt = $db->prepare("
@@ -447,7 +487,15 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 ORDER BY sr.sub_dept ASC
             ");
             $subDeptStmt->execute($subDeptParams);
-            $subDepts = $subDeptStmt->fetchAll(PDO::FETCH_COLUMN);
+            $rawSubDepts = $subDeptStmt->fetchAll(PDO::FETCH_COLUMN);
+            $subDepts = [];
+            foreach ($rawSubDepts as $sd) {
+                $sd = trim((string)$sd);
+                if ($sd !== '' && !in_array($sd, $subDepts)) {
+                    $subDepts[] = $sd;
+                }
+            }
+            sort($subDepts);
 
             // Calculate card counts (Total sites, Generated, Sent, Uploaded, Verified, Pending) for current SO Type, UAC, Dept & Subdept
             $statDeptClause = "";
@@ -456,6 +504,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 if ($dept !== '' && $dept !== 'all') {
                     if (strtoupper($dept) === 'PMD') {
                         $statDeptClause = " AND (UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                    } elseif (in_array(strtoupper($dept), ['BLANK', 'BLANKS', '-'])) {
+                        $statDeptClause = " AND ((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                     } elseif (in_array(strtoupper($dept), $userAllowedDepts)) {
                         $statDeptClause = " AND UPPER(COALESCE(sr.dept, '')) = UPPER(:s_dept)";
                         $statParams[':s_dept'] = $dept;
@@ -465,6 +515,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                             $paramKey = ":suad_{$idx}";
                             if ($ad === 'PMD') {
                                 $sClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                            } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                                $sClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                             } else {
                                 $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                                 $statParams[$paramKey] = $ad;
@@ -478,6 +530,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                         $paramKey = ":suad_{$idx}";
                         if ($ad === 'PMD') {
                             $sClauses[] = "(UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                        } elseif ($ad === 'BLANK' || $ad === 'BLANKS') {
+                            $sClauses[] = "((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                         } else {
                             $sClauses[] = "UPPER(COALESCE(sr.dept, '')) = {$paramKey}";
                             $statParams[$paramKey] = $ad;
@@ -488,6 +542,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             } elseif ($dept !== '' && $dept !== 'all') {
                 if (strtoupper($dept) === 'PMD') {
                     $statDeptClause = " AND (UPPER(COALESCE(sr.divisi, '')) = 'PMD' OR UPPER(COALESCE(sr.dept, '')) IN ('PMD', 'DNO', 'DSO'))";
+                } elseif (in_array(strtoupper($dept), ['BLANK', 'BLANKS', '-'])) {
+                    $statDeptClause = " AND ((sr.dept IS NULL OR TRIM(sr.dept) = '' OR TRIM(sr.dept) = '-') AND UPPER(COALESCE(sr.divisi, '')) != 'PMD')";
                 } else {
                     $statDeptClause = " AND UPPER(COALESCE(sr.dept, '')) = UPPER(:s_dept)";
                     $statParams[':s_dept'] = $dept;
@@ -498,10 +554,13 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
             if ($subDept !== '' && $subDept !== 'all') {
                 if (in_array(strtoupper($subDept), ['DNO', 'DSO'])) {
                     $statSubDeptClause = " AND (UPPER(COALESCE(sr.dept, '')) = UPPER(:s_sub_dept) OR UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:s_sub_dept))";
+                    $statParams[':s_sub_dept'] = $subDept;
+                } elseif (in_array(strtoupper($subDept), ['BLANK', 'BLANKS', '-'])) {
+                    $statSubDeptClause = " AND (sr.sub_dept IS NULL OR TRIM(sr.sub_dept) = '' OR TRIM(sr.sub_dept) = '-')";
                 } else {
                     $statSubDeptClause = " AND UPPER(COALESCE(sr.sub_dept, '')) = UPPER(:s_sub_dept)";
+                    $statParams[':s_sub_dept'] = $subDept;
                 }
-                $statParams[':s_sub_dept'] = $subDept;
             }
 
             $statStmt = $db->prepare("
@@ -648,7 +707,7 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 $docxAbs = $reportsDir . $filenameBase . '.docx';
                 $pdfAbs = $reportsDir . $filenameBase . '.pdf';
 
-                buildDocxFromData($reportData, $docxAbs);
+                buildDocxFromData($reportData, $docxAbs, $db);
                 convertDocxToPdf($docxAbs, $pdfAbs, $reportData);
 
                 // Record into generated_reports so state is synchronized
@@ -810,8 +869,8 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 }
             }
 
-            // Build docx using WordprocessingML template builder
-            buildDocxFromData($reportData, $docxPath);
+            // Build docx using WordprocessingML template builder or active template
+            buildDocxFromData($reportData, $docxPath, $db);
 
             // Convert to PDF using Word COM if available, or HTML headless browser
             $pdfGenerated = convertDocxToPdf($docxPath, $pdfPath, $reportData);
@@ -957,7 +1016,7 @@ if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'generate_report.php') {
                 $filenameBase = buildReportExportName($reportData['sitecode'], $reportData['sitename'], $reportData['periode_so'], new DateTime());
                 $docxAbs = $reportsDir . $filenameBase . '.docx';
                 $pdfAbsFile = $reportsDir . $filenameBase . '.pdf';
-                buildDocxFromData($reportData, $docxAbs);
+                buildDocxFromData($reportData, $docxAbs, $db);
                 convertDocxToPdf($docxAbs, $pdfAbsFile, $reportData);
                 $pdfBasename = $filenameBase . '.pdf';
                 $db->prepare("UPDATE generated_reports SET pdf_path = :p, docx_path = :d, updated_at = CURRENT_TIMESTAMP WHERE id = :id")->execute([
@@ -1466,7 +1525,7 @@ function fetchReportBundle(PDO $db, string $sitecode, int $month, int $year, arr
     $dbQty = (int) ($rec['db_physic_qty'] ?? 0);
     $pencapaian = $rec['total_physic_pct'] ?? '100%';
     if (is_numeric($pencapaian)) {
-        $pencapaian = round((float) $pencapaian, 2) . '%';
+        $pencapaian = number_format((float) $pencapaian, 2, '.', '') . '%';
     }
 
     // 6. Rekap DB followup status (Total DB, Solved, Unsolved) & Lampiran Rincian Perangkat
@@ -1669,7 +1728,7 @@ function convertDocxToPdf(string $docxPath, string $pdfPath, array $reportData):
     ];
 
     $htmlTemp = dirname($docxPath) . '/' . basename($docxPath, '.docx') . '.temp.html';
-    file_put_contents($htmlTemp, getBaHtmlString($reportData));
+    file_put_contents($htmlTemp, getBaHtmlString($reportData, $docxPath));
     $htmlReal = str_replace('\\', '/', realpath($htmlTemp) ?: $htmlTemp);
     $htmlUri = 'file://' . (str_starts_with($htmlReal, '/') ? '' : '/') . $htmlReal;
 
@@ -1752,10 +1811,257 @@ function convertDocxToPdf(string $docxPath, string $pdfPath, array $reportData):
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// HELPER: Build DOCX using WordprocessingML
+// HELPER: Resolve active DOCX template from Master Data (template_reports)
 // ─────────────────────────────────────────────────────────────────────
-function buildDocxFromData(array $d, string $targetDocx): void
+function getActiveTemplateDocxPath(?PDO $db = null): ?string
 {
+    if ($db === null) {
+        try {
+            $db = getDbConnection();
+        } catch (Exception $e) {
+            $db = null;
+        }
+    }
+
+    if ($db !== null) {
+        try {
+            $stmt = $db->query("
+                SELECT file_path FROM template_reports 
+                WHERE LOWER(file_ext) = 'docx' OR LOWER(file_type) = 'word'
+                ORDER BY updated_at DESC, id DESC 
+                LIMIT 1
+            ");
+            $dbPath = $stmt ? $stmt->fetchColumn() : null;
+            if ($dbPath) {
+                $candidates = [
+                    __DIR__ . '/../' . ltrim($dbPath, '/\\'),
+                    __DIR__ . '/../uploads/templates/' . basename($dbPath),
+                    dirname(__DIR__) . '/' . ltrim($dbPath, '/\\'),
+                ];
+                foreach ($candidates as $cand) {
+                    if (file_exists($cand) && filesize($cand) > 500) {
+                        return $cand;
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
+    }
+
+    // Fallbacks in server uploads or database templates
+    $fallbacks = [
+        __DIR__ . '/../uploads/templates/BA_Asset_Opname_Tindak_Lanjut_DB_20261028_160424.docx',
+        __DIR__ . '/../uploads/templates/BA_Asset_Opname_Tindak_Lanjut_DB.docx',
+        __DIR__ . '/../database/templates/BA_Asset_Opname_Tindak_Lanjut_DB.docx',
+    ];
+    foreach ($fallbacks as $fb) {
+        if (file_exists($fb) && filesize($fb) > 500) {
+            return $fb;
+        }
+    }
+
+    return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: Extract static "Mengetahui" titles and names from DOCX template
+// ─────────────────────────────────────────────────────────────────────
+function extractMengetahuiFromDocx(?string $docxPath): ?array
+{
+    if (!$docxPath || !file_exists($docxPath)) return null;
+    $zip = new ZipArchive();
+    if ($zip->open($docxPath) !== true) return null;
+    $xml = $zip->getFromName('word/document.xml');
+    $zip->close();
+    if (!$xml) return null;
+
+    $pos = strpos($xml, 'Mengetahui:');
+    if ($pos === false) return null;
+    $sub = substr($xml, $pos);
+    if (!preg_match('/<w:tbl\b[^>]*>(?:(?!<\/w:tbl>).)*?<\/w:tbl>/s', $sub, $mTbl)) return null;
+
+    preg_match_all('/<w:tr\b[^>]*>(?:(?!<\/w:tr>).)*?<\/w:tr>/s', $mTbl[0], $mRows);
+    $rows = $mRows[0] ?? [];
+    if (count($rows) < 3) return null;
+
+    preg_match_all('/<w:tc\b[^>]*>(?:(?!<\/w:tc>).)*?<\/w:tc>/s', $rows[0], $mCols0);
+    $nameRowIdx = count($rows) >= 4 ? 2 : count($rows) - 1;
+    preg_match_all('/<w:tc\b[^>]*>(?:(?!<\/w:tc>).)*?<\/w:tc>/s', $rows[$nameRowIdx], $mColsLast);
+
+    $titles = array_map(function ($tc) {
+        preg_match_all('/<w:p\b[^>]*>(?:(?!<\/w:p>).)*?<\/w:p>/s', $tc, $mPs);
+        $lines = [];
+        foreach ($mPs[0] as $p) {
+            $t = trim(strip_tags($p));
+            if ($t !== '') $lines[] = htmlspecialchars($t);
+        }
+        return implode('<br>', $lines);
+    }, $mCols0[0] ?? []);
+
+    $names = array_map(function ($tc) {
+        $n = trim(strip_tags($tc));
+        return $n !== '' ? htmlspecialchars($n) : '( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )';
+    }, $mColsLast[0] ?? []);
+
+    return ['titles' => $titles, 'names' => $names];
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: Populate DOCX template using dynamic placeholders
+// ─────────────────────────────────────────────────────────────────────
+function buildDocxFromTemplate(array $d, string $targetDocx, ?string $templatePath = null): bool
+{
+    if (!$templatePath || !file_exists($templatePath)) {
+        return false;
+    }
+
+    $dir = dirname($targetDocx);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    if (!@copy($templatePath, $targetDocx)) {
+        return false;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($targetDocx) !== true) {
+        return false;
+    }
+
+    $xml = $zip->getFromName('word/document.xml');
+    if (!$xml) {
+        $zip->close();
+        return false;
+    }
+
+    $avpTitle = $d['has_sub_dept'] && !empty($d['avp_title']) ? $d['avp_title'] : 'Head-Central Java And DIY Operation';
+    $avpPic = $d['has_sub_dept'] && !empty($d['avp_pic']) ? $d['avp_pic'] : 'Achmad Fauzan';
+    $fvpTitle = !empty($d['fvp_title']) ? $d['fvp_title'] : 'Head-Central Region Operation';
+    $fvpPic = !empty($d['fvp_pic']) ? $d['fvp_pic'] : 'Budi Hermanto';
+
+    $map = [
+        '{Day}' => $d['gen_day'],
+        '{Date}' => $d['gen_date'],
+        '{Month}' => $d['gen_month'],
+        '{Year}' => $d['gen_year'],
+        '[HARI]' => $d['gen_day'],
+        '[TANGGAL]' => $d['gen_date'],
+        '[BULAN]' => $d['gen_month'],
+        '[TAHUN]' => $d['gen_year'],
+
+        '{SITECODE}' => $d['sitecode'],
+        '{SITENAME}' => $d['sitename'],
+        '[SITE ID]' => $d['sitecode'],
+        '[SITE NAME]' => $d['sitename'],
+        '{Month} {Year}' => $d['periode_so'],
+        '{Periode SO}' => $d['periode_so'],
+        '[BULAN TAHUN]' => $d['periode_so'],
+
+        '{Result Match}' => (string) $d['match_qty'],
+        '{Result Physic}' => (string) $d['physic_qty'],
+        '{Result DB}' => (string) $d['db_qty'],
+        '{Pencapaian}' => (string) $d['pencapaian'],
+        '[MATCH]' => (string) $d['match_qty'],
+        '[FISIK]' => (string) $d['physic_qty'],
+        '[DB]' => (string) $d['db_qty'],
+        '[PENCAPAIAN]' => (string) $d['pencapaian'],
+
+        '{Total DB}' => (string) $d['total_db'],
+        '{Solved DB}' => (string) $d['solved_db'],
+        '{Unsolved DB}' => (string) $d['unsolved_db'],
+        '{New DB}' => (string) ($d['new_db'] ?? 0),
+        '[TOTAL DB]' => (string) $d['total_db'],
+        '[SOLVED DB]' => (string) $d['solved_db'],
+        '[UNSOLVED DB]' => (string) $d['unsolved_db'],
+        '[NEW DB]' => (string) ($d['new_db'] ?? 0),
+
+        '{Keterangan DB}' => $d['keterangan_db'] ?? 'tidak ada inputan flasma/prisma',
+        '[KETERANGAN DB]' => $d['keterangan_db'] ?? 'tidak ada inputan flasma/prisma',
+
+        // Dynamic signers: Kami yang membuat
+        '{PJ_NAME}' => $d['pic_name'],
+        '{NAMA_PJ}' => $d['pic_name'],
+        '{PJ Name}' => $d['pic_name'],
+        '{pj_name}' => $d['pic_name'],
+        '[NAMA PJ STOCK OPNAME]' => $d['pic_name'],
+
+        '{AVP_TITLE}' => $avpTitle,
+        '{Job Title AVP}' => $avpTitle,
+        '{avp_title}' => $avpTitle,
+        '[JOB TITLE AVP]' => $avpTitle,
+
+        '{AVP_NAME}' => $avpPic,
+        '{NAMA_AVP}' => $avpPic,
+        '{avp_pic}' => $avpPic,
+        '{AVP Name}' => $avpPic,
+        '[NAMA AVP]' => $avpPic,
+
+        '{FVP_TITLE}' => $fvpTitle,
+        '{Job Title FVP}' => $fvpTitle,
+        '{fvp_title}' => $fvpTitle,
+        '[JOB TITLE FVP]' => $fvpTitle,
+
+        '{FVP_NAME}' => $fvpPic,
+        '{NAMA_FVP}' => $fvpPic,
+        '{fvp_pic}' => $fvpPic,
+        '{FVP Name}' => $fvpPic,
+        '[NAMA FVP]' => $fvpPic,
+
+        // Backward compatibility for static samples in template
+        '( Panggah Kriesna Mukti )' => '( ' . $d['pic_name'] . ' )',
+        'Head-Central Java And DIY Operation' => $avpTitle,
+        '( Achmad Fauzan )' => '( ' . $avpPic . ' )',
+        'Head-Central Region Operation' => $fvpTitle,
+        '( Budi Hermanto )' => '( ' . $fvpPic . ' )',
+    ];
+
+    foreach ($map as $k => $v) {
+        $xml = str_replace($k, htmlspecialchars($v, ENT_XML1, 'UTF-8'), $xml);
+    }
+
+    // Dynamic row replication for Lampiran Rincian Perangkat
+    if (preg_match('/<w:tr\b[^>]*>(?:(?!<\/w:tr>).)*?\{REGNO\}.*?<\/w:tr>/s', $xml, $mRow)) {
+        $templateRow = $mRow[0];
+        $newRows = '';
+        $devices = $d['devices'] ?? [];
+        if (!empty($devices)) {
+            $no = 1;
+            foreach ($devices as $dev) {
+                $rowXml = $templateRow;
+                $rowXml = str_replace('{No}', (string) $no++, $rowXml);
+                $rowXml = str_replace('{REGNO}', htmlspecialchars($dev['reg_no'], ENT_XML1, 'UTF-8'), $rowXml);
+                $rowXml = str_replace('{NAME}', htmlspecialchars($dev['name'], ENT_XML1, 'UTF-8'), $rowXml);
+                $rowXml = str_replace('{FOLLOWUP}', htmlspecialchars($dev['status'] . ' - ' . $dev['keterangan'], ENT_XML1, 'UTF-8'), $rowXml);
+                $newRows .= $rowXml;
+            }
+        } else {
+            $rowXml = $templateRow;
+            $rowXml = str_replace('{No}', '1', $rowXml);
+            $rowXml = str_replace('{REGNO}', '-', $rowXml);
+            $rowXml = str_replace('{NAME}', 'Tidak ada perangkat dalam rekapitulasi status DB', $rowXml);
+            $rowXml = str_replace('{FOLLOWUP}', '-', $rowXml);
+            $newRows .= $rowXml;
+        }
+        $xml = str_replace($templateRow, $newRows, $xml);
+    }
+
+    $zip->addFromString('word/document.xml', $xml);
+    $zip->close();
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: Build DOCX (uses Master Data template first, fallback to code)
+// ─────────────────────────────────────────────────────────────────────
+function buildDocxFromData(array $d, string $targetDocx, ?PDO $db = null): void
+{
+    $templatePath = getActiveTemplateDocxPath($db);
+    if ($templatePath && buildDocxFromTemplate($d, $targetDocx, $templatePath)) {
+        return;
+    }
+
     $dir = dirname($targetDocx);
     if (!is_dir($dir))
         mkdir($dir, 0755, true);
@@ -2114,7 +2420,7 @@ function buildDocxFromData(array $d, string $targetDocx): void
 // ─────────────────────────────────────────────────────────────────────
 // HELPER: Generate HTML string for preview & headless print
 // ─────────────────────────────────────────────────────────────────────
-function getBaHtmlString(array $d): string
+function getBaHtmlString(array $d, ?string $docxPath = null): string
 {
     $logoDataUri = '';
     $logoPath = __DIR__ . '/../img/Lintasarta.png';
@@ -2174,6 +2480,26 @@ function getBaHtmlString(array $d): string
     }
 
     $keteranganDbText = htmlspecialchars($d['keterangan_db'] ?? 'tidak ada inputan flasma/prisma');
+
+    $mengetahuiTitles = [
+        'Lead-Asset Management',
+        'Associate Vice President<br><span style="font-size:11px;font-weight:normal;">Head-Asset Management</span>',
+        'PTH<br><span style="font-size:11px;font-weight:normal;">Head-Asset And Warehouse Management</span>'
+    ];
+    $mengetahuiNames = [
+        '( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )',
+        '( Indra Vivaldi )',
+        '( Hudi Wahyu Utomo )'
+    ];
+
+    $checkDocx = $docxPath ?: getActiveTemplateDocxPath();
+    if ($checkDocx && file_exists($checkDocx)) {
+        $extracted = extractMengetahuiFromDocx($checkDocx);
+        if (!empty($extracted['titles']) && !empty($extracted['names']) && count($extracted['titles']) >= 3) {
+            $mengetahuiTitles = $extracted['titles'];
+            $mengetahuiNames = $extracted['names'];
+        }
+    }
 
     return <<<HTML
 <!DOCTYPE html>
@@ -2426,9 +2752,9 @@ function getBaHtmlString(array $d): string
         </div>
         <table class="sig-table">
             <tr>
-                <td class="sig-title">Engineer-Asset Management</td>
-                <td class="sig-title">Associate Vice President<br><span style="font-size:11px;font-weight:normal;">Head-Asset Management</span></td>
-                <td class="sig-title">PTH<br><span style="font-size:11px;font-weight:normal;">Head-Asset And Warehouse Management</span></td>
+                <td class="sig-title">{$mengetahuiTitles[0]}</td>
+                <td class="sig-title">{$mengetahuiTitles[1]}</td>
+                <td class="sig-title">{$mengetahuiTitles[2]}</td>
             </tr>
             <tr>
                 <td class="sig-space"></td>
@@ -2436,9 +2762,9 @@ function getBaHtmlString(array $d): string
                 <td class="sig-space"></td>
             </tr>
             <tr>
-                <td class="sig-name">( Andhika Septa Prawira )</td>
-                <td class="sig-name">( Indra Vivaldi )</td>
-                <td class="sig-name">( Hudi Wahyu Utomo )</td>
+                <td class="sig-name">{$mengetahuiNames[0]}</td>
+                <td class="sig-name">{$mengetahuiNames[1]}</td>
+                <td class="sig-name">{$mengetahuiNames[2]}</td>
             </tr>
         </table>
     </div>
@@ -2498,5 +2824,6 @@ HTML;
 function renderHtmlBa(array $d): void
 {
     header('Content-Type: text/html; charset=utf-8');
-    echo getBaHtmlString($d);
+    $tpl = getActiveTemplateDocxPath();
+    echo getBaHtmlString($d, $tpl);
 }

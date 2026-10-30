@@ -89,7 +89,8 @@
 
     <!-- Overview Stats Cards -->
     <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <!-- Card 1: Total Sites -->
         <div class="card"
             style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
             <div
@@ -106,12 +107,17 @@
             </div>
         </div>
 
+        <!-- Card 2: Generated -->
         <div class="card"
             style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
             <div
-                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                style="width: 42px; height: 42px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: center; color: #2563eb;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="20 6 9 17 4 12"></polyline>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
             </div>
             <div>
@@ -121,36 +127,72 @@
             </div>
         </div>
 
-        <div class="card"
-            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
-            <div
-                style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path
-                        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
-                    </path>
-                </svg>
-            </div>
-            <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Sent to
-                    PIC Outlet</div>
-                <div id="stat-reports-sent" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
-            </div>
-        </div>
-
+        <!-- Card 3: Not Generated -->
         <div class="card"
             style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
             <div
                 style="width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Not Generated
+                </div>
+                <div id="stat-reports-not-generated" style="font-size: 20px; font-weight: 700; color: #64748b;">-</div>
+            </div>
+        </div>
+
+        <!-- Card 4: Pending (Sent to WA) -->
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #fff7ed; border: 1px solid #fed7aa; display: flex; align-items: center; justify-content: center; color: #ea580c;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
             </div>
             <div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Not
-                    Generated</div>
-                <div id="stat-reports-pending" style="font-size: 20px; font-weight: 700; color: #0f172a;">-</div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Pending
+                </div>
+                <div id="stat-reports-pending" style="font-size: 20px; font-weight: 700; color: #ea580c;">-</div>
+            </div>
+        </div>
+
+        <!-- Card 5: Waiting Verification -->
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: center; color: #0284c7;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Waiting Verification
+                </div>
+                <div id="stat-reports-waiting-verif" style="font-size: 20px; font-weight: 700; color: #0284c7;">-</div>
+            </div>
+        </div>
+
+        <!-- Card 6: Verified -->
+        <div class="card"
+            style="margin: 0; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+            <div
+                style="width: 42px; height: 42px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; display: flex; align-items: center; justify-content: center; color: #16a34a;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <polyline points="9 12 11 14 15 10"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size: 11.5px; font-weight: 600; color: #64748b; text-transform: uppercase;">Verified
+                </div>
+                <div id="stat-reports-verified" style="font-size: 20px; font-weight: 700; color: #16a34a;">-</div>
             </div>
         </div>
     </div>
@@ -272,13 +314,6 @@
                 <h2 class="card-title" style="font-size: 15px; margin: 0; color: #0f172a; font-weight: 700;">
                     Verification Report</h2>
             </div>
-            <div id="badge-verification-count"
-                style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 20px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                <span id="stat-verification-summary-text">0 Terkirim ke WA</span>
-            </div>
         </div>
 
         <!-- Filter & Search Toolbar -->
@@ -326,7 +361,7 @@
                     <select id="reports-verif-filter-status" class="form-control unified-filter-select"
                         style="width: auto;" onchange="App.onReportsVerifStatusFilterChange()">
                         <option value="all">Semua Status</option>
-                        <option value="sent">Menunggu Upload</option>
+                        <option value="sent">Pending</option>
                         <option value="uploaded">Menunggu Verifikasi</option>
                         <option value="verified">Verified</option>
                     </select>

@@ -133,6 +133,19 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                     </span>
                 </div>
             </div>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;" data-html2canvas-ignore="true">
+                <button type="button" class="btn btn-primary btn-generate-png" id="btn-generate-weekly-executive-summary"
+                    onclick="App.generateExecutiveSummaryPng('weekly-card-executive-summary')"
+                    data-html2canvas-ignore="true"
+                    style="<?= $isLoggedIn ? 'display: inline-flex;' : 'display: none;' ?> align-items: center; gap: 0.45rem; padding: 0.42rem 0.85rem; font-size: 12.5px; font-weight: 600; border-radius: 6px; background: #0284c7; border: 1px solid #0284c7; color: #ffffff; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.2);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Generate</span>
+                </button>
+            </div>
         </div>
         <div class="card-body" style="padding: 1.25rem;">
             <!-- ── Achievement Cards (PMD: PMD, DNO, DSO; Outlet Regional: National, WRO, CRO, ERO) ── -->
@@ -578,13 +591,13 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- SECTION 3: REPORT SO (WEEKLY)                                       -->
+    <!-- SECTION 3: REPORT STOCK OPNAME (WEEKLY)                                       -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <div class="card" id="weekly-card-hasil-so" style="margin-top: 1rem; margin-bottom: 2rem;">
         <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
             <div>
                 <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                    <h2 class="card-title" id="weekly-hasil-so-title" style="margin: 0;">Report SO PMD (Weekly)</h2>
+                    <h2 class="card-title" id="weekly-hasil-so-title" style="margin: 0;">Report Stock Opname PMD (Weekly)</h2>
                     <span id="weekly-report-period-badge" class="badge"
                         style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; letter-spacing: 0.2px;">
                         September - Week 1 2026
@@ -669,6 +682,10 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                                         style="vertical-align: middle; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Site Code <span class="sort-indicator" data-weekly-col="sitecode">⇅</span>
                                     </th>
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Defisit Target
+                                    </th>
                                     <th rowspan="2" class="sortable text-left col-name-site"
                                         onclick="App.toggleWeeklyReportSort('name_site')"
                                         style="vertical-align: middle; text-align: left; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
@@ -699,6 +716,10 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                                         style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
                                         Pencapaian
                                     </th>
+                                    <th class="text-center"
+                                        style="text-align: center; padding: 0.5rem 0.75rem 0.2rem; font-weight: 700; color: #1e293b; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                                        Defisit Target
+                                    </th>
                                     <th rowspan="2" class="sortable text-center"
                                         onclick="App.toggleWeeklyReportSort('status')"
                                         style="vertical-align: middle; text-align: center; padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 150px; position: sticky; top: 0; background: #f8fafc; z-index: 2;">
@@ -728,12 +749,16 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                                         style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
                                         % <span class="sort-indicator" data-weekly-col="pct">⇅</span>
                                     </th>
+                                    <th class="text-center sortable" onclick="App.toggleWeeklyReportSort('defisit')"
+                                        style="padding: 0.2rem 0.75rem 0.5rem; font-weight: 600; text-transform: none; position: sticky; top: 28px; background: #f8fafc; z-index: 2;">
+                                        % <span class="sort-indicator" data-weekly-col="defisit">⇅</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="weekly-report-so-tbody">
                                 <tr>
-                                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
-                                        Memuat data Report SO Weekly...
+                                    <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">
+                                        Memuat data Report Stock Opname Weekly...
                                     </td>
                                 </tr>
                             </tbody>

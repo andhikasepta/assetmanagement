@@ -186,6 +186,9 @@
                                 <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
                                     <input type="checkbox" class="user-uac-dept-checkbox" value="WRO" checked style="width: 14px; height: 14px;"> WRO
                                 </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" class="user-uac-dept-checkbox" value="BLANK" checked style="width: 14px; height: 14px;"> Blanks (Tanpa DEPT)
+                                </label>
                             </div>
                             <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #e2e8f0;">
                                 <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer;">
@@ -194,6 +197,15 @@
                                 </label>
                             </div>
                         </div>
+
+                        <label
+                            style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="user-uac-berita-acara" checked
+                                style="width: 16px; height: 16px; cursor: pointer;">
+                            <div>
+                                <span style="font-size: 12.5px; font-weight: 600; color: #1e293b;">Berita Acara</span>
+                            </div>
+                        </label>
 
                         <label
                             style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; cursor: pointer;">

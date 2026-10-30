@@ -89,6 +89,7 @@ const AllSummaryApp = (function () {
     let ratingPieChart = null;
     let execPieChart = null;
     let hasilPieChart = null;
+    let allRekapAverageChart = null;
     let hasilStats = { tercapai: 0, tidakTercapai: 0, noData: 0, total: 0 };
 
     let allHasilRows = [];
@@ -179,6 +180,12 @@ const AllSummaryApp = (function () {
             const btnQuarterly = document.getElementById('all-btn-so-type-quarterly');
             if (btnMonthly) btnMonthly.classList.toggle('active', summarySOType === 'monthly');
             if (btnQuarterly) btnQuarterly.classList.toggle('active', summarySOType === 'quarterly');
+
+            const titleEl = document.getElementById('all-rekap-chart-title');
+            if (titleEl) {
+                const prefix = (summarySOType === 'quarterly') ? 'Quarterly' : 'Monthly';
+                titleEl.textContent = `${prefix} Target Achievement (All Sites)`;
+            }
         }
 
         // Update BULAN dropdown options to match SO Type (Monthly = 12 months, Quarterly = per 3 months)
@@ -222,6 +229,12 @@ const AllSummaryApp = (function () {
         const btnQuarterly = document.getElementById('all-btn-so-type-quarterly');
         if (btnMonthly) btnMonthly.classList.toggle('active', type === 'monthly');
         if (btnQuarterly) btnQuarterly.classList.toggle('active', type === 'quarterly');
+
+        const titleEl = document.getElementById('all-rekap-chart-title');
+        if (titleEl) {
+            const prefix = (type === 'quarterly') ? 'Quarterly' : 'Monthly';
+            titleEl.textContent = `${prefix} Target Achievement (All Sites)`;
+        }
 
         // Update BULAN dropdown based on SO Type (Monthly = 12 months, Quarterly = per 3 months)
         updateSummaryMonthDropdown();
@@ -275,8 +288,8 @@ const AllSummaryApp = (function () {
             const ach = json.achievements || {};
             const nat = ach.national || ach.outlet_national || {};
             const pct = (nat.pct !== null && nat.pct !== undefined)
-                ? Math.round(Number(nat.pct))
-                : ((ach.summary_achievement !== null && ach.summary_achievement !== undefined) ? Math.round(Number(ach.summary_achievement)) : 0);
+                ? Number(nat.pct).toFixed(2)
+                : ((ach.summary_achievement !== null && ach.summary_achievement !== undefined) ? Number(ach.summary_achievement).toFixed(2) : '0.00');
             const target = 85;
 
             // Overall Achievement Card (No Target, Compare vs Previous Period)
@@ -292,9 +305,9 @@ const AllSummaryApp = (function () {
             if (trendEl) {
                 let diffPct = null;
                 if (nat.diff_pct !== undefined && nat.diff_pct !== null) {
-                    diffPct = Math.round(Number(nat.diff_pct));
+                    diffPct = Number(nat.diff_pct);
                 } else if (nat.prev_pct !== undefined && nat.prev_pct !== null && nat.pct !== null && nat.pct !== undefined) {
-                    diffPct = Math.round(Number(nat.pct)) - Math.round(Number(nat.prev_pct));
+                    diffPct = Number(nat.pct) - Number(nat.prev_pct);
                 }
 
                 if (diffPct !== null) {
@@ -308,7 +321,7 @@ const AllSummaryApp = (function () {
                     trendEl.innerHTML = `
                         <span class="kpi-target-indicator ${trendClass}">
                             ${svg}
-                            <span>${sign}${diffPct}%</span>
+                            <span>${sign}${diffPct.toFixed(2)}%</span>
                         </span>
                     `;
                 } else {
@@ -332,7 +345,7 @@ const AllSummaryApp = (function () {
             const grandTotal = (dbNat.qty !== undefined) ? dbNat.qty : (dbA.grand_total || 0);
 
             // Result DB Analysis Grand Total
-            ['all-db-analysis-grand-total', 'db-analysis-grand-total', 'all-db-val-total'].forEach(id => {
+            ['all-db-analysis-grand-total', 'db-analysis-grand-total', 'all-db-val-total', 'all-strip-db-val-total'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = Number(grandTotal).toLocaleString('id-ID');
             });
@@ -362,7 +375,7 @@ const AllSummaryApp = (function () {
             };
 
             const trendHtml = renderDbTrend();
-            ['all-db-grand-trend', 'db-grand-trend', 'all-db-card-trend'].forEach(id => {
+            ['all-db-grand-trend', 'db-grand-trend', 'all-db-card-trend', 'all-strip-db-grand-trend', 'all-strip-db-card-trend'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = trendHtml;
             });
@@ -419,7 +432,7 @@ const AllSummaryApp = (function () {
             };
 
             const statusTrendHtml = renderStatusTotalTrend();
-            ['all-db-status-grand-trend', 'db-status-grand-trend'].forEach(id => {
+            ['all-db-status-grand-trend', 'db-status-grand-trend', 'all-strip-db-status-grand-trend'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = statusTrendHtml;
             });
@@ -437,10 +450,64 @@ const AllSummaryApp = (function () {
                 if (el) el.textContent = Number(newDb).toLocaleString('id-ID');
             });
 
+            // Update Column 3: Ringkasan DB Analysis (All Sites)
+            const solvedRate = totalStatusDb > 0 ? ((Number(solved || 0) / totalStatusDb) * 100) : 0;
+            const unsolvedRate = totalStatusDb > 0 ? ((Number(unsolved || 0) / totalStatusDb) * 100) : 0;
+            const newDbRate = totalStatusDb > 0 ? ((Number(newDb || 0) / totalStatusDb) * 100) : 0;
+
+            const elAllRateBadge = document.getElementById('all-db-summary-rate-badge');
+            if (elAllRateBadge) elAllRateBadge.textContent = `${solvedRate.toFixed(2)}% Solved`;
+
+            const elAllRateText = document.getElementById('all-db-summary-rate-text');
+            if (elAllRateText) elAllRateText.textContent = `${solvedRate.toFixed(2)}%`;
+
+            const elAllBarSolved = document.getElementById('all-db-summary-bar-solved');
+            if (elAllBarSolved) elAllBarSolved.style.width = `${Math.min(100, solvedRate)}%`;
+
+            const elAllBarUnsolved = document.getElementById('all-db-summary-bar-unsolved');
+            if (elAllBarUnsolved) elAllBarUnsolved.style.width = `${Math.min(100, unsolvedRate)}%`;
+
+            const elAllBarNew = document.getElementById('all-db-summary-bar-new');
+            if (elAllBarNew) elAllBarNew.style.width = `${Math.min(100, newDbRate)}%`;
+
+            const elAllSumSolved = document.getElementById('all-db-summary-val-solved');
+            if (elAllSumSolved) elAllSumSolved.textContent = Number(solved || 0).toLocaleString('id-ID');
+            const elAllSumPctSolved = document.getElementById('all-db-summary-pct-solved');
+            if (elAllSumPctSolved) elAllSumPctSolved.textContent = `(${solvedRate.toFixed(2)}%)`;
+
+            const elAllSumUnsolved = document.getElementById('all-db-summary-val-unsolved');
+            if (elAllSumUnsolved) elAllSumUnsolved.textContent = Number(unsolved || 0).toLocaleString('id-ID');
+            const elAllSumPctUnsolved = document.getElementById('all-db-summary-pct-unsolved');
+            if (elAllSumPctUnsolved) elAllSumPctUnsolved.textContent = `(${unsolvedRate.toFixed(2)}%)`;
+
+            const elAllSumNew = document.getElementById('all-db-summary-val-new');
+            if (elAllSumNew) elAllSumNew.textContent = Number(newDb || 0).toLocaleString('id-ID');
+            const elAllSumPctNew = document.getElementById('all-db-summary-pct-new');
+            if (elAllSumPctNew) elAllSumPctNew.textContent = `(${newDbRate.toFixed(2)}%)`;
+
+            const elAllSumStatTotal = document.getElementById('all-db-summary-stat-status-total');
+            if (elAllSumStatTotal) elAllSumStatTotal.textContent = Number(totalStatusDb).toLocaleString('id-ID');
+
+            const elAllDbPeriodBadge = document.getElementById('all-db-analysis-period-badge');
+            const elAllExecBadge = document.getElementById('all-executive-period-badge');
+            if (elAllDbPeriodBadge && elAllExecBadge) elAllDbPeriodBadge.textContent = elAllExecBadge.textContent;
+
         } catch (err) {
             console.error('Error loading summary KPIs:', err);
         }
     }
+
+    function toggleDbBreakdownPanel() {
+        const panel = document.getElementById('all-db-breakdown-panel');
+        const text = document.getElementById('all-db-breakdown-toggle-text');
+        if (!panel) return;
+        const isHidden = (panel.style.display === 'none' || panel.style.display === '' || window.getComputedStyle(panel).display === 'none');
+        panel.style.display = isHidden ? 'block' : 'none';
+        if (text) {
+            text.textContent = isHidden ? 'Sembunyikan Breakdown ▲' : 'Tampilkan Breakdown ▼';
+        }
+    }
+    window.AllSummaryApp_toggleDbBreakdownPanel = toggleDbBreakdownPanel;
 
     // ── 2. Trend Line Chart (Count All) ──
     async function loadTrendChart(year, month) {
@@ -473,8 +540,38 @@ const AllSummaryApp = (function () {
             const json = await res.json();
             if (!json.success) return;
 
-            const labels = json.months || (summarySOType === 'quarterly' ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
-            const data = json.national_trend || [];
+            const fullLabels = json.months || (summarySOType === 'quarterly' ? ['Q1', 'Q2', 'Q3', 'Q4'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+            const fullData = json.national_trend || [];
+
+            let maxIdx = -1;
+            for (let i = fullData.length - 1; i >= 0; i--) {
+                if (fullData[i] !== null && fullData[i] !== undefined && !isNaN(fullData[i])) {
+                    maxIdx = i;
+                    break;
+                }
+            }
+            if (maxIdx === -1 && json.dept_trends) {
+                Object.values(json.dept_trends).forEach(arr => {
+                    if (Array.isArray(arr)) {
+                        for (let i = arr.length - 1; i >= 0; i--) {
+                            if (arr[i] !== null && arr[i] !== undefined && !isNaN(arr[i]) && i > maxIdx) {
+                                maxIdx = i;
+                            }
+                        }
+                    }
+                });
+            }
+
+            const labels = (maxIdx >= 0) ? fullLabels.slice(0, maxIdx + 1) : fullLabels;
+            const data = (maxIdx >= 0) ? fullData.slice(0, maxIdx + 1) : fullData;
+
+            if (subtitleEl) {
+                const endLabel = labels[labels.length - 1] || (summarySOType === 'quarterly' ? 'Q4' : 'Dec');
+                const startLabel = labels[0] || (summarySOType === 'quarterly' ? 'Q1' : 'Jan');
+                subtitleEl.textContent = (summarySOType === 'monthly')
+                    ? `Monthly Physical % ${startLabel} - ${endLabel} ${year} (All Sites)`
+                    : `Quarterly Physical % ${startLabel} - ${endLabel} ${year} (All Sites)`;
+            }
 
             const primaryColor = '#0284c7'; // Corporate blue
 
@@ -542,7 +639,7 @@ const AllSummaryApp = (function () {
                         },
                         tooltip: {
                             callbacks: {
-                                label: ctx => ` All Sites: ${ctx.parsed.y !== null ? ctx.parsed.y + '%' : 'Tidak Ada Data'}`
+                                label: ctx => ` All Sites: ${ctx.parsed.y !== null ? (typeof ctx.parsed.y === 'number' ? ctx.parsed.y.toFixed(2) : ctx.parsed.y) + '%' : 'Tidak Ada Data'}`
                             }
                         }
                     }
@@ -717,7 +814,7 @@ const AllSummaryApp = (function () {
                         const rawVal = dataset.data[index];
                         if (rawVal === null || rawVal === undefined || isNaN(rawVal)) return;
 
-                        const val = Math.round(Number(rawVal));
+                        const val = Number(rawVal).toFixed(2);
                         const text = `${val}%`;
                         const { x, y, base } = barElement;
                         const barHeight = Math.abs(base - y);
@@ -906,7 +1003,7 @@ const AllSummaryApp = (function () {
                                 const ds = context.dataset;
                                 const name = ds.fullName || ds.label;
                                 const val = context.parsed.y;
-                                return ` ${name}: ${val !== null && val !== undefined ? val + '%' : 'Tidak Ada Data'}`;
+                                return ` ${name}: ${val !== null && val !== undefined ? (typeof val === 'number' ? Number(val).toFixed(2) : val) + '%' : 'Tidak Ada Data'}`;
                             }
                         }
                     }
@@ -1294,7 +1391,7 @@ const AllSummaryApp = (function () {
                             callbacks: {
                                 label: function (context) {
                                     const val = context.raw || 0;
-                                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(2) : '0.00';
                                     return ` ${context.label}: ${val} sites (${pct}%)`;
                                 }
                             }
@@ -1325,9 +1422,9 @@ const AllSummaryApp = (function () {
 
         if (!statsContainer || total === 0) return;
 
-        const pctTercapai = total > 0 ? Math.round((tercapai / total) * 100) : 0;
-        const pctTidak = total > 0 ? Math.round((tidakTercapai / total) * 100) : 0;
-        const pctNoData = total > 0 ? Math.round((noData / total) * 100) : 0;
+        const pctTercapai = total > 0 ? ((tercapai / total) * 100).toFixed(2) : '0.00';
+        const pctTidak = total > 0 ? ((tidakTercapai / total) * 100).toFixed(2) : '0.00';
+        const pctNoData = total > 0 ? ((noData / total) * 100).toFixed(2) : '0.00';
 
         const activeTercapai = (curStatus === 'tercapai') ? ' active' : '';
         const activeTidak = (curStatus === 'tidak_tercapai') ? ' active' : '';
@@ -1460,14 +1557,14 @@ const AllSummaryApp = (function () {
         const tbody = document.getElementById('hasil-so-table-body');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Report SO...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">Memuat data Report Stock Opname...</td></tr>`;
 
         try {
             const url = `api/reconciliation.php?action=subdept_results&category=all&so_type=${summarySOType}&month=${month}&year=${year}&dept=all&sub_dept=all`;
             const res = await fetch(url);
             const json = await res.json();
             if (!json.success) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Gagal memuat data</td></tr>`;
                 renderHasilPieChart(0, 0, 0, 0);
                 return;
             }
@@ -1496,7 +1593,7 @@ const AllSummaryApp = (function () {
             applyHasilFilter();
         } catch (err) {
             console.error('Error loading hasil SO:', err);
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">Kesalahan jaringan</td></tr>`;
             renderHasilPieChart(0, 0, 0, 0);
         }
     }
@@ -1545,7 +1642,7 @@ const AllSummaryApp = (function () {
         if (!tbody) return;
 
         if (filteredHasilRows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
             updateHasilPagination(0);
             return;
         }
@@ -1569,7 +1666,7 @@ const AllSummaryApp = (function () {
             let statusClass = 'status-none';
 
             if (r.has_data !== false && pct !== null && !isNaN(pct)) {
-                const roundedPct = Math.round(pct);
+                const roundedPct = parseFloat(pct);
                 if (isTarget98) {
                     if (roundedPct >= 98) {
                         statusText = 'Tercapai';
@@ -1612,8 +1709,16 @@ const AllSummaryApp = (function () {
 
             const statusBadge = `<span class="so-status-badge ${statusClass}">${statusText}</span>`;
 
-            const pctText = pct !== null ? `${pct}%` : '-';
+            const pctText = pct !== null ? `${pct.toFixed(2)}%` : '-';
             const pctColor = pct !== null ? (pct >= targetThreshold ? 'color: #16a34a; font-weight: 700;' : 'color: #dc2626; font-weight: 700;') : 'color: #94a3b8;';
+
+            let defisitText = '-';
+            let defisitColor = 'color: #94a3b8;';
+            if (r.has_data !== false && pct !== null && !isNaN(pct)) {
+                const defisit = 100 - parseFloat(pct);
+                defisitText = `${defisit.toFixed(2)}%`;
+                defisitColor = defisit > 0 ? 'color: #dc2626; font-weight: 700;' : 'color: #16a34a; font-weight: 700;';
+            }
 
             const qtyMatch = r.match_physic_qty !== undefined ? r.match_physic_qty : (r.qty_match || 0);
             const qtyPhysic = r.physic_physic_qty !== undefined ? r.physic_physic_qty : (r.qty_physic || 0);
@@ -1630,6 +1735,7 @@ const AllSummaryApp = (function () {
                     <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyDb).toLocaleString('id-ID')}</td>
                     <td style="text-align: center; font-variant-numeric: tabular-nums;">${Number(qtyActual).toLocaleString('id-ID')}</td>
                     <td style="text-align: center; ${pctColor}">${pctText}</td>
+                    <td style="text-align: center; ${defisitColor}">${defisitText}</td>
                     <td style="text-align: center;">${statusBadge}</td>
                 </tr>
             `;
@@ -1865,6 +1971,48 @@ const AllSummaryApp = (function () {
                 updateAllRdbFilterDropdowns(json.filter_options);
             }
 
+            if (json.stats) {
+                const s = json.stats;
+                const totalItems = parseInt(s.total_items || 0, 10);
+                const solvedCount = parseInt(s.solved_count || 0, 10);
+                const unsolvedCount = parseInt(s.unsolved_count || 0, 10);
+                const newDbCount = parseInt(s.new_db_count || 0, 10);
+
+                const solvedPct = totalItems > 0 ? ((solvedCount / totalItems) * 100).toFixed(2) : '0.00';
+                const unsolvedPct = totalItems > 0 ? ((unsolvedCount / totalItems) * 100).toFixed(2) : '0.00';
+                const newDbPct = totalItems > 0 ? ((newDbCount / totalItems) * 100).toFixed(2) : '0.00';
+
+                const elRateText = document.getElementById('all-db-summary-rate-text');
+                if (elRateText) elRateText.textContent = `${solvedPct}%`;
+                const elRateBadge = document.getElementById('all-db-summary-rate-badge');
+                if (elRateBadge) elRateBadge.textContent = `${solvedPct}% Solved`;
+
+                const elBarSolved = document.getElementById('all-db-summary-bar-solved');
+                if (elBarSolved) elBarSolved.style.width = `${Math.min(100, parseFloat(solvedPct))}%`;
+                const elBarUnsolved = document.getElementById('all-db-summary-bar-unsolved');
+                if (elBarUnsolved) elBarUnsolved.style.width = `${Math.min(100, parseFloat(unsolvedPct))}%`;
+                const elBarNew = document.getElementById('all-db-summary-bar-new');
+                if (elBarNew) elBarNew.style.width = `${Math.min(100, parseFloat(newDbPct))}%`;
+
+                const elSolvedVal = document.getElementById('all-db-summary-val-solved');
+                if (elSolvedVal) elSolvedVal.textContent = solvedCount.toLocaleString('id-ID');
+                const elSolvedPct = document.getElementById('all-db-summary-pct-solved');
+                if (elSolvedPct) elSolvedPct.textContent = `(${solvedPct}%)`;
+
+                const elUnsolvedVal = document.getElementById('all-db-summary-val-unsolved');
+                if (elUnsolvedVal) elUnsolvedVal.textContent = unsolvedCount.toLocaleString('id-ID');
+                const elUnsolvedPct = document.getElementById('all-db-summary-pct-unsolved');
+                if (elUnsolvedPct) elUnsolvedPct.textContent = `(${unsolvedPct}%)`;
+
+                const elNewVal = document.getElementById('all-db-summary-val-new');
+                if (elNewVal) elNewVal.textContent = newDbCount.toLocaleString('id-ID');
+                const elNewPct = document.getElementById('all-db-summary-pct-new');
+                if (elNewPct) elNewPct.textContent = `(${newDbPct}%)`;
+
+                const elStatTotal = document.getElementById('all-db-summary-stat-status-total');
+                if (elStatTotal) elStatTotal.textContent = totalItems.toLocaleString('id-ID');
+            }
+
             const rows = json.data || [];
             const total = json.total !== undefined ? json.total : rows.length;
             const pageSizeNum = (allRdbStatusPageSize === 999999) ? (total || 1) : allRdbStatusPageSize;
@@ -2058,7 +2206,7 @@ const AllSummaryApp = (function () {
 
     function getRekapPctClass(val, isPmd = false) {
         if (val === null || val === undefined || isNaN(val) || val === '') return 'pct-none';
-        const num = Math.round(parseFloat(val));
+        const num = parseFloat(val);
         if (isPmd) {
             return num >= 98 ? 'pct-green' : 'pct-red';
         }
@@ -2077,7 +2225,7 @@ const AllSummaryApp = (function () {
         }
         const num = parseFloat(val);
         const cls = getRekapPctClass(num, isPmd);
-        return `<span class="pct-badge ${cls}">${Math.round(num)}%</span>`;
+        return `<span class="pct-badge ${cls}">${num.toFixed(2)}%</span>`;
     }
 
     function updateRekapMonthHeaders(visibleMonths, isQuarterly) {
@@ -2110,6 +2258,7 @@ const AllSummaryApp = (function () {
             const emptyColspan = isQuarterlyRekap ? 7 : 15;
             tbody.innerHTML = `<tr><td colspan="${emptyColspan}" style="text-align: center; padding: 2.5rem; color: #94a3b8;">Tidak ada data yang cocok.</td></tr>`;
             if (tfoot) tfoot.innerHTML = '';
+            renderAllRekapAverageChart([], isQuarterlyRekap);
             updateRekapPagination(0);
             return;
         }
@@ -2121,9 +2270,9 @@ const AllSummaryApp = (function () {
         pageRows.forEach((r, idx) => {
             const no = startIdx + idx + 1;
             const months = r.months || {};
-            const isPmd = (r.dept && r.dept.toUpperCase() === 'PMD') || 
-                          (r.sub_dept && r.sub_dept.toUpperCase() === 'PMD') || 
-                          (r.name_site && r.name_site.toUpperCase().includes('TEKNO'));
+            const isPmd = (r.dept && r.dept.toUpperCase() === 'PMD') ||
+                (r.sub_dept && r.sub_dept.toUpperCase() === 'PMD') ||
+                (r.name_site && r.name_site.toUpperCase().includes('TEKNO'));
 
             let monthCols = '';
             visibleMonths.forEach(m => {
@@ -2139,11 +2288,13 @@ const AllSummaryApp = (function () {
                     ${monthCols}
                 </tr>
             `;
-        });
+        }
+        );
 
         tbody.innerHTML = html;
 
         // Render Footer (Average total physical % per month, matching Rekapitulasi summary page)
+        const monthlyChartData = [];
         if (tfoot) {
             let footHtml = `
                 <tr class="table-summary-row" style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
@@ -2160,13 +2311,265 @@ const AllSummaryApp = (function () {
                     }
                 });
                 const avg = count > 0 ? (sum / count) : null;
+                const label = isQuarterlyRekap ? (REKAP_QUARTER_LABELS[m] || REKAP_MONTH_NAMES[m]) : REKAP_MONTH_NAMES[m];
+                monthlyChartData.push({
+                    month: m,
+                    label: label,
+                    avg: avg,
+                    count: count,
+                    total: filteredRekapRows.length
+                });
                 footHtml += `<td style="text-align: center; padding: 8px 6px; vertical-align: middle;">${formatRekapPctBadge(avg, false)}</td>`;
             });
             footHtml += '</tr>';
             tfoot.innerHTML = footHtml;
         }
 
+        renderAllRekapAverageChart(monthlyChartData, isQuarterlyRekap);
         updateRekapPagination(filteredRekapRows.length);
+    }
+
+    function renderAllRekapAverageChart(monthlyData, isQuarterly) {
+        const canvas = document.getElementById('all-chart-rekap-average');
+        if (!canvas) return;
+
+        if (allRekapAverageChart) {
+            allRekapAverageChart.destroy();
+            allRekapAverageChart = null;
+        }
+
+        const titleEl = document.getElementById('all-rekap-chart-title');
+        if (titleEl) {
+            const prefix = (isQuarterly || summarySOType === 'quarterly') ? 'Quarterly' : 'Monthly';
+            titleEl.textContent = `${prefix} Target Achievement (All Sites)`;
+        }
+
+        const subtitleEl = document.getElementById('all-rekap-chart-subtitle');
+        if (subtitleEl) {
+            const totalSites = (monthlyData && monthlyData[0]) ? monthlyData[0].total : filteredRekapRows.length;
+            const typeLabel = isQuarterly ? 'Quarter' : 'Bulan';
+            subtitleEl.textContent = `Rata-rata persentase pencapaian fisik per ${typeLabel} (${totalSites.toLocaleString('id-ID')} Sites)`;
+        }
+
+        if (!monthlyData || monthlyData.length === 0) return;
+
+        // Truncate future months/quarters with no data up to the last month/quarter that has data
+        let lastDataIdx = -1;
+        for (let i = monthlyData.length - 1; i >= 0; i--) {
+            const d = monthlyData[i];
+            if (d && d.avg !== null && d.avg !== undefined && !isNaN(d.avg) && d.count > 0) {
+                lastDataIdx = i;
+                break;
+            }
+        }
+        const activeMonthlyData = (lastDataIdx >= 0) ? monthlyData.slice(0, lastDataIdx + 1) : monthlyData;
+
+        const labels = activeMonthlyData.map(d => d.label);
+        const dataValues = activeMonthlyData.map(d => d.avg !== null ? Number(d.avg.toFixed(2)) : null);
+
+        const bgColors = activeMonthlyData.map(d => {
+            if (d.avg === null) return 'rgba(203, 213, 225, 0.45)';
+            if (d.avg >= 85) return '#16a34a';
+            if (d.avg >= 75) return '#ea580c';
+            return '#dc2626';
+        });
+
+        const borderColors = activeMonthlyData.map(d => {
+            if (d.avg === null) return '#cbd5e1';
+            if (d.avg >= 85) return '#15803d';
+            if (d.avg >= 75) return '#c2410c';
+            return '#b91c1c';
+        });
+
+        // Bottom value label plugin (crisp, solid font with 2 decimals anchored at bottom)
+        const valueBottomPlugin = {
+            id: 'allRekapValueBottomPlugin',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+
+                    meta.data.forEach((barElement, index) => {
+                        const rawVal = dataset.data[index];
+                        if (rawVal === null || rawVal === undefined || isNaN(rawVal)) return;
+
+                        const text = `${Number(rawVal).toFixed(2)}%`;
+                        const { x, y, base } = barElement;
+                        const barHeight = Math.abs(base - y);
+                        const bWidth = barElement.width || 30;
+
+                        ctx.save();
+                        ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+                        const textWidth = ctx.measureText(text).width;
+
+                        if (barHeight >= 20) {
+                            ctx.fillStyle = '#ffffff';
+                            if (bWidth >= textWidth - 2) {
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(text, x, base - 8);
+                            } else {
+                                ctx.translate(x, base - 8);
+                                ctx.rotate(-Math.PI / 2);
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, 0, 0);
+                            }
+                        } else if (barHeight > 0) {
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillStyle = '#475569';
+                            ctx.fillText(text, x, y - 3);
+                        } else {
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillStyle = '#94a3b8';
+                            ctx.fillText(text, x, base - 3);
+                        }
+                        ctx.restore();
+                    });
+                });
+            }
+        };
+
+        // Dashed Target Line Plugin (Target 85%)
+        const targetLinePlugin = {
+            id: 'allRekapTargetLinePlugin',
+            afterDraw(chart) {
+                const target = 85;
+                const { ctx, chartArea, scales: { y } } = chart;
+                if (!chartArea || !y) return;
+
+                const yPixel = y.getPixelForValue(target);
+                if (isNaN(yPixel)) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 4]);
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(chartArea.left, yPixel);
+                ctx.lineTo(chartArea.right, yPixel);
+                ctx.stroke();
+
+                const text = `TARGET ${target}%`;
+                ctx.setLineDash([]);
+                ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                const textWidth = ctx.measureText(text).width;
+                const padX = 6;
+                const badgeWidth = textWidth + padX * 2;
+                const badgeHeight = 17;
+                const badgeX = Math.min(chartArea.right + 6, chart.width - badgeWidth - 4);
+                const badgeY = yPixel - badgeHeight / 2;
+
+                ctx.fillStyle = '#dc2626';
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 3);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+                }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, badgeX + badgeWidth / 2, yPixel);
+                ctx.restore();
+            }
+        };
+
+        const ctx = canvas.getContext('2d');
+        allRekapAverageChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Rata-rata Fisik (%)',
+                    data: dataValues,
+                    backgroundColor: bgColors,
+                    borderColor: 'transparent',
+                    borderWidth: 0,
+                    borderRadius: {
+                        topLeft: 6,
+                        topRight: 6,
+                        bottomLeft: 0,
+                        bottomRight: 0
+                    },
+                    borderSkipped: 'bottom',
+                    barPercentage: 0.54,
+                    categoryPercentage: 0.78,
+                    maxBarThickness: 34
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 24,
+                        right: 80,
+                        bottom: 6,
+                        left: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            stepSize: 20,
+                            callback: val => `${val}%`,
+                            color: '#94a3b8',
+                            font: { size: 11, family: 'Inter, -apple-system, sans-serif' }
+                        },
+                        grid: {
+                            color: '#f1f5f9',
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 11, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                            color: '#475569'
+                        },
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleFont: { size: 12, weight: '700', family: 'Inter, -apple-system, sans-serif' },
+                        bodyFont: { size: 11.5, weight: '500', family: 'Inter, -apple-system, sans-serif' },
+                        padding: 10,
+                        cornerRadius: 6,
+                        callbacks: {
+                            title: (items) => items[0]?.label || '',
+                            label: (context) => {
+                                const item = activeMonthlyData[context.dataIndex];
+                                if (item && item.avg !== null) {
+                                    return ` Rata-rata: ${item.avg.toFixed(2)}% (${item.count}/${item.total} Sites)`;
+                                }
+                                return ' Belum Ada Data';
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [valueBottomPlugin, targetLinePlugin]
+        });
     }
 
     function updateRekapPagination(total) {
@@ -2798,6 +3201,7 @@ const AllSummaryApp = (function () {
         onScorecardSubDeptChange,
         renderTrendDivWhChart,
         updateSummaryMonthDropdown,
+        toggleDbBreakdownPanel,
         toggleUserDropdown,
         closeUserDropdown
     };

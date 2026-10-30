@@ -313,8 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div style="display: flex; align-items: center; gap: 0.6rem;">
                 <h3 class="quick-access-title">Quick Access</h3>
             </div>
-            <button type="button" class="quick-access-close" onclick="toggleQuickAccess()"
-                aria-label="Close">
+            <button type="button" class="quick-access-close" onclick="toggleQuickAccess()" aria-label="Close">
                 &times;
             </button>
         </div>
@@ -324,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a class="quick-access-item" href="./#card-executive-db-analysis"><span>Result DB Analysis</span></a>
             <a class="quick-access-item" href="./#card-scorecard-summary"><span>Score Card Summary</span></a>
             <a class="quick-access-item" href="./#card-trend-dept-wrapper"><span>Trend Chart</span></a>
-            <a class="quick-access-item" href="./#card-hasil-so-subdept"><span>Report SO</span></a>
+            <a class="quick-access-item" href="./#card-hasil-so-subdept"><span>Report Stock Opname</span></a>
             <a class="quick-access-item" href="./#card-rekapitulasi"><span>Rekapitulasi</span></a>
             <a class="quick-access-item" href="./#card-site-movements"><span>History &amp; Log</span></a>
         </div>
@@ -398,19 +397,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     root.removeAttribute('title');
                 }
                 if (root.querySelectorAll) {
-                    root.querySelectorAll('[title]').forEach(function(el) {
+                    root.querySelectorAll('[title]').forEach(function (el) {
                         el.removeAttribute('title');
                     });
                 }
             }
-            document.addEventListener('mouseover', function(e) {
+            document.addEventListener('mouseover', function (e) {
                 let el = e.target;
                 while (el && el !== document && el.nodeType === 1) {
                     if (el.hasAttribute('title')) el.removeAttribute('title');
                     el = el.parentElement;
                 }
             }, true);
-            document.addEventListener('pointerover', function(e) {
+            document.addEventListener('pointerover', function (e) {
                 let el = e.target;
                 while (el && el !== document && el.nodeType === 1) {
                     if (el.hasAttribute('title')) el.removeAttribute('title');
@@ -418,7 +417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }, true);
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() {
+                document.addEventListener('DOMContentLoaded', function () {
                     removeTitles(document.body || document.documentElement);
                 });
             } else {

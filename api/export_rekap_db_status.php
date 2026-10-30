@@ -542,7 +542,7 @@ try {
         'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
     $sheet->getStyle('B7')->getNumberFormat()->setFormatCode('#,##0');
-    $sheet->getStyle('C7')->getNumberFormat()->setFormatCode('0.0%');
+    $sheet->getStyle('C7')->getNumberFormat()->setFormatCode('0.00%');
     $sheet->getStyle('D7')->getNumberFormat()->setFormatCode('"Rp "#,##0.00');
     $sheet->getStyle('B7:D7')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     $sheet->getStyle('A7:E7')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('CBD5E1'));
@@ -559,7 +559,7 @@ try {
         'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
     $sheet->getStyle('B8')->getNumberFormat()->setFormatCode('#,##0');
-    $sheet->getStyle('C8')->getNumberFormat()->setFormatCode('0.0%');
+    $sheet->getStyle('C8')->getNumberFormat()->setFormatCode('0.00%');
     $sheet->getStyle('D8')->getNumberFormat()->setFormatCode('"Rp "#,##0.00');
     $sheet->getStyle('B8:D8')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     $sheet->getStyle('A8:E8')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('CBD5E1'));
@@ -576,13 +576,13 @@ try {
         'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
     $sheet->getStyle('B9')->getNumberFormat()->setFormatCode('#,##0');
-    $sheet->getStyle('C9')->getNumberFormat()->setFormatCode('0.0%');
+    $sheet->getStyle('C9')->getNumberFormat()->setFormatCode('0.00%');
     $sheet->getStyle('D9')->getNumberFormat()->setFormatCode('"Rp "#,##0.00');
     $sheet->getStyle('B9:D9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     $sheet->getStyle('A9:E9')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('CBD5E1'));
 
-    // KPI Row 10: TOTAL DB
-    $sheet->setCellValue('A10', 'TOTAL DB');
+    // KPI Row 10: TOTAL
+    $sheet->setCellValue('A10', 'TOTAL');
     $sheet->setCellValue('B10', $totalDbCount);
     $sheet->setCellValue('C10', 1.0);
     $sheet->setCellValue('D10', $totalNbv);
@@ -594,7 +594,7 @@ try {
     ]);
     $sheet->getStyle('A10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle('B10')->getNumberFormat()->setFormatCode('#,##0');
-    $sheet->getStyle('C10')->getNumberFormat()->setFormatCode('0.0%');
+    $sheet->getStyle('C10')->getNumberFormat()->setFormatCode('0.00%');
     $sheet->getStyle('D10')->getNumberFormat()->setFormatCode('"Rp "#,##0.00');
     $sheet->getStyle('B10:D10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     $sheet->getRowDimension(10)->setRowHeight(19);

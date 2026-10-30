@@ -139,6 +139,16 @@ try {
         $nationalBuckets = array_fill(1, 12, ['sum' => 0.0, 'count' => 0]);
         $subDeptBuckets = [];
         $pmdSubDeptBuckets = [];
+        $pmdSiteBuckets = [];
+        $pmdSiteNames = [];
+        foreach ($sites as $s) {
+            $sc = strtoupper(trim($s['sitecode'] ?? ''));
+            $isSitePmd = (in_array(strtoupper(trim($s['dept'] ?? '')), ['PMD', 'DNO', 'DSO'], true) || strtoupper(trim($s['divisi'] ?? '')) === 'PMD' || ($s['category'] ?? '') === 'monthly_pmd');
+            if ($isSitePmd && $sc !== '') {
+                $pmdSiteBuckets[$sc] = array_fill(1, 12, ['sum' => 0.0, 'count' => 0]);
+                $pmdSiteNames[$sc] = trim($s['name_site'] ?? $sc);
+            }
+        }
         $itBuckets = array_fill(1, 12, ['sum' => 0.0, 'count' => 0]);
         $itSiteBuckets = [
             '50002001384' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
@@ -148,12 +158,16 @@ try {
         $teknoSiteBuckets = [
             '50002003289' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
             '50002003307' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            '50002003305' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            '50002003448' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            '50002003922' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            '50002003599' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
         ];
         $hubSiteBuckets = [
             'BALIKPAPAN' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
-            'MEDAN'      => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
-            'PALEMBANG'  => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
-            'SURABAYA'   => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'MEDAN' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'PALEMBANG' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
+            'SURABAYA' => array_fill(1, 12, ['sum' => 0.0, 'count' => 0]),
         ];
 
         foreach ($sites as $s) {
@@ -287,8 +301,12 @@ try {
                         }
                     }
 
-                    // 5. Sub Depts (Exclude warehouse and special sites from Outlet Regional subdepts)
+                    // 5. Sub Depts & Sites (Exclude warehouse and special sites from Outlet Regional subdepts)
                     if ($isPmd) {
+                        if (isset($pmdSiteBuckets[$upperCode])) {
+                            $pmdSiteBuckets[$upperCode][$m]['sum'] += $val;
+                            $pmdSiteBuckets[$upperCode][$m]['count']++;
+                        }
                         if (isset($pmdSubDeptBuckets[$subDept])) {
                             $pmdSubDeptBuckets[$subDept][$m]['sum'] += $val;
                             $pmdSubDeptBuckets[$subDept][$m]['count']++;
@@ -312,11 +330,11 @@ try {
             if ($soType === 'quarterly') {
                 $quarters = [3, 6, 9, 12];
                 foreach ($quarters as $m) {
-                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count']) : null;
+                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count'], 2) : null;
                 }
             } else {
                 for ($m = 1; $m <= 12; $m++) {
-                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count']) : null;
+                    $res[] = $buckets[$m]['count'] > 0 ? round($buckets[$m]['sum'] / $buckets[$m]['count'], 2) : null;
                 }
             }
             return $res;
@@ -349,11 +367,17 @@ try {
             }
         }
 
-        // 3. PMD Sub DEPT series
+        // 3. PMD Sub DEPT series & PMD 7 Sites series
         ksort($pmdSubDeptBuckets);
         $pmdSubDeptSeries = [];
         foreach ($pmdSubDeptBuckets as $subKey => $b) {
             $pmdSubDeptSeries[$subKey] = $toSeries($b);
+        }
+
+        $pmdSiteSeries = [];
+        foreach ($pmdSiteBuckets as $sc => $b) {
+            $name = $pmdSiteNames[$sc] ?? $sc;
+            $pmdSiteSeries[$name] = $toSeries($b);
         }
 
         echo json_encode([
@@ -365,21 +389,27 @@ try {
             'national_trend' => $nationalSeries,
             'subdept_trends' => $subDeptSeries,
             'pmd_subdept_trends' => $pmdSubDeptSeries,
+            'pmd_site_trends' => $pmdSiteSeries,
             'it_corporate_trend' => $toSeries($itBuckets),
             'it_site_trends' => [
                 'OUTLET OPTI TBS' => $toSeries($itSiteBuckets['50002001384']),
                 'IT CORPORATE - ARCADIA LT 4' => $toSeries($itSiteBuckets['50002003133']),
             ],
             'tekno_trend' => $toSeries($teknoBuckets),
-            'tekno_site_trends' => [
+            'tekno_site_trends' => ($soType === 'quarterly') ? [
+                'BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO' => $toSeries($teknoSiteBuckets['50002003305']),
+                'STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO' => $toSeries($teknoSiteBuckets['50002003448']),
+                'STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO' => $toSeries($teknoSiteBuckets['50002003922']),
+                'PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO' => $toSeries($teknoSiteBuckets['50002003599']),
+            ] : [
                 'GUDANG WAREHOUSE TEKNO' => $toSeries($teknoSiteBuckets['50002003289']),
                 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO' => $toSeries($teknoSiteBuckets['50002003307']),
             ],
             'hub_site_trends' => [
                 'Warehouse HUB BALIKPAPAN' => $toSeries($hubSiteBuckets['BALIKPAPAN']),
-                'Warehouse HUB MEDAN'      => $toSeries($hubSiteBuckets['MEDAN']),
-                'Warehouse HUB PALEMBANG'  => $toSeries($hubSiteBuckets['PALEMBANG']),
-                'Warehouse HUB SURABAYA'   => $toSeries($hubSiteBuckets['SURABAYA']),
+                'Warehouse HUB MEDAN' => $toSeries($hubSiteBuckets['MEDAN']),
+                'Warehouse HUB PALEMBANG' => $toSeries($hubSiteBuckets['PALEMBANG']),
+                'Warehouse HUB SURABAYA' => $toSeries($hubSiteBuckets['SURABAYA']),
             ],
             'division_warehouse_trends' => array_filter([
                 'PMD' => ($soType === 'quarterly') ? null : $toSeries($deptBuckets['PMD']),
@@ -391,7 +421,9 @@ try {
                 'Warehouse HUB PALEMBANG' => $toSeries($hubSiteBuckets['PALEMBANG']),
                 'Warehouse HUB SURABAYA' => $toSeries($hubSiteBuckets['SURABAYA']),
                 'Warehouse TEKNO (50002003289)' => ($soType === 'quarterly') ? null : $toSeries($teknoSiteBuckets['50002003289']),
-            ], function ($v) { return $v !== null; }),
+            ], function ($v) {
+                return $v !== null;
+            }),
         ]);
         exit;
     }
@@ -689,7 +721,7 @@ try {
     $monthAverages = [];
     for ($m = 1; $m <= 12; $m++) {
         $cnt = $monthTotals[$m]['count'];
-        $monthAverages[$m] = $cnt > 0 ? round($monthTotals[$m]['sum'] / $cnt) : null;
+        $monthAverages[$m] = $cnt > 0 ? round($monthTotals[$m]['sum'] / $cnt, 2) : null;
     }
 
     echo json_encode([

@@ -24,8 +24,8 @@ try {
         // ── 1. ACTION = SUMMARY (Weekly Summary Page) ───────────────
         if ($action === 'summary') {
             $month = isset($_GET['month']) && is_numeric($_GET['month']) ? (int) $_GET['month'] : 0;
-            $week  = isset($_GET['week']) && is_numeric($_GET['week'])   ? (int) $_GET['week']  : 0;
-            $year  = isset($_GET['year']) && is_numeric($_GET['year'])   ? (int) $_GET['year']  : (int) date('Y');
+            $week = isset($_GET['week']) && is_numeric($_GET['week']) ? (int) $_GET['week'] : 0;
+            $year = isset($_GET['year']) && is_numeric($_GET['year']) ? (int) $_GET['year'] : (int) date('Y');
             $category = trim($_GET['category'] ?? 'pmd'); // 'pmd' or 'outlet'
 
             // If month or week not specified, find latest available period in asset_reconciliation_weekly
@@ -50,7 +50,8 @@ try {
                     }
                 } else {
                     $week = 1;
-                    if ($year <= 0) $year = (int) date('Y');
+                    if ($year <= 0)
+                        $year = (int) date('Y');
                 }
             } elseif ($month <= 0 || $week <= 0) {
                 $latestStmt = $db->query("
@@ -66,8 +67,8 @@ try {
                 $latest = $latestStmt->fetch(PDO::FETCH_ASSOC);
                 if ($latest) {
                     $month = (int) $latest['period_month'];
-                    $week  = (int) $latest['period_week'];
-                    $year  = (int) $latest['period_year'];
+                    $week = (int) $latest['period_week'];
+                    $year = (int) $latest['period_year'];
                 } else {
                     $month = (int) date('n');
                     $week = 1;
@@ -108,9 +109,9 @@ try {
 
             // Rating thresholds (from Rating KPI Master Data)
             $vpMax = isset($ratingKpis['very_poor']['max_pct']) && $ratingKpis['very_poor']['max_pct'] !== null ? (float) $ratingKpis['very_poor']['max_pct'] : 34.0;
-            $pMax  = isset($ratingKpis['poor']['max_pct']) && $ratingKpis['poor']['max_pct'] !== null ? (float) $ratingKpis['poor']['max_pct'] : 62.0;
-            $mMax  = isset($ratingKpis['moderate']['max_pct']) && $ratingKpis['moderate']['max_pct'] !== null ? (float) $ratingKpis['moderate']['max_pct'] : 71.0;
-            $gMax  = isset($ratingKpis['good']['max_pct']) && $ratingKpis['good']['max_pct'] !== null ? (float) $ratingKpis['good']['max_pct'] : 84.0;
+            $pMax = isset($ratingKpis['poor']['max_pct']) && $ratingKpis['poor']['max_pct'] !== null ? (float) $ratingKpis['poor']['max_pct'] : 62.0;
+            $mMax = isset($ratingKpis['moderate']['max_pct']) && $ratingKpis['moderate']['max_pct'] !== null ? (float) $ratingKpis['moderate']['max_pct'] : 71.0;
+            $gMax = isset($ratingKpis['good']['max_pct']) && $ratingKpis['good']['max_pct'] !== null ? (float) $ratingKpis['good']['max_pct'] : 84.0;
 
             // Helper to evaluate Rating from Rating KPI Master Data
             $evalRating = function (?float $pct) use ($vpMax, $pMax, $mMax, $gMax): array {
@@ -118,10 +119,14 @@ try {
                     return ['rating' => 'Very Poor', 'rating_code' => 'very_poor'];
                 }
                 $p = (int) round($pct);
-                if ($p <= $vpMax) return ['rating' => 'Very Poor', 'rating_code' => 'very_poor'];
-                if ($p <= $pMax)  return ['rating' => 'Poor', 'rating_code' => 'poor'];
-                if ($p <= $mMax)  return ['rating' => 'Moderate', 'rating_code' => 'moderate'];
-                if ($p <= $gMax)  return ['rating' => 'Good', 'rating_code' => 'good'];
+                if ($p <= $vpMax)
+                    return ['rating' => 'Very Poor', 'rating_code' => 'very_poor'];
+                if ($p <= $pMax)
+                    return ['rating' => 'Poor', 'rating_code' => 'poor'];
+                if ($p <= $mMax)
+                    return ['rating' => 'Moderate', 'rating_code' => 'moderate'];
+                if ($p <= $gMax)
+                    return ['rating' => 'Good', 'rating_code' => 'good'];
                 return ['rating' => 'Very Good', 'rating_code' => 'very_good'];
             };
 
@@ -133,8 +138,8 @@ try {
                 $p = (int) round($pct);
                 $isExec = ($p >= $execThreshPct);
                 return [
-                    'status'   => $isExec ? 'Executed' : 'Not Executed',
-                    'code'     => $isExec ? 'executed' : 'not_executed',
+                    'status' => $isExec ? 'Executed' : 'Not Executed',
+                    'code' => $isExec ? 'executed' : 'not_executed',
                     'executed' => $isExec,
                 ];
             };
@@ -251,24 +256,24 @@ try {
                 ];
                 $subDeptStats = [
                     'CJDO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'EKO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'WJO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'WKO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'BNO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'EJO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'MPO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'SMO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'CSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'NSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'SSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'CCO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'WCO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'ECO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'EEO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'NEO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'SEO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'DNO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
-                    'DSO'  => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'EKO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'WJO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'WKO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'BNO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'EJO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'MPO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'SMO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'CSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'NSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'SSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'CCO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'WCO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'ECO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'EEO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'NEO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'SEO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'DNO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
+                    'DSO' => ['sum' => 0.0, 'count' => 0, 'total' => 0],
                 ];
 
                 $catSum = 0.0;
@@ -295,7 +300,8 @@ try {
 
                     // Filter based on selected category (PMD or Outlet Regional)
                     if ($cat === 'pmd') {
-                        if (!$isPmd) continue;
+                        if (!$isPmd)
+                            continue;
                     } else {
                         // Outlet Regional: non-PMD, non-warehouse/HUB, strictly group_type = 'monthly'
                         $info = trim($s['info'] ?? '');
@@ -310,13 +316,15 @@ try {
                     $isPmdSite = $isPmd;
 
                     if ($isPmdSite) {
-                        if (isset($deptStats['PMD'])) $deptStats['PMD']['total']++;
+                        if (isset($deptStats['PMD']))
+                            $deptStats['PMD']['total']++;
                     } elseif (isset($deptStats[$dept])) {
                         $deptStats[$dept]['total']++;
                     }
 
                     if ($dept === 'DNO' || $dept === 'DSO') {
-                        if (isset($subDeptStats[$dept])) $subDeptStats[$dept]['total']++;
+                        if (isset($subDeptStats[$dept]))
+                            $subDeptStats[$dept]['total']++;
                     }
                     if ($subDept !== '') {
                         if (!isset($subDeptStats[$subDept])) {
@@ -425,23 +433,23 @@ try {
                     }
 
                     $matchedSites[$sc] = [
-                        'sitecode'         => $sc,
-                        'name_site'        => $s['name_site'] ?? '',
-                        'dept'             => $dept,
-                        'sub_dept'         => $subDept,
-                        'regional'         => $s['regional'] ?? '',
-                        'pct'              => ($pct !== null ? round($pct, 2) : null),
-                        'match_qty'        => $matchQty,
-                        'physic_qty'       => $physicQty,
-                        'db_qty'           => $dbQty,
-                        'actual_qty'       => $actualQty,
-                        'target_qty'       => $targetQty,
-                        'status'           => $status,
-                        'has_data'         => $hasData,
-                        'executed'         => $executed,
+                        'sitecode' => $sc,
+                        'name_site' => $s['name_site'] ?? '',
+                        'dept' => $dept,
+                        'sub_dept' => $subDept,
+                        'regional' => $s['regional'] ?? '',
+                        'pct' => ($pct !== null ? round($pct, 2) : null),
+                        'match_qty' => $matchQty,
+                        'physic_qty' => $physicQty,
+                        'db_qty' => $dbQty,
+                        'actual_qty' => $actualQty,
+                        'target_qty' => $targetQty,
+                        'status' => $status,
+                        'has_data' => $hasData,
+                        'executed' => $executed,
                         'execution_status' => $executionStatus,
-                        'rating'           => $rating,
-                        'rating_code'      => $ratingCode,
+                        'rating' => $rating,
+                        'rating_code' => $ratingCode,
                     ];
                 }
 
@@ -452,10 +460,10 @@ try {
                     $pct = ($count > 0) ? round($sum / $count, 2) : 0.0;
                     $roundedPct = (int) round($pct);
                     return [
-                        'pct'           => $pct,
+                        'pct' => $pct,
                         'sites_counted' => $count,
-                        'total_sites'   => $total,
-                        'status'        => ($total === 0 || $count === 0) ? 'Belum Ada Data' : (($roundedPct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
+                        'total_sites' => $total,
+                        'status' => ($total === 0 || $count === 0) ? 'Belum Ada Data' : (($roundedPct >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
                     ];
                 };
 
@@ -474,16 +482,16 @@ try {
                 }
 
                 return [
-                    'main'             => [
-                        'pct'           => $mainPct,
+                    'main' => [
+                        'pct' => $mainPct,
                         'sites_counted' => $catCount,
-                        'total_sites'   => $catTotalSites,
-                        'status'        => ($catTotalSites === 0 || $catCount === 0) ? 'Belum Ada Data' : (($mainRounded >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
+                        'total_sites' => $catTotalSites,
+                        'status' => ($catTotalSites === 0 || $catCount === 0) ? 'Belum Ada Data' : (($mainRounded >= $targetPct) ? 'Tercapai' : 'Tidak Tercapai'),
                     ],
-                    'depts'            => $deptsFormatted,
-                    'sub_depts'        => $subDeptsFormatted,
-                    'sites'            => $matchedSites,
-                    'raw_count'        => count($recs),
+                    'depts' => $deptsFormatted,
+                    'sub_depts' => $subDeptsFormatted,
+                    'sites' => $matchedSites,
+                    'raw_count' => count($recs),
                 ];
             };
 
@@ -526,30 +534,30 @@ try {
 
             // Build Achievements Payload
             $achievements = [
-                'has_previous'    => $hasPrevious,
-                'target_pct'      => $targetPct,
+                'has_previous' => $hasPrevious,
+                'target_pct' => $targetPct,
                 'previous_period' => $hasPrevious ? ['month' => $prevMonth, 'week' => $prevWeek, 'year' => $prevYear] : null,
-                'main'            => [
-                    'pct'           => $currData['main']['pct'],
-                    'prev_pct'      => $hasPrevious ? $prevData['main']['pct'] : null,
-                    'diff_pct'      => $calcDiff($currData['main']['pct'], $hasPrevious ? $prevData['main']['pct'] : null),
+                'main' => [
+                    'pct' => $currData['main']['pct'],
+                    'prev_pct' => $hasPrevious ? $prevData['main']['pct'] : null,
+                    'diff_pct' => $calcDiff($currData['main']['pct'], $hasPrevious ? $prevData['main']['pct'] : null),
                     'sites_counted' => $currData['main']['sites_counted'],
-                    'total_sites'   => $currData['main']['total_sites'],
-                    'status'        => $currData['main']['status'],
+                    'total_sites' => $currData['main']['total_sites'],
+                    'status' => $currData['main']['status'],
                 ],
-                'depts'           => [],
-                'sub_depts'       => [],
+                'depts' => [],
+                'sub_depts' => [],
             ];
 
             foreach ($currData['depts'] as $dKey => $dVal) {
                 $prevPct = $hasPrevious ? ($prevData['depts'][$dKey]['pct'] ?? null) : null;
                 $kpiObj = [
-                    'pct'           => $dVal['pct'],
-                    'prev_pct'      => $prevPct,
-                    'diff_pct'      => $calcDiff($dVal['pct'], $prevPct),
+                    'pct' => $dVal['pct'],
+                    'prev_pct' => $prevPct,
+                    'diff_pct' => $calcDiff($dVal['pct'], $prevPct),
                     'sites_counted' => $dVal['sites_counted'],
-                    'total_sites'   => $dVal['total_sites'],
-                    'status'        => $dVal['status'],
+                    'total_sites' => $dVal['total_sites'],
+                    'status' => $dVal['status'],
                 ];
                 $achievements['depts'][strtolower($dKey)] = $kpiObj;
                 $achievements['depts'][strtoupper($dKey)] = $kpiObj;
@@ -558,12 +566,12 @@ try {
             foreach ($currData['sub_depts'] as $sKey => $sVal) {
                 $prevPct = $hasPrevious ? ($prevData['sub_depts'][$sKey]['pct'] ?? null) : null;
                 $kpiObj = [
-                    'pct'           => $sVal['pct'],
-                    'prev_pct'      => $prevPct,
-                    'diff_pct'      => $calcDiff($sVal['pct'], $prevPct),
+                    'pct' => $sVal['pct'],
+                    'prev_pct' => $prevPct,
+                    'diff_pct' => $calcDiff($sVal['pct'], $prevPct),
                     'sites_counted' => $sVal['sites_counted'],
-                    'total_sites'   => $sVal['total_sites'],
-                    'status'        => $sVal['status'],
+                    'total_sites' => $sVal['total_sites'],
+                    'status' => $sVal['status'],
                 ];
                 $achievements['sub_depts'][strtolower($sKey)] = $kpiObj;
                 $achievements['sub_depts'][strtoupper($sKey)] = $kpiObj;
@@ -573,14 +581,14 @@ try {
             // Rule: Always display full words: Very Good, Good, Moderate, Poor, Very Poor
             $ratingCounts = [
                 'very_good' => 0,
-                'good'      => 0,
-                'moderate'  => 0,
-                'poor'      => 0,
+                'good' => 0,
+                'moderate' => 0,
+                'poor' => 0,
                 'very_poor' => 0,
             ];
 
             $executionCounts = [
-                'executed'     => 0,
+                'executed' => 0,
                 'not_executed' => 0,
             ];
 
@@ -602,27 +610,27 @@ try {
             $totalSitesForScorecard = count($siteRows);
 
             $scorecard = [
-                'rating'    => [
-                    'total'     => $totalSitesForScorecard,
+                'rating' => [
+                    'total' => $totalSitesForScorecard,
                     'very_good' => $ratingCounts['very_good'],
-                    'good'      => $ratingCounts['good'],
-                    'moderate'  => $ratingCounts['moderate'],
-                    'poor'      => $ratingCounts['poor'],
+                    'good' => $ratingCounts['good'],
+                    'moderate' => $ratingCounts['moderate'],
+                    'poor' => $ratingCounts['poor'],
                     'very_poor' => $ratingCounts['very_poor'],
-                    'pct_vg'    => ($totalSitesForScorecard > 0) ? round(($ratingCounts['very_good'] / $totalSitesForScorecard) * 100, 1) : 0,
-                    'pct_g'     => ($totalSitesForScorecard > 0) ? round(($ratingCounts['good'] / $totalSitesForScorecard) * 100, 1) : 0,
-                    'pct_m'     => ($totalSitesForScorecard > 0) ? round(($ratingCounts['moderate'] / $totalSitesForScorecard) * 100, 1) : 0,
-                    'pct_p'     => ($totalSitesForScorecard > 0) ? round(($ratingCounts['poor'] / $totalSitesForScorecard) * 100, 1) : 0,
-                    'pct_vp'    => ($totalSitesForScorecard > 0) ? round(($ratingCounts['very_poor'] / $totalSitesForScorecard) * 100, 1) : 0,
+                    'pct_vg' => ($totalSitesForScorecard > 0) ? round(($ratingCounts['very_good'] / $totalSitesForScorecard) * 100, 2) : 0,
+                    'pct_g' => ($totalSitesForScorecard > 0) ? round(($ratingCounts['good'] / $totalSitesForScorecard) * 100, 2) : 0,
+                    'pct_m' => ($totalSitesForScorecard > 0) ? round(($ratingCounts['moderate'] / $totalSitesForScorecard) * 100, 2) : 0,
+                    'pct_p' => ($totalSitesForScorecard > 0) ? round(($ratingCounts['poor'] / $totalSitesForScorecard) * 100, 2) : 0,
+                    'pct_vp' => ($totalSitesForScorecard > 0) ? round(($ratingCounts['very_poor'] / $totalSitesForScorecard) * 100, 2) : 0,
                 ],
                 'execution' => [
-                    'total'        => $totalSitesForScorecard,
-                    'executed'     => $executionCounts['executed'],
+                    'total' => $totalSitesForScorecard,
+                    'executed' => $executionCounts['executed'],
                     'not_executed' => $executionCounts['not_executed'],
-                    'pct_exec'     => ($totalSitesForScorecard > 0) ? round(($executionCounts['executed'] / $totalSitesForScorecard) * 100, 1) : 0,
-                    'pct_not_exec' => ($totalSitesForScorecard > 0) ? round(($executionCounts['not_executed'] / $totalSitesForScorecard) * 100, 1) : 0,
+                    'pct_exec' => ($totalSitesForScorecard > 0) ? round(($executionCounts['executed'] / $totalSitesForScorecard) * 100, 2) : 0,
+                    'pct_not_exec' => ($totalSitesForScorecard > 0) ? round(($executionCounts['not_executed'] / $totalSitesForScorecard) * 100, 2) : 0,
                 ],
-                'sites'     => $siteRows,
+                'sites' => $siteRows,
             ];
 
             $periodsStmt = $db->query("
@@ -637,40 +645,40 @@ try {
             $availablePeriods = $periodsStmt ? $periodsStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
             echo json_encode([
-                'success'           => true,
-                'period'            => [
+                'success' => true,
+                'period' => [
                     'month' => $month,
-                    'week'  => $week,
-                    'year'  => $year,
+                    'week' => $week,
+                    'year' => $year,
                 ],
-                'latest_period'     => !empty($availablePeriods) ? [
+                'latest_period' => !empty($availablePeriods) ? [
                     'month' => (int) $availablePeriods[0]['period_month'],
-                    'week'  => (int) $availablePeriods[0]['period_week'],
-                    'year'  => (int) $availablePeriods[0]['period_year'],
+                    'week' => (int) $availablePeriods[0]['period_week'],
+                    'year' => (int) $availablePeriods[0]['period_year'],
                 ] : [
                     'month' => (int) date('n'),
-                    'week'  => 1,
-                    'year'  => (int) date('Y'),
+                    'week' => 1,
+                    'year' => (int) date('Y'),
                 ],
-                'available_periods' => array_map(function($p) {
+                'available_periods' => array_map(function ($p) {
                     return [
-                        'year'  => (int) $p['period_year'],
+                        'year' => (int) $p['period_year'],
                         'month' => (int) $p['period_month'],
-                        'week'  => (int) $p['period_week'],
+                        'week' => (int) $p['period_week'],
                     ];
                 }, $availablePeriods),
-                'category'          => $category,
-                'achievements'      => $achievements,
-                'scorecard'         => $scorecard,
-                'report_so'         => $siteRows,
+                'category' => $category,
+                'achievements' => $achievements,
+                'scorecard' => $scorecard,
+                'report_so' => $siteRows,
             ]);
             exit;
         }
 
         // ── 2. ACTION = LIST (SO Profile Weekly Master Data Table) ───
         $month = isset($_GET['month']) && is_numeric($_GET['month']) ? (int) $_GET['month'] : 0;
-        $week  = isset($_GET['week']) && is_numeric($_GET['week'])   ? (int) $_GET['week']  : 0;
-        $year  = isset($_GET['year']) && is_numeric($_GET['year'])   ? (int) $_GET['year']  : 0;
+        $week = isset($_GET['week']) && is_numeric($_GET['week']) ? (int) $_GET['week'] : 0;
+        $year = isset($_GET['year']) && is_numeric($_GET['year']) ? (int) $_GET['year'] : 0;
         $search = trim($_GET['search'] ?? '');
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $pageSize = $_GET['page_size'] ?? '10';
@@ -681,12 +689,31 @@ try {
         $sortDir = strtolower(trim($_GET['sort_dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
         $allowedSort = [
-            'id', 'profile', 'period_start', 'period_end', 'period_month', 'period_week', 'period_year',
-            'match_physic_qty', 'match_physic_pct', 'match_nbv_value', 'match_nbv_pct',
-            'physic_physic_qty', 'physic_physic_pct', 'physic_nbv_value', 'physic_nbv_pct',
-            'db_physic_qty', 'db_physic_pct', 'db_nbv_value', 'db_nbv_pct',
-            'total_physic_actual', 'total_physic_target', 'total_physic_pct',
-            'total_nbv_actual', 'total_nbv_target', 'total_nbv_pct'
+            'id',
+            'profile',
+            'period_start',
+            'period_end',
+            'period_month',
+            'period_week',
+            'period_year',
+            'match_physic_qty',
+            'match_physic_pct',
+            'match_nbv_value',
+            'match_nbv_pct',
+            'physic_physic_qty',
+            'physic_physic_pct',
+            'physic_nbv_value',
+            'physic_nbv_pct',
+            'db_physic_qty',
+            'db_physic_pct',
+            'db_nbv_value',
+            'db_nbv_pct',
+            'total_physic_actual',
+            'total_physic_target',
+            'total_physic_pct',
+            'total_nbv_actual',
+            'total_nbv_target',
+            'total_nbv_pct'
         ];
         if (!in_array($sortCol, $allowedSort, true)) {
             $sortCol = 'id';
@@ -768,11 +795,11 @@ try {
         $rows = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode([
-            'success'   => true,
-            'data'      => $rows,
-            'totals'    => $totals,
-            'total'     => $totalRecords,
-            'page'      => $page,
+            'success' => true,
+            'data' => $rows,
+            'totals' => $totals,
+            'total' => $totalRecords,
+            'page' => $page,
             'page_size' => $pageSize,
         ]);
         exit;
@@ -790,8 +817,8 @@ try {
 
         if ($isBulk) {
             $month = isset($input['month']) ? (int) $input['month'] : (int) ($_GET['month'] ?? 0);
-            $week  = isset($input['week'])  ? (int) $input['week']  : (int) ($_GET['week'] ?? 0);
-            $year  = isset($input['year'])  ? (int) $input['year']  : (int) ($_GET['year'] ?? 0);
+            $week = isset($input['week']) ? (int) $input['week'] : (int) ($_GET['week'] ?? 0);
+            $year = isset($input['year']) ? (int) $input['year'] : (int) ($_GET['year'] ?? 0);
 
             if ($id === 'all' || ($month <= 0 && $week <= 0 && $year <= 0)) {
                 $db->exec('TRUNCATE TABLE asset_reconciliation_weekly RESTART IDENTITY');
@@ -820,9 +847,9 @@ try {
             $count = $stmt->rowCount();
 
             echo json_encode([
-                'success'       => true,
+                'success' => true,
                 'deleted_count' => $count,
-                'message'       => "Berhasil menghapus {$count} baris data SO Profile Weekly."
+                'message' => "Berhasil menghapus {$count} baris data SO Profile Weekly."
             ]);
             exit;
         }

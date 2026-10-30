@@ -379,7 +379,7 @@ try {
                 $siteAchievements[$sc] = [
                     'sitecode' => $sc,
                     'name_site' => $s['name_site'] ?? '',
-                    'pct' => ($m !== null && $m['pct'] !== null) ? round($m['pct']) : null,
+                    'pct' => ($m !== null && $m['pct'] !== null) ? round($m['pct'], 2) : null,
                     'db_qty' => ($m !== null) ? (int)$m['db_qty'] : 0,
                     'has_data' => ($m !== null && $m['pct'] !== null),
                 ];
@@ -396,7 +396,7 @@ try {
             $compiledSubDepts = [];
             foreach ($subDeptStats as $sCode => $sData) {
                 $compiledSubDepts[strtolower($sCode)] = [
-                    'pct' => $sData['count'] > 0 ? round($sData['sum'] / $sData['count']) : 0,
+                    'pct' => $sData['count'] > 0 ? round($sData['sum'] / $sData['count'], 2) : 0,
                     'count' => $sData['count'],
                     'total_sites' => $sData['total'],
                 ];
@@ -493,42 +493,42 @@ try {
 
             return [
                 'national' => [
-                    'pct' => $nationalCount > 0 ? round($nationalSum / $nationalCount) : 0,
+                    'pct' => $nationalCount > 0 ? round($nationalSum / $nationalCount, 2) : 0,
                     'count' => $nationalCount,
                     'total_sites' => $totalNationalSites,
                 ],
                 'outlet_national' => [
-                    'pct' => $outletCount > 0 ? round($outletSum / $outletCount) : 0,
+                    'pct' => $outletCount > 0 ? round($outletSum / $outletCount, 2) : 0,
                     'count' => $outletCount,
                     'total_sites' => $totalOutletSites,
                 ],
                 'cro' => [
-                    'pct' => $deptStats['CRO']['count'] > 0 ? round($deptStats['CRO']['sum'] / $deptStats['CRO']['count']) : 0,
+                    'pct' => $deptStats['CRO']['count'] > 0 ? round($deptStats['CRO']['sum'] / $deptStats['CRO']['count'], 2) : 0,
                     'count' => $deptStats['CRO']['count'],
                     'total_sites' => $deptStats['CRO']['total'],
                 ],
                 'ero' => [
-                    'pct' => $deptStats['ERO']['count'] > 0 ? round($deptStats['ERO']['sum'] / $deptStats['ERO']['count']) : 0,
+                    'pct' => $deptStats['ERO']['count'] > 0 ? round($deptStats['ERO']['sum'] / $deptStats['ERO']['count'], 2) : 0,
                     'count' => $deptStats['ERO']['count'],
                     'total_sites' => $deptStats['ERO']['total'],
                 ],
                 'wro' => [
-                    'pct' => $deptStats['WRO']['count'] > 0 ? round($deptStats['WRO']['sum'] / $deptStats['WRO']['count']) : 0,
+                    'pct' => $deptStats['WRO']['count'] > 0 ? round($deptStats['WRO']['sum'] / $deptStats['WRO']['count'], 2) : 0,
                     'count' => $deptStats['WRO']['count'],
                     'total_sites' => $deptStats['WRO']['total'],
                 ],
                 'pmd' => [
-                    'pct' => $deptStats['PMD']['count'] > 0 ? round($deptStats['PMD']['sum'] / $deptStats['PMD']['count']) : 0,
+                    'pct' => $deptStats['PMD']['count'] > 0 ? round($deptStats['PMD']['sum'] / $deptStats['PMD']['count'], 2) : 0,
                     'count' => $deptStats['PMD']['count'],
                     'total_sites' => $deptStats['PMD']['total'],
                 ],
                 'dno' => [
-                    'pct' => $subDeptStats['DNO']['count'] > 0 ? round($subDeptStats['DNO']['sum'] / $subDeptStats['DNO']['count']) : 0,
+                    'pct' => $subDeptStats['DNO']['count'] > 0 ? round($subDeptStats['DNO']['sum'] / $subDeptStats['DNO']['count'], 2) : 0,
                     'count' => $subDeptStats['DNO']['count'],
                     'total_sites' => $subDeptStats['DNO']['total'],
                 ],
                 'dso' => [
-                    'pct' => $subDeptStats['DSO']['count'] > 0 ? round($subDeptStats['DSO']['sum'] / $subDeptStats['DSO']['count']) : 0,
+                    'pct' => $subDeptStats['DSO']['count'] > 0 ? round($subDeptStats['DSO']['sum'] / $subDeptStats['DSO']['count'], 2) : 0,
                     'count' => $subDeptStats['DSO']['count'],
                     'total_sites' => $subDeptStats['DSO']['total'],
                 ],
@@ -1020,7 +1020,7 @@ try {
                         }
                     }
 
-                    foreach (['cro', 'ero', 'wro', 'pmd'] as $dk) {
+                    foreach (['cro', 'ero', 'wro'] as $dk) {
                         if (isset($dbA[$dk])) {
                             $cDept = $currStatus['depts'][$dk] ?? ['solved' => 0, 'unsolved' => 0, 'new_db' => 0, 'solved_sites' => 0, 'unsolved_sites' => 0, 'new_db_sites' => 0];
                             $pDept = $isCurrDbUploaded ? ($prevStatus['depts'][$dk] ?? null) : null;
@@ -1158,11 +1158,14 @@ try {
                     if (isset($dbA['pmd'])) {
                         $cPmd = $currStatus['pmd'];
                         $pPmd = $prevStatus['pmd'] ?? null;
+                        $dbA['pmd']['solved'] = $cPmd['solved'];
+                        $dbA['pmd']['unsolved'] = $cPmd['unsolved'];
+                        $dbA['pmd']['new_db'] = $cPmd['new_db'];
                         $dbA['pmd']['solved_sites'] = $cPmd['solved_sites'];
                         $dbA['pmd']['unsolved_sites'] = $cPmd['unsolved_sites'];
                         $dbA['pmd']['new_db_sites'] = $cPmd['new_db_sites'];
 
-                        $cTotalPmd = ($dbA['pmd']['solved'] ?? 0) + ($dbA['pmd']['unsolved'] ?? 0) + ($dbA['pmd']['new_db'] ?? 0);
+                        $cTotalPmd = $cPmd['solved'] + $cPmd['unsolved'] + $cPmd['new_db'];
                         $pTotalPmd = $pPmd ? ($pPmd['solved'] + $pPmd['unsolved'] + $pPmd['new_db']) : null;
                         $dbA['pmd']['total_status'] = $cTotalPmd;
                         $dbA['pmd']['prev_total_status'] = $pTotalPmd;
@@ -1536,7 +1539,7 @@ try {
                 $statusText = 'Belum Ada Data';
                 $statusClass = 'none';
                 if ($pct !== null) {
-                    $evalPct = (float) round($pct);
+                    $evalPct = (float) round($pct, 2);
                     if ($isTarget98) {
                         if ($evalPct >= 98.0) {
                             $statusText = 'Tercapai';
@@ -1569,14 +1572,14 @@ try {
                     'db_physic_qty' => $dbQty,
                     'total_physic_actual' => $actual,
                     'total_physic_target' => $target,
-                    'total_physic_pct' => $pct !== null ? round($pct) : null,
+                    'total_physic_pct' => $pct !== null ? round($pct, 2) : null,
                     'status' => $statusText,
                     'status_class' => $statusClass,
                     'has_data' => $hasData,
                 ];
             }
 
-            $avgPct = $countWithData > 0 ? round($totalPctSum / $countWithData) : 0;
+            $avgPct = $countWithData > 0 ? round($totalPctSum / $countWithData, 2) : 0;
             $overallStatus = 'none';
             $overallStatusText = 'Belum Ada Data';
             $isPmdOverall = (strtoupper($dept) === 'PMD');

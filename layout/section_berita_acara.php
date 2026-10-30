@@ -86,10 +86,10 @@
         </div>
     </div>
 
-    <!-- 3 Overview Stats Cards as requested: Generated, Pending, Verified -->
+    <!-- Overview Stats Cards: Generated, Not Generated, Pending, Waiting Verification, Verified -->
     <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <!-- Card 1: Value Generated Report -->
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <!-- Card 1: Generated Report -->
         <div class="card"
             style="margin: 0; padding: 1.15rem 1.35rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
             <div
@@ -112,7 +112,27 @@
             </div>
         </div>
 
-        <!-- Card 2: Pending Report (Status hanya sent to whatsapp) -->
+        <!-- Card 2: Not Generated -->
+        <div class="card"
+            style="margin: 0; padding: 1.15rem 1.35rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div
+                style="width: 46px; height: 46px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+            </div>
+            <div>
+                <div
+                    style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Not Generated</div>
+                <div id="stat-ba-not-generated"
+                    style="font-size: 22px; font-weight: 800; color: #64748b; line-height: 1.2; margin-top: 2px;">-
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Pending Report (Status sent to whatsapp) -->
         <div class="card"
             style="margin: 0; padding: 1.15rem 1.35rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
             <div
@@ -132,7 +152,28 @@
             </div>
         </div>
 
-        <!-- Card 3: Report Verified (Report yang sudah di upload ulang dan verified) -->
+        <!-- Card 4: Waiting Verification -->
+        <div class="card"
+            style="margin: 0; padding: 1.15rem 1.35rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div
+                style="width: 46px; height: 46px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: center; color: #0284c7;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </div>
+            <div>
+                <div
+                    style="font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Waiting Verification</div>
+                <div id="stat-ba-waiting-verif"
+                    style="font-size: 22px; font-weight: 800; color: #0284c7; line-height: 1.2; margin-top: 2px;">-
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Report Verified -->
         <div class="card"
             style="margin: 0; padding: 1.15rem 1.35rem; display: flex; align-items: center; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
             <div
@@ -207,7 +248,10 @@
                     <select id="ba-filter-status" class="form-control unified-filter-select" style="width: auto;"
                         onchange="App.onBaStatusFilterChange()">
                         <option value="all">Semua Status</option>
-                        <option value="pending">Pending</option>
+                        <option value="not_generated">Not Generated</option>
+                        <option value="generated">Generated</option>
+                        <option value="sent">Pending</option>
+                        <option value="uploaded">Menunggu Verifikasi</option>
                         <option value="verified">Verified</option>
                     </select>
                 </div>

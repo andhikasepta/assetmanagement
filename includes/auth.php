@@ -24,7 +24,7 @@ function getCurrentUser(): ?array
         if (!empty($_SESSION['user']['id']) || !empty($_SESSION['user']['username'])) {
             try {
                 $db = getDbConnection();
-                $stmt = $db->prepare('SELECT id, username, name, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_reset_report, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE id = :id OR LOWER(username) = LOWER(:u) LIMIT 1');
+                $stmt = $db->prepare('SELECT id, username, name, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_reset_report, can_access_berita_acara, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE id = :id OR LOWER(username) = LOWER(:u) LIMIT 1');
                 $stmt->execute([
                     ':id' => (int) ($_SESSION['user']['id'] ?? 0),
                     ':u' => (string) ($_SESSION['user']['username'] ?? '')
@@ -41,6 +41,7 @@ function getCurrentUser(): ?array
                         'can_access_reports' => filter_var($u['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'reports_depts' => !empty($u['reports_depts']) ? $u['reports_depts'] : 'ALL',
                         'can_reset_report' => filter_var($u['can_reset_report'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_berita_acara' => filter_var($u['can_access_berita_acara'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data' => filter_var($u['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data_weekly' => filter_var($u['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_user_management' => filter_var($u['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
@@ -95,7 +96,7 @@ function attemptLogin(string $username, string $password): array
     // Try checking database first
     try {
         $db = getDbConnection();
-        $stmt = $db->prepare('SELECT id, username, name, password, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE username = :username LIMIT 1');
+        $stmt = $db->prepare('SELECT id, username, name, password, role, can_access_all_summary, can_access_weekly_summary, can_access_reports, reports_depts, can_reset_report, can_access_berita_acara, can_access_master_data, can_access_master_data_weekly, can_access_user_management, can_master_add_import, can_master_edit, can_master_delete, can_master_weekly_add_import, can_master_weekly_delete FROM users WHERE username = :username LIMIT 1');
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -131,6 +132,7 @@ function attemptLogin(string $username, string $password): array
                         'can_access_reports' => filter_var($user['can_access_reports'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'reports_depts' => !empty($user['reports_depts']) ? $user['reports_depts'] : 'ALL',
                         'can_reset_report' => filter_var($user['can_reset_report'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                        'can_access_berita_acara' => filter_var($user['can_access_berita_acara'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data' => filter_var($user['can_access_master_data'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_master_data_weekly' => filter_var($user['can_access_master_data_weekly'] ?? true, FILTER_VALIDATE_BOOLEAN),
                         'can_access_user_management' => filter_var($user['can_access_user_management'] ?? true, FILTER_VALIDATE_BOOLEAN),
@@ -165,6 +167,7 @@ function attemptLogin(string $username, string $password): array
                 'can_access_reports' => true,
                 'reports_depts' => 'ALL',
                 'can_reset_report' => true,
+                'can_access_berita_acara' => true,
                 'can_access_master_data' => true,
                 'can_access_master_data_weekly' => true,
                 'can_access_user_management' => true,
