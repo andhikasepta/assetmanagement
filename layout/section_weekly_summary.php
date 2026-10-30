@@ -209,9 +209,9 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                     </div>
                 </div>
 
-                <!-- WRO Group: WRO Card + Subdept Cards (CSO, NSO, SSO) -->
-                <div class="kpi-card-group" id="weekly-kpi-group-wro" style="display: none;">
-                    <div class="kpi-card kpi-card-split" id="weekly-kpi-card-wro">
+                <!-- WRO Group: 1 Unified Card (WRO Dept + Subdepts CSO, NSO, SSO) -->
+                <div class="kpi-card kpi-card-group" id="weekly-kpi-group-wro" style="display: none;">
+                    <div class="kpi-card-split" id="weekly-kpi-card-wro">
                         <div class="kpi-title">WRO Achievement</div>
                         <div class="kpi-card-main">
                             <div class="kpi-split-value" id="weekly-kpi-wro-achievement">0%</div>
@@ -256,8 +256,8 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                 </div>
 
                 <!-- CRO Group: CRO Card + Subdept Cards (CJDO, EKO, WJO, WKO) -->
-                <div class="kpi-card-group" id="weekly-kpi-group-cro" style="display: none;">
-                    <div class="kpi-card kpi-card-split" id="weekly-kpi-card-cro">
+                <div class="kpi-card kpi-card-group" id="weekly-kpi-group-cro" style="display: none;">
+                    <div class="kpi-card-split" id="weekly-kpi-card-cro">
                         <div class="kpi-title">CRO Achievement</div>
                         <div class="kpi-card-main">
                             <div class="kpi-split-value" id="weekly-kpi-cro-achievement">0%</div>
@@ -311,8 +311,8 @@ $defaultWeeklyWeek = !empty($latestWeeklyPeriod['period_week']) ? (int) $latestW
                 </div>
 
                 <!-- ERO Group: ERO Card + Subdept Cards (BNO, EJO, MPO, SMO) -->
-                <div class="kpi-card-group" id="weekly-kpi-group-ero" style="display: none;">
-                    <div class="kpi-card kpi-card-split" id="weekly-kpi-card-ero">
+                <div class="kpi-card kpi-card-group" id="weekly-kpi-group-ero" style="display: none;">
+                    <div class="kpi-card-split" id="weekly-kpi-card-ero">
                         <div class="kpi-title">ERO Achievement</div>
                         <div class="kpi-card-main">
                             <div class="kpi-split-value" id="weekly-kpi-ero-achievement">0%</div>

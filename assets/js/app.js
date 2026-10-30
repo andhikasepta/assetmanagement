@@ -153,6 +153,7 @@ const App = (() => {
     // Trend Charts state
     let chartTrendDept = null;
     let chartTrendSubDept = null;
+    let chartTrendSubDeptList = [];
     let chartTrendPmd = null;
     let currentTrendSubDeptFilter = 'CSO';
     let currentTrendPmdSiteFilter = 'all';
@@ -8777,9 +8778,10 @@ const App = (() => {
 
         const deptCanvas = document.getElementById('chart-trend-dept');
         const subDeptCanvas = document.getElementById('chart-trend-subdept');
+        const subDeptGrid = document.getElementById('trend-subdept-grid');
         const pmdCanvas = document.getElementById('chart-trend-pmd');
 
-        if (!deptCanvas || !subDeptCanvas || !pmdCanvas) return;
+        if (!deptCanvas || (!subDeptCanvas && !subDeptGrid) || !pmdCanvas) return;
 
         const targetYear = year || (document.getElementById('summary-filter-year')?.value) || 2026;
 
@@ -8968,8 +8970,35 @@ const App = (() => {
 
             // Helper to sync subdept chart with the selected DEPT group
             const applySubDeptGroupHighlight = (chart, deptKey) => {
-                if (!chart || !chart.data || !chart.data.datasets) return;
-                chart._activeDeptGroup = deptKey || null;
+                const allowedSubs = deptKey ? (DEPT_SUBDEPTS_MAP[deptKey] || []) : null;
+
+                // Sync individual subdept cards in grid
+                const subCards = document.querySelectorAll('.subdept-single-card');
+                if (subCards && subCards.length > 0) {
+                    subCards.forEach(card => {
+                        const titleEl = card.querySelector('h4');
+                        const cardText = titleEl ? titleEl.textContent : '';
+                        if (!allowedSubs) {
+                            card.style.opacity = '1';
+                            card.style.borderColor = '#e2e8f0';
+                            card.style.boxShadow = '0 1px 3px rgba(15,23,42,0.04)';
+                        } else {
+                            const isMatch = allowedSubs.some(sub => cardText.includes(sub));
+                            if (isMatch) {
+                                card.style.opacity = '1';
+                                card.style.borderColor = '#2563eb';
+                                card.style.boxShadow = '0 4px 12px rgba(37,99,235,0.18)';
+                            } else {
+                                card.style.opacity = '0.32';
+                                card.style.borderColor = '#e2e8f0';
+                                card.style.boxShadow = 'none';
+                            }
+                        }
+                    });
+                }
+
+                if (chart && chart.data && chart.data.datasets) {
+                    chart._activeDeptGroup = deptKey || null;
                 const allowedSubs = deptKey ? (DEPT_SUBDEPTS_MAP[deptKey] || []) : null;
 
                 chart.data.datasets.forEach((ds, idx) => {
@@ -9066,7 +9095,8 @@ const App = (() => {
                     }
                 });
 
-                chart.update('none');
+                    chart.update('none');
+                }
 
                 // Dynamic Header / Subtitle sync for Sub DEPT chart
                 const subBadge = document.getElementById('trend-subdept-badge');
@@ -9250,8 +9280,8 @@ const App = (() => {
                         },
                         layout: {
                             padding: {
-                                top: 26,
-                                right: 80,
+                                top: 12,
+                                right: 14,
                                 bottom: 6,
                                 left: 6
                             }
@@ -9484,7 +9514,7 @@ const App = (() => {
 
                                 ctx.save();
 
-                                // 1. Draw dashed line across the chart width
+                                // Draw dashed line across the chart width
                                 ctx.beginPath();
                                 ctx.setLineDash([5, 4]);
                                 ctx.strokeStyle = '#dc2626';
@@ -9492,37 +9522,6 @@ const App = (() => {
                                 ctx.moveTo(chartArea.left, yPixel);
                                 ctx.lineTo(chartArea.right, yPixel);
                                 ctx.stroke();
-
-                                // 2. Target Label Badge in the right padding area (matching Monthly Target Achievement)
-                                const text = `TARGET ${target}%`;
-                                ctx.setLineDash([]);
-                                ctx.font = '700 10px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-                                const textWidth = ctx.measureText(text).width;
-                                const padX = 6;
-                                const badgeHeight = 17;
-                                const badgeWidth = textWidth + padX * 2;
-                                const badgeX = Math.min(chartArea.right + 6, chart.width - badgeWidth - 4);
-
-                                let badgeY = yPixel - badgeHeight / 2;
-                                if (badgeY < chartArea.top - 2) {
-                                    badgeY = chartArea.top - 2;
-                                } else if (badgeY + badgeHeight > chartArea.bottom + 2) {
-                                    badgeY = chartArea.bottom - badgeHeight;
-                                }
-
-                                ctx.fillStyle = '#dc2626';
-                                if (ctx.roundRect) {
-                                    ctx.beginPath();
-                                    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 3);
-                                    ctx.fill();
-                                } else {
-                                    ctx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
-                                }
-
-                                ctx.fillStyle = '#ffffff';
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                ctx.fillText(text, badgeX + badgeWidth / 2, yPixel);
 
                                 ctx.restore();
                             }
@@ -9677,104 +9676,277 @@ const App = (() => {
             if (chartTrendDept) chartTrendDept.destroy();
             chartTrendDept = new Chart(deptCanvas.getContext('2d'), createChartConfig(deptDatasets, deptTargetVal, true));
 
-            // 2. Render Card 2: Sub DEPT / Site Trends
+            // 2. Render Sub DEPT / Site Trends
+            const destroyAllSubDeptCharts = () => {
+                if (chartTrendSubDeptList && chartTrendSubDeptList.length > 0) {
+                    chartTrendSubDeptList.forEach(c => {
+                        try { if (c) c.destroy(); } catch (e) {}
+                    });
+                    chartTrendSubDeptList = [];
+                }
+                if (chartTrendSubDept) {
+                    try { chartTrendSubDept.destroy(); } catch (e) {}
+                    chartTrendSubDept = null;
+                }
+            };
+
             if (isIt) {
+                destroyAllSubDeptCharts();
                 const itSitePalette = {
                     'OUTLET OPTI TBS': '#2563eb',
                     'IT CORPORATE - ARCADIA LT 4': '#60a5fa'
                 };
-                const subDeptDatasets = [];
+                const gridContainer = document.getElementById('trend-subdept-grid');
                 const siteData = json.it_site_trends || {};
-                for (const [siteLabel, values] of Object.entries(siteData)) {
-                    const color = itSitePalette[siteLabel] || '#2563eb';
-                    subDeptDatasets.push({
-                        label: siteLabel,
-                        data: values || [],
-                        borderColor: color,
-                        backgroundColor: color,
-                        _origBorderColor: color,
-                        _origBackgroundColor: color,
-                        _origBorderWidth: 2.5,
-                        _origPointRadius: 4,
-                        _origPointHoverRadius: 6,
-                        borderWidth: 2.5,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        tension: 0.3,
-                        spanGaps: true
+                const siteEntries = Object.entries(siteData);
+
+                if (gridContainer) {
+                    gridContainer.innerHTML = '';
+                    siteEntries.forEach(([siteLabel, values], idx) => {
+                        const chartNumber = idx + 1;
+                        const canvasId = `chart-subdept-it-${idx}`;
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'card subdept-single-card';
+                        cardDiv.innerHTML = `
+                            <h4 style="text-align: center; font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; letter-spacing: 0.2px;">
+                                ${siteLabel}
+                            </h4>
+                            <div style="position: relative; height: 165px; width: 100%;">
+                                <canvas id="${canvasId}"></canvas>
+                            </div>
+                        `;
+                        gridContainer.appendChild(cardDiv);
+
+                        const canvasEl = document.getElementById(canvasId);
+                        if (canvasEl) {
+                            const color = itSitePalette[siteLabel] || '#2563eb';
+                            const slicedVals = (values || []).slice(0, months.length);
+                            const singleConfig = {
+                                type: 'line',
+                                data: {
+                                    labels: months,
+                                    datasets: [{
+                                        label: siteLabel,
+                                        data: slicedVals,
+                                        borderColor: color,
+                                        borderWidth: 2.2,
+                                        fill: true,
+                                        tension: 0.35,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 5.5,
+                                        pointHoverBackgroundColor: color,
+                                        pointHoverBorderColor: '#ffffff',
+                                        pointHoverBorderWidth: 2,
+                                        backgroundColor: function (context) {
+                                            const { ctx, chartArea } = context.chart || {};
+                                            if (!ctx || !chartArea) return 'rgba(37, 99, 235, 0.2)';
+                                            return getAreaGradient(ctx, chartArea, color, 0.28, 0.02);
+                                        },
+                                        spanGaps: true
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    layout: { padding: { left: 2, right: 6, top: 6, bottom: 2 } },
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: { grid: { display: false, drawBorder: false }, border: { display: false }, ticks: { color: '#64748b', font: { size: 9.5 } } },
+                                        y: { min: 0, max: 100, ticks: { stepSize: 25, color: '#94a3b8', font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#f1f5f9' }, border: { display: false } }
+                                    }
+                                }
+                            };
+                            chartTrendSubDeptList.push(new Chart(canvasEl.getContext('2d'), singleConfig));
+                        }
                     });
                 }
-
-                if (chartTrendSubDept) chartTrendSubDept.destroy();
-                chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 98));
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else if (isTekno) {
-                if (chartTrendSubDept) { chartTrendSubDept.destroy(); chartTrendSubDept = null; }
+                destroyAllSubDeptCharts();
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else if (!isPmd) {
-                // Render Card 3: Sub DEPT Trends (Outlet Regional)
-                // Filterable as standalone line graph, sharing the CSO palette color (#2563eb)
+                // Render Sub DEPT Trends (Outlet Regional)
+                // All sub departments in separate standalone cards in a 4-column responsive grid
+                destroyAllSubDeptCharts();
+
                 const csoPaletteColor = '#2563eb'; // Royal Blue (CSO Palette Color)
-                const subDeptSelect = document.getElementById('trend-subdept-filter-select');
+                const gridContainer = document.getElementById('trend-subdept-grid');
                 let subEntries = Object.entries(json.subdept_trends || {});
                 if (summaryCategory === 'warehouse_hub') {
                     subEntries = subEntries.filter(([subKey]) => !['CSO', 'BNO', 'MPO', 'SMO'].includes(subKey));
                 }
 
-                if (subDeptSelect) {
-                    const availableKeys = subEntries.map(([k]) => k);
-                    let sel = currentTrendSubDeptFilter || 'CSO';
-                    if (sel !== 'all' && !availableKeys.includes(sel)) {
-                        sel = availableKeys.includes('CSO') ? 'CSO' : (availableKeys[0] || 'all');
-                    }
-                    currentTrendSubDeptFilter = sel;
-
-                    let optHtml = `<option value="all"${sel === 'all' ? ' selected' : ''}>Semua Sub Dept</option>`;
-                    availableKeys.forEach(k => {
-                        optHtml += `<option value="${k}"${k === sel ? ' selected' : ''}>${k}</option>`;
-                    });
-                    subDeptSelect.innerHTML = optHtml;
-                }
-
                 // Subtitle update
                 const subDeptSubtitle = document.getElementById('trend-subdept-subtitle');
                 if (subDeptSubtitle) {
-                    const isAll = (currentTrendSubDeptFilter === 'all');
-                    const subLabel = isAll ? ' — All Sub Depts' : ` — ${currentTrendSubDeptFilter}`;
                     subDeptSubtitle.textContent = (summarySOType === 'monthly')
-                        ? `Monthly Physical % (Jan - Dec ${targetYear})${subLabel}`
-                        : `Quarterly Physical % (${targetYear})${subLabel}`;
+                        ? `Monthly Physical % (Jan - Dec ${targetYear}) — ${subEntries.length} Sub Depts`
+                        : `Quarterly Physical % (${targetYear}) — ${subEntries.length} Sub Depts`;
                 }
 
-                const subDeptDatasets = [];
-                let entriesToPlot = subEntries;
-                if (currentTrendSubDeptFilter && currentTrendSubDeptFilter !== 'all') {
-                    entriesToPlot = subEntries.filter(([k]) => k === currentTrendSubDeptFilter);
-                }
+                if (gridContainer) {
+                    gridContainer.innerHTML = '';
+                    subEntries.forEach(([subKey, item], idx) => {
+                        const chartNumber = idx + 1;
+                        const canvasId = `chart-subdept-${subKey.replace(/[^a-zA-Z0-9_\-]/g, '_')}`;
 
-                entriesToPlot.forEach(([subKey, item]) => {
-                    subDeptDatasets.push({
-                        label: subKey,
-                        data: item.values || [],
-                        borderColor: csoPaletteColor,
-                        backgroundColor: csoPaletteColor,
-                        _origBorderColor: csoPaletteColor,
-                        _origBackgroundColor: csoPaletteColor,
-                        _origBorderWidth: 2.5,
-                        _origPointRadius: (entriesToPlot.length === 1 ? 4 : 2),
-                        _origPointHoverRadius: 6,
-                        borderWidth: 2.5,
-                        pointRadius: (entriesToPlot.length === 1 ? 4 : 0),
-                        pointHoverRadius: 6,
-                        tension: 0.3,
-                        spanGaps: true
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'card subdept-single-card';
+                        cardDiv.innerHTML = `
+                            <h4 style="text-align: center; font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; letter-spacing: 0.2px;">
+                                ${subKey}
+                            </h4>
+                            <div style="position: relative; height: 165px; width: 100%;">
+                                <canvas id="${canvasId}"></canvas>
+                            </div>
+                        `;
+                        gridContainer.appendChild(cardDiv);
+
+                        const canvasEl = document.getElementById(canvasId);
+                        if (canvasEl) {
+                            const rawVals = item.values || [];
+                            const slicedVals = rawVals.slice(0, months.length);
+
+                            const singleConfig = {
+                                type: 'line',
+                                data: {
+                                    labels: months,
+                                    datasets: [{
+                                        label: subKey,
+                                        data: slicedVals,
+                                        borderColor: csoPaletteColor,
+                                        borderWidth: 2.2,
+                                        fill: true,
+                                        tension: 0.35,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 5.5,
+                                        pointHoverBackgroundColor: csoPaletteColor,
+                                        pointHoverBorderColor: '#ffffff',
+                                        pointHoverBorderWidth: 2,
+                                        backgroundColor: function (context) {
+                                            const { ctx, chartArea } = context.chart || {};
+                                            if (!ctx || !chartArea) return 'rgba(37, 99, 235, 0.2)';
+                                            return getAreaGradient(ctx, chartArea, csoPaletteColor, 0.28, 0.02);
+                                        },
+                                        spanGaps: true
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    animation: { duration: 250 },
+                                    layout: {
+                                        padding: {
+                                            left: 2,
+                                            right: 6,
+                                            top: 6,
+                                            bottom: 2
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            backgroundColor: '#0f172a',
+                                            titleColor: '#94a3b8',
+                                            bodyColor: '#ffffff',
+                                            padding: 8,
+                                            cornerRadius: 6,
+                                            displayColors: false,
+                                            callbacks: {
+                                                title: (items) => items[0]?.label || '',
+                                                label: (context) => {
+                                                    const val = context.parsed.y;
+                                                    return ` ${subKey}: ` + (val !== null && val !== undefined ? Number(val).toFixed(2) + '%' : '-');
+                                                },
+                                                footer: () => 'Target: 85%'
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            grid: { display: false, drawBorder: false },
+                                            border: { display: false },
+                                            ticks: {
+                                                color: '#64748b',
+                                                font: { size: 9.5, weight: '500', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }
+                                            }
+                                        },
+                                        y: {
+                                            min: 0,
+                                            max: 100,
+                                            ticks: {
+                                                stepSize: 25,
+                                                color: '#94a3b8',
+                                                font: { size: 9, family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                                callback: (v) => v + '%'
+                                            },
+                                            grid: { color: '#f1f5f9', drawBorder: false },
+                                            border: { display: false }
+                                        }
+                                    }
+                                },
+                                plugins: [
+                                    {
+                                        id: `subdeptTarget_${subKey}`,
+                                        afterDraw(chart) {
+                                            const target = 85;
+                                            const { ctx, chartArea, scales: { x, y } } = chart;
+                                            if (!chartArea || !x || !y) return;
+
+                                            const yPixel = y.getPixelForValue(target);
+                                            if (isNaN(yPixel)) return;
+
+                                            ctx.save();
+                                            // Red dashed line
+                                            ctx.beginPath();
+                                            ctx.setLineDash([4, 3]);
+                                            ctx.strokeStyle = '#dc2626';
+                                            ctx.lineWidth = 1.2;
+                                            ctx.moveTo(chartArea.left, yPixel);
+                                            ctx.lineTo(chartArea.right, yPixel);
+                                            ctx.stroke();
+                                            ctx.restore();
+                                        }
+                                    },
+                                    {
+                                        id: `subdeptCrosshair_${subKey}`,
+                                        afterDatasetsDraw(chart) {
+                                            let activeElements = [];
+                                            if (chart.tooltip && typeof chart.tooltip.getActiveElements === 'function') {
+                                                activeElements = chart.tooltip.getActiveElements();
+                                            } else if (typeof chart.getActiveElements === 'function') {
+                                                activeElements = chart.getActiveElements();
+                                            }
+                                            if (!activeElements || activeElements.length === 0) return;
+                                            const activePoint = activeElements[0];
+                                            const { ctx, chartArea } = chart;
+                                            if (!activePoint || !chartArea) return;
+                                            const x = activePoint.element ? activePoint.element.x : null;
+                                            if (x === null || isNaN(x)) return;
+
+                                            ctx.save();
+                                            ctx.beginPath();
+                                            ctx.setLineDash([3, 3]);
+                                            ctx.strokeStyle = '#cbd5e1';
+                                            ctx.lineWidth = 1;
+                                            ctx.moveTo(x, chartArea.top);
+                                            ctx.lineTo(x, chartArea.bottom);
+                                            ctx.stroke();
+                                            ctx.restore();
+                                        }
+                                    }
+                                ]
+                            };
+
+                            const subChartInst = new Chart(canvasEl.getContext('2d'), singleConfig);
+                            chartTrendSubDeptList.push(subChartInst);
+                        }
                     });
-                });
+                }
 
-                if (chartTrendSubDept) chartTrendSubDept.destroy();
-                chartTrendSubDept = new Chart(subDeptCanvas.getContext('2d'), createChartConfig(subDeptDatasets, 85));
                 if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else {
+                destroyAllSubDeptCharts();
                 // Render Card 2: PMD Dept Trends (All 7 PMD Sites)
                 const pmdSitePalette = {
                     'OUTLET BWA BANTEN': '#2563eb',   // Royal Blue (DNO)
@@ -9841,6 +10013,9 @@ const App = (() => {
             setTimeout(() => {
                 if (chartTrendDept) chartTrendDept.resize();
                 if (chartTrendSubDept) chartTrendSubDept.resize();
+                if (chartTrendSubDeptList && chartTrendSubDeptList.length > 0) {
+                    chartTrendSubDeptList.forEach(c => { if (c) c.resize(); });
+                }
                 if (chartTrendPmd) chartTrendPmd.resize();
             }, 50);
         }
@@ -10565,7 +10740,8 @@ const App = (() => {
                 ctx.restore();
             }
         };
-
+                ctx.restore();
+         
         const ctx = canvas.getContext('2d');
         chartRekapAverage = new Chart(ctx, {
             type: 'bar',
