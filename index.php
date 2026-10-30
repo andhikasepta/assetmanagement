@@ -333,7 +333,7 @@ $monthNames = [
                                 </button>
                                 <button type="button" class="summary-type-slider-btn" id="btn-summary-cat-it"
                                     onclick="App.switchSummaryCategory('it_coorporate')">
-                                    <span>IT Coorporate</span>
+                                    <span>IT Corporate</span>
                                 </button>
                             </div>
                             <!-- Quarterly Categories -->
@@ -1455,10 +1455,11 @@ $monthNames = [
 
                     <!-- Row below: Sub DEPT (Outlet) or PMD Sub DEPT -->
                     <div class="trend-charts-row-2 single-chart" id="trend-charts-row-sub">
-                        <!-- Card 2: Trend Line PMD Sub DEPT (Default Display) -->
-                        <div class="card" id="card-trend-pmd-wrapper" style="margin-bottom: 0;">
+                        <!-- Card 2: Trend Line PMD Dept Grid of Cards (Default Display) -->
+                        <div class="card" id="card-trend-pmd-wrapper"
+                            style="margin-bottom: 0; background: transparent; border: none; box-shadow: none;">
                             <div class="card-header"
-                                style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                style="padding: 0.5rem 0.25rem 0.85rem 0.25rem; border-bottom: none; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                                 <div>
                                     <h3 class="card-title" id="trend-pmd-title"
                                         style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 2px;">
@@ -1468,27 +1469,20 @@ $monthNames = [
                                         Monthly Physical % (Jan - Dec 2026)</p>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                                    <label for="trend-pmd-site-filter"
-                                        style="font-size: 12px; font-weight: 600; color: #475569; margin: 0;">SITE</label>
-                                    <select id="trend-pmd-site-filter" class="form-control unified-filter-select"
-                                        style="width: auto; padding: 0.3rem 0.65rem; font-size: 12px; font-weight: 600;"
-                                        onchange="App.onTrendPmdSiteFilterChange(this.value)">
-                                        <option value="all" selected>Semua Site (7 Sites)</option>
-                                    </select>
                                     <span class="badge"
                                         style="background: #faf5ff; color: #9333ea; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 6px;">PMD</span>
                                 </div>
                             </div>
-                            <div class="card-body" style="padding: 1rem; position: relative;">
-
-                                <div style="position: relative; height: 380px; width: 100%;">
-                                    <canvas id="chart-trend-pmd"></canvas>
+                            <div class="card-body" style="padding: 0; position: relative;">
+                                <div id="trend-pmd-grid" class="trend-subdept-grid">
+                                    <!-- Dynamic PMD Site Trend Cards (7 Sites) -->
                                 </div>
                             </div>
                         </div>
 
                         <!-- Card 3: Trend Line Sub DEPT (Outlet Regional) Grid of Cards -->
-                        <div class="card" id="card-trend-subdept-wrapper" style="margin-bottom: 0; display: none; background: transparent; border: none; box-shadow: none;">
+                        <div class="card" id="card-trend-subdept-wrapper"
+                            style="margin-bottom: 0; display: none; background: transparent; border: none; box-shadow: none;">
                             <div class="card-header"
                                 style="padding: 0.5rem 0.25rem 0.85rem 0.25rem; border-bottom: none; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                                 <div>
@@ -1757,6 +1751,201 @@ $monthNames = [
                                         </div>
                                     </div>
 
+                                    <!-- Outlet Regional Depts (WRO, CRO, ERO) -->
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <!-- WRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-wro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-solved-wro"
+                                                    style="color: #16a34a; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-wro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside WRO (CSO, NSO, SSO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CSO</span>
+                                                        <span id="db-sub-trend-solved-cso"></span>
+                                                    </div>
+                                                    <div id="db-solved-cso"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-cso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>NSO</span>
+                                                        <span id="db-sub-trend-solved-nso"></span>
+                                                    </div>
+                                                    <div id="db-solved-nso"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-nso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SSO</span>
+                                                        <span id="db-sub-trend-solved-sso"></span>
+                                                    </div>
+                                                    <div id="db-solved-sso"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-sso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- CRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-cro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-solved-cro"
+                                                    style="color: #16a34a; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-cro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside CRO (CJDO, EKO, WJO, WKO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CJDO</span>
+                                                        <span id="db-sub-trend-solved-cjdo"></span>
+                                                    </div>
+                                                    <div id="db-solved-cjdo"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-cjdo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EKO</span>
+                                                        <span id="db-sub-trend-solved-eko"></span>
+                                                    </div>
+                                                    <div id="db-solved-eko"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-eko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WJO</span>
+                                                        <span id="db-sub-trend-solved-wjo"></span>
+                                                    </div>
+                                                    <div id="db-solved-wjo"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-wjo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WKO</span>
+                                                        <span id="db-sub-trend-solved-wko"></span>
+                                                    </div>
+                                                    <div id="db-solved-wko"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-wko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ERO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-solved-ero"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-solved-ero"
+                                                    style="color: #16a34a; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-solved-ero"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside ERO (BNO, EJO, MPO, SMO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>BNO</span>
+                                                        <span id="db-sub-trend-solved-bno"></span>
+                                                    </div>
+                                                    <div id="db-solved-bno"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-bno"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EJO</span>
+                                                        <span id="db-sub-trend-solved-ejo"></span>
+                                                    </div>
+                                                    <div id="db-solved-ejo"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-ejo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>MPO</span>
+                                                        <span id="db-sub-trend-solved-mpo"></span>
+                                                    </div>
+                                                    <div id="db-solved-mpo"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-mpo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SMO</span>
+                                                        <span id="db-sub-trend-solved-smo"></span>
+                                                    </div>
+                                                    <div id="db-solved-smo"
+                                                        style="font-size: 12px; font-weight: 800; color: #16a34a; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-solved-smo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- PMD Subdepts (DNO, DSO) -->
                                     <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
                                         <div class="kpi-subdept-item">
@@ -1829,6 +2018,201 @@ $monthNames = [
                                         </div>
                                     </div>
 
+                                    <!-- Outlet Regional Depts (WRO, CRO, ERO) -->
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <!-- WRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-wro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-unsolved-wro"
+                                                    style="color: #dc2626; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-wro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside WRO (CSO, NSO, SSO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CSO</span>
+                                                        <span id="db-sub-trend-unsolved-cso"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-cso"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-cso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>NSO</span>
+                                                        <span id="db-sub-trend-unsolved-nso"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-nso"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-nso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SSO</span>
+                                                        <span id="db-sub-trend-unsolved-sso"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-sso"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-sso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- CRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-cro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-unsolved-cro"
+                                                    style="color: #dc2626; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-cro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside CRO (CJDO, EKO, WJO, WKO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CJDO</span>
+                                                        <span id="db-sub-trend-unsolved-cjdo"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-cjdo"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-cjdo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EKO</span>
+                                                        <span id="db-sub-trend-unsolved-eko"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-eko"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-eko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WJO</span>
+                                                        <span id="db-sub-trend-unsolved-wjo"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-wjo"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-wjo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WKO</span>
+                                                        <span id="db-sub-trend-unsolved-wko"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-wko"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-wko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ERO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-unsolved-ero"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-unsolved-ero"
+                                                    style="color: #dc2626; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-unsolved-ero"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside ERO (BNO, EJO, MPO, SMO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>BNO</span>
+                                                        <span id="db-sub-trend-unsolved-bno"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-bno"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-bno"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EJO</span>
+                                                        <span id="db-sub-trend-unsolved-ejo"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-ejo"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-ejo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>MPO</span>
+                                                        <span id="db-sub-trend-unsolved-mpo"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-mpo"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-mpo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SMO</span>
+                                                        <span id="db-sub-trend-unsolved-smo"></span>
+                                                    </div>
+                                                    <div id="db-unsolved-smo"
+                                                        style="font-size: 12px; font-weight: 800; color: #dc2626; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-unsolved-smo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- PMD Subdepts (DNO, DSO) -->
                                     <div class="kpi-subdept-container db-status-sub-pmd" style="display: none;">
                                         <div class="kpi-subdept-item">
@@ -1898,6 +2282,201 @@ $monthNames = [
                                         </div>
                                         <div class="kpi-card-meta">
                                             <div class="kpi-subtext" id="db-subtext-new">0/0 Sites</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Outlet Regional Depts (WRO, CRO, ERO) -->
+                                    <div class="kpi-subdept-container db-status-sub-outlet">
+                                        <!-- WRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">WRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-wro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-new-wro"
+                                                    style="color: #2563eb; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-wro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside WRO (CSO, NSO, SSO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CSO</span>
+                                                        <span id="db-sub-trend-new-cso"></span>
+                                                    </div>
+                                                    <div id="db-new-cso"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-cso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>NSO</span>
+                                                        <span id="db-sub-trend-new-nso"></span>
+                                                    </div>
+                                                    <div id="db-new-nso"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-nso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SSO</span>
+                                                        <span id="db-sub-trend-new-sso"></span>
+                                                    </div>
+                                                    <div id="db-new-sso"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-sso"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- CRO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">CRO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-cro"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-new-cro"
+                                                    style="color: #2563eb; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-cro"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside CRO (CJDO, EKO, WJO, WKO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>CJDO</span>
+                                                        <span id="db-sub-trend-new-cjdo"></span>
+                                                    </div>
+                                                    <div id="db-new-cjdo"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-cjdo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EKO</span>
+                                                        <span id="db-sub-trend-new-eko"></span>
+                                                    </div>
+                                                    <div id="db-new-eko"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-eko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WJO</span>
+                                                        <span id="db-sub-trend-new-wjo"></span>
+                                                    </div>
+                                                    <div id="db-new-wjo"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-wjo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>WKO</span>
+                                                        <span id="db-sub-trend-new-wko"></span>
+                                                    </div>
+                                                    <div id="db-new-wko"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-wko"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ERO Dept Card -->
+                                        <div class="kpi-subdept-item">
+                                            <div class="kpi-subdept-header" style="margin-bottom: 2px;">
+                                                <span class="kpi-subdept-name"
+                                                    style="font-size: 13px; font-weight: 800; color: #0f172a;">ERO</span>
+                                                <span class="db-subdept-trend" id="db-sub-trend-new-ero"></span>
+                                            </div>
+                                            <div
+                                                style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+                                                <div class="kpi-subdept-val" id="db-new-ero"
+                                                    style="color: #2563eb; font-size: 17px; font-weight: 800;">0</div>
+                                                <div class="kpi-subdept-meta" id="db-sub-sites-new-ero"
+                                                    style="font-size: 10.5px; color: #64748b;">0/0 Sites</div>
+                                            </div>
+                                            <!-- Subdepts inside ERO (BNO, EJO, MPO, SMO) -->
+                                            <div class="db-nested-subdepts"
+                                                style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;">
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>BNO</span>
+                                                        <span id="db-sub-trend-new-bno"></span>
+                                                    </div>
+                                                    <div id="db-new-bno"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-bno"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>EJO</span>
+                                                        <span id="db-sub-trend-new-ejo"></span>
+                                                    </div>
+                                                    <div id="db-new-ejo"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-ejo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>MPO</span>
+                                                        <span id="db-sub-trend-new-mpo"></span>
+                                                    </div>
+                                                    <div id="db-new-mpo"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-mpo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                                <div class="db-nested-subdept-item">
+                                                    <div
+                                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 700; color: #475569;">
+                                                        <span>SMO</span>
+                                                        <span id="db-sub-trend-new-smo"></span>
+                                                    </div>
+                                                    <div id="db-new-smo"
+                                                        style="font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+                                                        0</div>
+                                                    <div id="db-sub-sites-new-smo"
+                                                        style="font-size: 8.5px; color: #94a3b8;">0 Sites</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

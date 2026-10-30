@@ -155,6 +155,7 @@ const App = (() => {
     let chartTrendSubDept = null;
     let chartTrendSubDeptList = [];
     let chartTrendPmd = null;
+    let chartTrendPmdList = [];
     let currentTrendSubDeptFilter = 'CSO';
     let currentTrendPmdSiteFilter = 'all';
     let lastTrendJsonData = null;
@@ -8780,8 +8781,9 @@ const App = (() => {
         const subDeptCanvas = document.getElementById('chart-trend-subdept');
         const subDeptGrid = document.getElementById('trend-subdept-grid');
         const pmdCanvas = document.getElementById('chart-trend-pmd');
+        const pmdGrid = document.getElementById('trend-pmd-grid');
 
-        if (!deptCanvas || (!subDeptCanvas && !subDeptGrid) || !pmdCanvas) return;
+        if (!deptCanvas || (!subDeptCanvas && !subDeptGrid) || (!pmdCanvas && !pmdGrid)) return;
 
         const targetYear = year || (document.getElementById('summary-filter-year')?.value) || 2026;
 
@@ -9690,8 +9692,168 @@ const App = (() => {
                 }
             };
 
+            const destroyAllPmdCharts = () => {
+                if (chartTrendPmdList && chartTrendPmdList.length > 0) {
+                    chartTrendPmdList.forEach(c => {
+                        try { if (c) c.destroy(); } catch (e) {}
+                    });
+                    chartTrendPmdList = [];
+                }
+                if (chartTrendPmd) {
+                    try { chartTrendPmd.destroy(); } catch (e) {}
+                    chartTrendPmd = null;
+                }
+            };
+
+            // Standard config generator for all standalone trend line cards with point hover inspection
+            const createSingleTrendConfig = (canvasId, labelName, rawVals, color, targetVal = 85) => {
+                const slicedVals = (rawVals || []).slice(0, months.length);
+                return {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: labelName,
+                            data: slicedVals,
+                            borderColor: color,
+                            borderWidth: 2.2,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 0,
+                            radius: 0,
+                            pointHoverRadius: 6,
+                            hoverRadius: 6,
+                            pointHitRadius: 25,
+                            pointBackgroundColor: color,
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointHoverBackgroundColor: color,
+                            pointHoverBorderColor: '#ffffff',
+                            pointHoverBorderWidth: 2,
+                            backgroundColor: function (context) {
+                                const { ctx, chartArea } = context.chart || {};
+                                if (!ctx || !chartArea) return 'rgba(37, 99, 235, 0.2)';
+                                return getAreaGradient(ctx, chartArea, color, 0.28, 0.02);
+                            },
+                            spanGaps: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 250 },
+                        layout: {
+                            padding: {
+                                left: 2,
+                                right: 6,
+                                top: 6,
+                                bottom: 2
+                            }
+                        },
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: '#0f172a',
+                                titleColor: '#94a3b8',
+                                bodyColor: '#ffffff',
+                                titleFont: { size: 11, weight: '700', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                bodyFont: { size: 12, weight: '700', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                padding: 8,
+                                cornerRadius: 6,
+                                displayColors: false,
+                                callbacks: {
+                                    title: (items) => items[0]?.label || '',
+                                    label: (context) => {
+                                        const val = context.parsed.y;
+                                        return ` ${labelName}: ` + (val !== null && val !== undefined && !isNaN(val) ? Number(val).toFixed(2) + '%' : '-');
+                                    },
+                                    footer: () => `Target: ${targetVal}%`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false, drawBorder: false },
+                                border: { display: false },
+                                ticks: {
+                                    color: '#64748b',
+                                    font: { size: 9.5, weight: '500', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }
+                                }
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    stepSize: 25,
+                                    color: '#94a3b8',
+                                    font: { size: 9, family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+                                    callback: (v) => v + '%'
+                                },
+                                grid: { color: '#f1f5f9', drawBorder: false },
+                                border: { display: false }
+                            }
+                        }
+                    },
+                    plugins: [
+                        {
+                            id: `targetLine_${canvasId}`,
+                            afterDraw(chart) {
+                                const { ctx, chartArea, scales: { x, y } } = chart;
+                                if (!chartArea || !x || !y) return;
+
+                                const yPixel = y.getPixelForValue(targetVal);
+                                if (isNaN(yPixel)) return;
+
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.setLineDash([4, 3]);
+                                ctx.strokeStyle = '#dc2626';
+                                ctx.lineWidth = 1.2;
+                                ctx.moveTo(chartArea.left, yPixel);
+                                ctx.lineTo(chartArea.right, yPixel);
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+                        },
+                        {
+                            id: `crosshair_${canvasId}`,
+                            afterDatasetsDraw(chart) {
+                                let activeElements = [];
+                                if (chart.tooltip && typeof chart.tooltip.getActiveElements === 'function') {
+                                    activeElements = chart.tooltip.getActiveElements();
+                                } else if (typeof chart.getActiveElements === 'function') {
+                                    activeElements = chart.getActiveElements();
+                                }
+                                if (!activeElements || activeElements.length === 0) return;
+                                const activePoint = activeElements[0];
+                                const { ctx, chartArea } = chart;
+                                if (!activePoint || !chartArea) return;
+                                const x = activePoint.element ? activePoint.element.x : null;
+                                if (x === null || isNaN(x)) return;
+
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.setLineDash([3, 3]);
+                                ctx.strokeStyle = '#cbd5e1';
+                                ctx.lineWidth = 1;
+                                ctx.moveTo(x, chartArea.top);
+                                ctx.lineTo(x, chartArea.bottom);
+                                ctx.stroke();
+                                ctx.restore();
+                            }
+                        }
+                    ]
+                };
+            };
+
             if (isIt) {
                 destroyAllSubDeptCharts();
+                destroyAllPmdCharts();
                 const itSitePalette = {
                     'OUTLET OPTI TBS': '#2563eb',
                     'IT CORPORATE - ARCADIA LT 4': '#60a5fa'
@@ -9703,7 +9865,6 @@ const App = (() => {
                 if (gridContainer) {
                     gridContainer.innerHTML = '';
                     siteEntries.forEach(([siteLabel, values], idx) => {
-                        const chartNumber = idx + 1;
                         const canvasId = `chart-subdept-it-${idx}`;
                         const cardDiv = document.createElement('div');
                         cardDiv.className = 'card subdept-single-card';
@@ -9720,54 +9881,19 @@ const App = (() => {
                         const canvasEl = document.getElementById(canvasId);
                         if (canvasEl) {
                             const color = itSitePalette[siteLabel] || '#2563eb';
-                            const slicedVals = (values || []).slice(0, months.length);
-                            const singleConfig = {
-                                type: 'line',
-                                data: {
-                                    labels: months,
-                                    datasets: [{
-                                        label: siteLabel,
-                                        data: slicedVals,
-                                        borderColor: color,
-                                        borderWidth: 2.2,
-                                        fill: true,
-                                        tension: 0.35,
-                                        pointRadius: 0,
-                                        pointHoverRadius: 5.5,
-                                        pointHoverBackgroundColor: color,
-                                        pointHoverBorderColor: '#ffffff',
-                                        pointHoverBorderWidth: 2,
-                                        backgroundColor: function (context) {
-                                            const { ctx, chartArea } = context.chart || {};
-                                            if (!ctx || !chartArea) return 'rgba(37, 99, 235, 0.2)';
-                                            return getAreaGradient(ctx, chartArea, color, 0.28, 0.02);
-                                        },
-                                        spanGaps: true
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    layout: { padding: { left: 2, right: 6, top: 6, bottom: 2 } },
-                                    plugins: { legend: { display: false } },
-                                    scales: {
-                                        x: { grid: { display: false, drawBorder: false }, border: { display: false }, ticks: { color: '#64748b', font: { size: 9.5 } } },
-                                        y: { min: 0, max: 100, ticks: { stepSize: 25, color: '#94a3b8', font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#f1f5f9' }, border: { display: false } }
-                                    }
-                                }
-                            };
+                            const singleConfig = createSingleTrendConfig(canvasId, siteLabel, values, color, 85);
                             chartTrendSubDeptList.push(new Chart(canvasEl.getContext('2d'), singleConfig));
                         }
                     });
                 }
-                if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else if (isTekno) {
                 destroyAllSubDeptCharts();
-                if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
+                destroyAllPmdCharts();
             } else if (!isPmd) {
                 // Render Sub DEPT Trends (Outlet Regional)
                 // All sub departments in separate standalone cards in a 4-column responsive grid
                 destroyAllSubDeptCharts();
+                destroyAllPmdCharts();
 
                 const csoPaletteColor = '#2563eb'; // Royal Blue (CSO Palette Color)
                 const gridContainer = document.getElementById('trend-subdept-grid');
@@ -9787,7 +9913,6 @@ const App = (() => {
                 if (gridContainer) {
                     gridContainer.innerHTML = '';
                     subEntries.forEach(([subKey, item], idx) => {
-                        const chartNumber = idx + 1;
                         const canvasId = `chart-subdept-${subKey.replace(/[^a-zA-Z0-9_\-]/g, '_')}`;
 
                         const cardDiv = document.createElement('div');
@@ -9804,150 +9929,16 @@ const App = (() => {
 
                         const canvasEl = document.getElementById(canvasId);
                         if (canvasEl) {
-                            const rawVals = item.values || [];
-                            const slicedVals = rawVals.slice(0, months.length);
-
-                            const singleConfig = {
-                                type: 'line',
-                                data: {
-                                    labels: months,
-                                    datasets: [{
-                                        label: subKey,
-                                        data: slicedVals,
-                                        borderColor: csoPaletteColor,
-                                        borderWidth: 2.2,
-                                        fill: true,
-                                        tension: 0.35,
-                                        pointRadius: 0,
-                                        pointHoverRadius: 5.5,
-                                        pointHoverBackgroundColor: csoPaletteColor,
-                                        pointHoverBorderColor: '#ffffff',
-                                        pointHoverBorderWidth: 2,
-                                        backgroundColor: function (context) {
-                                            const { ctx, chartArea } = context.chart || {};
-                                            if (!ctx || !chartArea) return 'rgba(37, 99, 235, 0.2)';
-                                            return getAreaGradient(ctx, chartArea, csoPaletteColor, 0.28, 0.02);
-                                        },
-                                        spanGaps: true
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    animation: { duration: 250 },
-                                    layout: {
-                                        padding: {
-                                            left: 2,
-                                            right: 6,
-                                            top: 6,
-                                            bottom: 2
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: { display: false },
-                                        tooltip: {
-                                            backgroundColor: '#0f172a',
-                                            titleColor: '#94a3b8',
-                                            bodyColor: '#ffffff',
-                                            padding: 8,
-                                            cornerRadius: 6,
-                                            displayColors: false,
-                                            callbacks: {
-                                                title: (items) => items[0]?.label || '',
-                                                label: (context) => {
-                                                    const val = context.parsed.y;
-                                                    return ` ${subKey}: ` + (val !== null && val !== undefined ? Number(val).toFixed(2) + '%' : '-');
-                                                },
-                                                footer: () => 'Target: 85%'
-                                            }
-                                        }
-                                    },
-                                    scales: {
-                                        x: {
-                                            grid: { display: false, drawBorder: false },
-                                            border: { display: false },
-                                            ticks: {
-                                                color: '#64748b',
-                                                font: { size: 9.5, weight: '500', family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }
-                                            }
-                                        },
-                                        y: {
-                                            min: 0,
-                                            max: 100,
-                                            ticks: {
-                                                stepSize: 25,
-                                                color: '#94a3b8',
-                                                font: { size: 9, family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
-                                                callback: (v) => v + '%'
-                                            },
-                                            grid: { color: '#f1f5f9', drawBorder: false },
-                                            border: { display: false }
-                                        }
-                                    }
-                                },
-                                plugins: [
-                                    {
-                                        id: `subdeptTarget_${subKey}`,
-                                        afterDraw(chart) {
-                                            const target = 85;
-                                            const { ctx, chartArea, scales: { x, y } } = chart;
-                                            if (!chartArea || !x || !y) return;
-
-                                            const yPixel = y.getPixelForValue(target);
-                                            if (isNaN(yPixel)) return;
-
-                                            ctx.save();
-                                            // Red dashed line
-                                            ctx.beginPath();
-                                            ctx.setLineDash([4, 3]);
-                                            ctx.strokeStyle = '#dc2626';
-                                            ctx.lineWidth = 1.2;
-                                            ctx.moveTo(chartArea.left, yPixel);
-                                            ctx.lineTo(chartArea.right, yPixel);
-                                            ctx.stroke();
-                                            ctx.restore();
-                                        }
-                                    },
-                                    {
-                                        id: `subdeptCrosshair_${subKey}`,
-                                        afterDatasetsDraw(chart) {
-                                            let activeElements = [];
-                                            if (chart.tooltip && typeof chart.tooltip.getActiveElements === 'function') {
-                                                activeElements = chart.tooltip.getActiveElements();
-                                            } else if (typeof chart.getActiveElements === 'function') {
-                                                activeElements = chart.getActiveElements();
-                                            }
-                                            if (!activeElements || activeElements.length === 0) return;
-                                            const activePoint = activeElements[0];
-                                            const { ctx, chartArea } = chart;
-                                            if (!activePoint || !chartArea) return;
-                                            const x = activePoint.element ? activePoint.element.x : null;
-                                            if (x === null || isNaN(x)) return;
-
-                                            ctx.save();
-                                            ctx.beginPath();
-                                            ctx.setLineDash([3, 3]);
-                                            ctx.strokeStyle = '#cbd5e1';
-                                            ctx.lineWidth = 1;
-                                            ctx.moveTo(x, chartArea.top);
-                                            ctx.lineTo(x, chartArea.bottom);
-                                            ctx.stroke();
-                                            ctx.restore();
-                                        }
-                                    }
-                                ]
-                            };
-
+                            const singleConfig = createSingleTrendConfig(canvasId, subKey, item.values, csoPaletteColor, 85);
                             const subChartInst = new Chart(canvasEl.getContext('2d'), singleConfig);
                             chartTrendSubDeptList.push(subChartInst);
                         }
                     });
                 }
-
-                if (chartTrendPmd) { chartTrendPmd.destroy(); chartTrendPmd = null; }
             } else {
                 destroyAllSubDeptCharts();
-                // Render Card 2: PMD Dept Trends (All 7 PMD Sites)
+                destroyAllPmdCharts();
+                // Render Card 2: PMD Dept Trends (All 7 PMD Sites in separate standalone cards)
                 const pmdSitePalette = {
                     'OUTLET BWA BANTEN': '#2563eb',   // Royal Blue (DNO)
                     'OUTLET BWA MERUYA': '#3b82f6',   // Vivid Blue (DNO)
@@ -9958,56 +9949,44 @@ const App = (() => {
                     'OUTLET SEOA': '#818cf8'          // Soft Indigo (DSO)
                 };
 
-                const pmdSiteSelect = document.getElementById('trend-pmd-site-filter');
+                const gridContainer = document.getElementById('trend-pmd-grid');
                 const siteData = json.pmd_site_trends || {};
                 const siteEntries = Object.entries(siteData);
-
-                if (pmdSiteSelect) {
-                    const sel = currentTrendPmdSiteFilter || 'all';
-                    let optHtml = `<option value="all"${sel === 'all' ? ' selected' : ''}>Semua Site (7 Sites)</option>`;
-                    siteEntries.forEach(([siteName]) => {
-                        optHtml += `<option value="${siteName}"${siteName === sel ? ' selected' : ''}>${siteName}</option>`;
-                    });
-                    pmdSiteSelect.innerHTML = optHtml;
-                }
 
                 // Subtitle update
                 const pmdSubtitle = document.getElementById('trend-pmd-subtitle');
                 if (pmdSubtitle) {
-                    const isAll = (currentTrendPmdSiteFilter === 'all');
-                    const siteLabel = isAll ? ' — 7 Sites' : ` — ${currentTrendPmdSiteFilter}`;
-                    pmdSubtitle.textContent = `Monthly Physical % (Jan - Dec ${targetYear})${siteLabel}`;
+                    pmdSubtitle.textContent = (summarySOType === 'monthly')
+                        ? `Monthly Physical % (Jan - Dec ${targetYear}) — ${siteEntries.length} Sites`
+                        : `Quarterly Physical % (${targetYear}) — ${siteEntries.length} Sites`;
                 }
 
-                let entriesToPlot = siteEntries;
-                if (currentTrendPmdSiteFilter && currentTrendPmdSiteFilter !== 'all') {
-                    entriesToPlot = siteEntries.filter(([name]) => name === currentTrendPmdSiteFilter);
-                }
+                if (gridContainer) {
+                    gridContainer.innerHTML = '';
+                    siteEntries.forEach(([siteLabel, rawVals], idx) => {
+                        const canvasId = `chart-pmd-${siteLabel.replace(/[^a-zA-Z0-9_\-]/g, '_')}`;
 
-                const pmdDatasets = [];
-                entriesToPlot.forEach(([siteLabel, values]) => {
-                    const color = pmdSitePalette[siteLabel] || '#2563eb';
-                    pmdDatasets.push({
-                        label: siteLabel,
-                        data: values || [],
-                        borderColor: color,
-                        backgroundColor: color,
-                        _origBorderColor: color,
-                        _origBackgroundColor: color,
-                        _origBorderWidth: 2.4,
-                        _origPointRadius: (entriesToPlot.length === 1 ? 4 : 2),
-                        _origPointHoverRadius: 6,
-                        borderWidth: 2.4,
-                        pointRadius: (entriesToPlot.length === 1 ? 4 : 0),
-                        pointHoverRadius: 6,
-                        tension: 0.3,
-                        spanGaps: true
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'card subdept-single-card';
+                        cardDiv.innerHTML = `
+                            <h4 style="text-align: center; font-size: 13px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${siteLabel}">
+                                ${siteLabel}
+                            </h4>
+                            <div style="position: relative; height: 165px; width: 100%;">
+                                <canvas id="${canvasId}"></canvas>
+                            </div>
+                        `;
+                        gridContainer.appendChild(cardDiv);
+
+                        const canvasEl = document.getElementById(canvasId);
+                        if (canvasEl) {
+                            const color = pmdSitePalette[siteLabel] || '#2563eb';
+                            const singleConfig = createSingleTrendConfig(canvasId, siteLabel, rawVals, color, 98);
+                            const pmdChartInst = new Chart(canvasEl.getContext('2d'), singleConfig);
+                            chartTrendPmdList.push(pmdChartInst);
+                        }
                     });
-                });
-
-                if (chartTrendPmd) chartTrendPmd.destroy();
-                chartTrendPmd = new Chart(pmdCanvas.getContext('2d'), createChartConfig(pmdDatasets, 98));
-                if (chartTrendSubDept) { chartTrendSubDept.destroy(); chartTrendSubDept = null; }
+                }
             }
 
             setTimeout(() => {
@@ -10017,6 +9996,9 @@ const App = (() => {
                     chartTrendSubDeptList.forEach(c => { if (c) c.resize(); });
                 }
                 if (chartTrendPmd) chartTrendPmd.resize();
+                if (chartTrendPmdList && chartTrendPmdList.length > 0) {
+                    chartTrendPmdList.forEach(c => { if (c) c.resize(); });
+                }
             }, 50);
         }
 
@@ -10740,8 +10722,7 @@ const App = (() => {
                 ctx.restore();
             }
         };
-                ctx.restore();
-         
+
         const ctx = canvas.getContext('2d');
         chartRekapAverage = new Chart(ctx, {
             type: 'bar',
