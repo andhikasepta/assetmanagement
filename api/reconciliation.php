@@ -379,6 +379,9 @@ try {
                 $siteAchievements[$sc] = [
                     'sitecode' => $sc,
                     'name_site' => $s['name_site'] ?? '',
+                    'divisi' => strtoupper(trim($s['divisi'] ?? '')),
+                    'dept' => strtoupper(trim($s['dept'] ?? '')),
+                    'sub_dept' => strtoupper(trim($s['sub_dept'] ?? '')),
                     'pct' => ($m !== null && $m['pct'] !== null) ? round($m['pct'], 2) : null,
                     'db_qty' => ($m !== null) ? (int)$m['db_qty'] : 0,
                     'has_data' => ($m !== null && $m['pct'] !== null),
@@ -755,6 +758,9 @@ try {
                     $dbA['sites'][$sc] = [
                         'sitecode' => $sc,
                         'name_site' => $sInfo['name_site'] ?? '',
+                        'divisi' => $sInfo['divisi'] ?? '',
+                        'dept' => $sInfo['dept'] ?? '',
+                        'sub_dept' => $sInfo['sub_dept'] ?? '',
                         'qty' => $currQty,
                         'prev_qty' => $hasPrevious ? $prevQty : 0,
                         'diff_qty' => ($hasPrevious && $isCurrRecUploaded) ? ($currQty - $prevQty) : null,

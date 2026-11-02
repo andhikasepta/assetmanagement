@@ -1316,7 +1316,7 @@ const App = (() => {
     // ── Delete Record ──────────────────────────────────────────
 
     async function deleteRecord(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan.')) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -1987,8 +1987,7 @@ const App = (() => {
             return;
         }
 
-        const confirmMsg = `Apakah Anda yakin ingin menghapus secara permanen ${ids.length} data terpilih? Tindakan ini tidak dapat dibatalkan.`;
-        if (!confirm(confirmMsg)) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -2029,7 +2028,7 @@ const App = (() => {
     }
 
     async function deleteSRRecord(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan.')) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -2416,7 +2415,7 @@ const App = (() => {
     }
 
     async function deleteSRHistoryRule(historyId) {
-        if (!confirm('Apakah Anda yakin ingin menghapus aturan periode ini?')) return;
+        if (!confirm('anda yakin ingin menghapus data ?')) return;
         try {
             const res = await fetch('api/site_regional.php?action=delete_history', {
                 method: 'POST',
@@ -3131,10 +3130,7 @@ const App = (() => {
             return;
         }
 
-        const monthName = month ? monthSelect.options[monthSelect.selectedIndex].text : 'Semua Bulan';
-        const confirmMsg = `Apakah Anda yakin ingin menghapus permanen data Rekap DB untuk:\nBulan: ${monthName}\nTahun: ${year || 'Semua Tahun'}?\n\nTindakan ini tidak dapat dibatalkan!`;
-
-        if (!confirm(confirmMsg)) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -3176,7 +3172,7 @@ const App = (() => {
     }
 
     async function deleteRekapDbItem(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus baris data Rekap DB ini?')) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -4885,26 +4881,54 @@ const App = (() => {
             }
         });
 
-        // Toggle subdepts in Status Groups (Outlet vs PMD vs IT vs Tekno)
-        document.querySelectorAll('.db-status-sub-outlet').forEach(el => {
-            el.style.display = (!isPmd && !isIt && !isTekno) ? 'grid' : 'none';
-            // In Warehouse HUB quarterly, make sure CRO item inside .db-status-sub-outlet is visible
-            const croItem = el.children[1];
-            if (croItem) {
-                croItem.style.display = (isQuarterly && !isHub) ? 'none' : 'block';
-            }
+        // Toggle category cards & subdept mapping in Status Penyelesaian DB (mirrors #achievement-cards)
+        const showOutletStatusGroups = (!isPmd && !isIt && !isTekno);
+        const showCroStatusGroup = showOutletStatusGroups && !(isQuarterly && !isHub);
+
+        document.querySelectorAll('.db-status-card-pmd').forEach(el => {
+            el.style.display = isPmd ? 'flex' : 'none';
         });
-        document.querySelectorAll('.db-status-sub-pmd').forEach(el => {
-            el.style.display = isPmd ? 'grid' : 'none';
-        });
-        document.querySelectorAll('.db-status-sub-it').forEach(el => {
-            el.style.display = isIt ? 'grid' : 'none';
+        document.querySelectorAll('.db-status-card-it').forEach(el => {
+            el.style.display = isIt ? 'flex' : 'none';
         });
         document.querySelectorAll('.db-status-sub-tekno').forEach(el => {
-            el.style.display = isTekno ? 'grid' : 'none';
+            el.style.display = isTekno ? 'contents' : 'none';
         });
 
+        document.querySelectorAll('.db-status-group-wro').forEach(el => {
+            el.style.display = showOutletStatusGroups ? 'flex' : 'none';
+            el.style.flex = isHub ? '1.15 1 240px' : '';
+            const subGrid = el.querySelector('.kpi-subdept-container');
+            if (subGrid) subGrid.style.gridTemplateColumns = isHub ? 'repeat(2, minmax(0, 1fr))' : '';
+        });
+        document.querySelectorAll('.db-status-group-cro').forEach(el => {
+            el.style.display = showCroStatusGroup ? 'flex' : 'none';
+            el.style.flex = isHub ? '1 1 220px' : '';
+            const subGrid = el.querySelector('.kpi-subdept-container');
+            if (subGrid) subGrid.style.gridTemplateColumns = isHub ? 'repeat(1, minmax(0, 1fr))' : '';
+        });
+        document.querySelectorAll('.db-status-group-ero').forEach(el => {
+            el.style.display = showOutletStatusGroups ? 'flex' : 'none';
+            el.style.flex = isHub ? '1 1 220px' : '';
+            const subGrid = el.querySelector('.kpi-subdept-container');
+            if (subGrid) subGrid.style.gridTemplateColumns = isHub ? 'repeat(1, minmax(0, 1fr))' : '';
+        });
+
+        document.querySelectorAll('.db-status-dept-group .kpi-subdept-item[data-subdept]').forEach(el => {
+            const code = (el.getAttribute('data-subdept') || '').toLowerCase();
+            if (isHub) {
+                el.style.display = hubSubDepts.includes(code) ? 'flex' : 'none';
+            } else {
+                el.style.display = 'flex';
+            }
+        });
+
+        if (isTekno) {
+            renderTeknoStatusRowCards((currentDbAnalysisData && currentDbAnalysisData._cat === 'warehouse_tekno' && currentDbAnalysisData._soType === summarySOType) ? (currentDbAnalysisData.sites || {}) : {});
+        }
+
         updateDbAnalysisGrandTotalBadge();
+        renderDbHybridStatusChart(currentDbAnalysisData);
         renderResultDbChart(currentDbAnalysisData);
         if (currentDbAnalysisData) {
             const curSolved = Number(currentDbAnalysisData.solved || 0);
@@ -5201,8 +5225,704 @@ const App = (() => {
         renderDbResolutionGauge(solvedRate, activeItem || {});
     }
 
+    function renderTeknoStatusRowCards(sitesMap) {
+        const formatQty = (n) => Number(n || 0).toLocaleString();
+        const itSiteCodes = ['50002001384', '50002003133'];
+        let teknoSites = Object.values(sitesMap || {}).filter(s => s && s.sitecode && !itSiteCodes.includes(String(s.sitecode)));
+        if (teknoSites.length === 0) {
+            teknoSites = (summarySOType === 'quarterly')
+                ? [
+                    { sitecode: '50002003305', name_site: 'BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO' },
+                    { sitecode: '50002003448', name_site: 'STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO' },
+                    { sitecode: '50002003922', name_site: 'STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO' },
+                    { sitecode: '50002003599', name_site: 'PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO' }
+                ]
+                : [
+                    { sitecode: '50002003289', name_site: 'GUDANG WAREHOUSE TEKNO' },
+                    { sitecode: '50002003307', name_site: 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO' }
+                ];
+        }
+
+        const buildCards = (type, color) => teknoSites.map(s => {
+            const diffVal = type === 'solved' ? s.diff_solved : (type === 'unsolved' ? s.diff_unsolved : s.diff_new_db);
+            const prevVal = type === 'solved' ? s.prev_solved : (type === 'unsolved' ? s.prev_unsolved : s.prev_new_db);
+            const countVal = type === 'solved' ? s.solved : (type === 'unsolved' ? s.unsolved : s.new_db);
+            const displayName = s.name_site || s.sitecode;
+            return `
+                <div class="kpi-card kpi-card-split db-status-card-tekno">
+                    <div class="kpi-title">${escapeHtml(displayName)}</div>
+                    <div class="kpi-card-main">
+                        <div class="kpi-split-value" style="color: ${color};">${formatQty(countVal || 0)}</div>
+                        <div class="kpi-split-badges">
+                            <span class="db-dept-trend">${renderStatusTrendBadge(diffVal, prevVal, false, type)}</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card-meta">
+                        <div class="kpi-subtext">${escapeHtml(s.sitecode)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const teknoSolved = document.getElementById('db-status-sub-tekno-solved');
+        if (teknoSolved) teknoSolved.innerHTML = buildCards('solved', '#16a34a');
+
+        const teknoUnsolved = document.getElementById('db-status-sub-tekno-unsolved');
+        if (teknoUnsolved) teknoUnsolved.innerHTML = buildCards('unsolved', '#dc2626');
+
+        const teknoNew = document.getElementById('db-status-sub-tekno-new');
+        if (teknoNew) teknoNew.innerHTML = buildCards('new_db', '#2563eb');
+    }
+
+    // ── Hybrid B (Option 3: Nordic Navy–Sky): Segmented Bar + Shared Dot Legend (Status Penyelesaian DB) ──
+    const SWEET_DB_PALETTE = [
+        '#2563EB', // 1. Royal Blue
+        '#3B82F6', // 2. Clean Blue
+        '#38BDF8', // 3. Sky Cyan
+        '#64748B', // 4. Slate
+        '#60A5FA', // 5. Soft Blue
+        '#475569', // 6. Deep Slate
+        '#7DD3FC', // 7. Ice Sky
+        '#93C5FD', // 8. Powder Blue
+        '#94A3B8', // 9. Muted Slate
+        '#BFDBFE'  // 10. Pale Blue
+    ];
+    const SWEET_DB_MIST_TAIL = '#CBD5E1';
+
+    const DB_HYBRID_STATUS_META = {
+        solved:   { full: 'SOLVED DB',   short: 'Solved',   arc: '#22C55E', text: '#16a34a', diffKey: 'diff_solved',   prevKey: 'prev_solved',   sitesKey: 'solved_sites' },
+        unsolved: { full: 'UNSOLVED DB', short: 'Unsolved', arc: '#EF4444', text: '#dc2626', diffKey: 'diff_unsolved', prevKey: 'prev_unsolved', sitesKey: 'unsolved_sites' },
+        new_db:   { full: 'NEW DB',      short: 'New DB',   arc: '#3B82F6', text: '#2563eb', diffKey: 'diff_new_db',   prevKey: 'prev_new_db',   sitesKey: 'new_db_sites' }
+    };
+
+    let dbHybridLevel = 'subdept';
+
+    function onDbHybridLevelChange(val) {
+        dbHybridLevel = (val === 'dept') ? 'dept' : 'subdept';
+        renderDbHybridStatusChart(currentDbAnalysisData);
+    }
+
+    function stripPmdOutletPrefix(name) {
+        return String(name || '').replace(/^OUTLET\s+/i, '').trim();
+    }
+
+    function formatDbHybridTrendMeta(diff, statusKey) {
+        if (!currentDbAnalysisData || !currentDbAnalysisData.has_previous || diff === undefined || diff === null || isNaN(Number(diff))) {
+            return { text: '', color: '#64748b' };
+        }
+        const d = Number(diff);
+        if (d === 0) return { text: '', color: '#64748b' };
+        const fmt = Math.abs(d).toLocaleString('en-US');
+        const isSolved = (statusKey === 'solved');
+        if (d > 0) {
+            return {
+                text: `▲ +${fmt}`,
+                color: isSolved ? '#16a34a' : '#dc2626'
+            };
+        }
+        return {
+            text: `▼ -${fmt}`,
+            color: '#16a34a'
+        };
+    }
+
+    function dbHybridPolar(cx, cy, r, rad) {
+        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+
+    function dbHybridArcPath(cx, cy, rOut, rIn, a1, a2) {
+        const span = Math.max(0, Math.min(Math.PI, a2 - a1));
+        if (span <= 0.0001) return '';
+        const endAngle = (span >= Math.PI - 0.0005) ? (a1 + Math.PI - 0.0005) : a2;
+        const large = (endAngle - a1) > Math.PI ? 1 : 0;
+        const p1 = dbHybridPolar(cx, cy, rOut, a1);
+        const p2 = dbHybridPolar(cx, cy, rOut, endAngle);
+        const p3 = dbHybridPolar(cx, cy, rIn, endAngle);
+        const p4 = dbHybridPolar(cx, cy, rIn, a1);
+        return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${rOut} ${rOut} 0 ${large} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} A ${rIn} ${rIn} 0 ${large} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} Z`;
+    }
+
+    function clearDbHybridUnitHighlight() {
+        const wrap = document.getElementById('db-hybrid-bars-wrap');
+        if (wrap) wrap.classList.remove('unit-dimming');
+        const shell = document.getElementById('db-hybrid-shell');
+        if (!shell) return;
+        shell.querySelectorAll('.db-hybrid-seg-block.is-unit-focus').forEach(el => el.classList.remove('is-unit-focus'));
+        shell.querySelectorAll('.db-hybrid-dot-chip.is-active').forEach(el => el.classList.remove('is-active'));
+    }
+
+    function positionDbHybridTooltip(anchorEl, dotColor, labelText, valText, pctText, trendText, trendColor) {
+        const shell = document.getElementById('db-hybrid-shell');
+        const tip = document.getElementById('db-hybrid-speech-tip');
+        const caret = document.getElementById('db-st-caret');
+        if (!shell || !tip || !caret || !anchorEl) return;
+
+        const elDot = document.getElementById('db-st-dot');
+        const elLabel = document.getElementById('db-st-label');
+        const elVal = document.getElementById('db-st-val');
+        const elPct = document.getElementById('db-st-pct');
+        const elTrend = document.getElementById('db-st-trend');
+
+        if (elDot) elDot.style.background = dotColor || '#2563EB';
+        if (elLabel) elLabel.textContent = labelText ? `${labelText}:` : '';
+        if (elVal) elVal.textContent = valText || '';
+        if (elPct) elPct.textContent = pctText ? `(${pctText})` : '';
+        if (elTrend) {
+            elTrend.textContent = trendText || '';
+            elTrend.style.color = trendColor || '#0f172a';
+        }
+
+        tip.classList.add('is-visible');
+
+        const sRect = shell.getBoundingClientRect();
+        const eRect = anchorEl.getBoundingClientRect();
+        const tWidth = tip.offsetWidth || 195;
+        const tHeight = tip.offsetHeight || 34;
+
+        const centerX = (eRect.left - sRect.left) + (eRect.width / 2);
+        const topY = Math.max(4, (eRect.top - sRect.top) - tHeight - 9);
+        const leftX = Math.max(6, Math.min(centerX - tWidth / 2, Math.max(6, sRect.width - tWidth - 6)));
+        const caretX = Math.max(12, Math.min(centerX - leftX - 5, Math.max(12, tWidth - 20)));
+
+        tip.style.left = `${leftX}px`;
+        tip.style.top = `${topY}px`;
+        caret.style.left = `${caretX}px`;
+    }
+
+    function showDbHybridArcTooltip(el) {
+        if (!el) return;
+        clearDbHybridUnitHighlight();
+        positionDbHybridTooltip(
+            el,
+            el.dataset.color || '#22C55E',
+            el.dataset.label || '',
+            el.dataset.val || '',
+            el.dataset.pct || '',
+            el.dataset.trend || '',
+            el.dataset.trendColor || '#16a34a'
+        );
+    }
+
+    function showDbHybridSegTooltip(el) {
+        if (!el) return;
+        clearDbHybridUnitHighlight();
+        const shell = document.getElementById('db-hybrid-shell');
+        if (shell) {
+            shell.querySelectorAll('.db-hybrid-dot-chip').forEach(c => {
+                if (c.dataset.code === el.dataset.fullcode) c.classList.add('is-active');
+            });
+        }
+        const dept = el.dataset.dept || '';
+        const code = el.dataset.fullcode || '';
+        const subSuffix = (dept && dept !== 'DEFAULT' && dept !== 'PMD' && dept !== code) ? ` (${dept})` : '';
+        positionDbHybridTooltip(
+            el,
+            el.dataset.color || '#2563EB',
+            `${el.dataset.status || ''} · ${code}${subSuffix}`,
+            `${el.dataset.val || '0'} QTY`,
+            el.dataset.pct || '',
+            el.dataset.trend || '',
+            el.dataset.trendColor || '#0f172a'
+        );
+    }
+
+    function focusDbHybridUnitFromLegend(chipEl) {
+        if (!chipEl) return;
+        const code = chipEl.dataset.code || '';
+        const color = chipEl.dataset.color || '#2563EB';
+        const summary = chipEl.dataset.summary || '';
+        const totalVal = chipEl.dataset.total || '0';
+
+        clearDbHybridUnitHighlight();
+        chipEl.classList.add('is-active');
+
+        const wrap = document.getElementById('db-hybrid-bars-wrap');
+        const shell = document.getElementById('db-hybrid-shell');
+        let anchorBlock = null;
+
+        if (shell) {
+            const matchedBlocks = [];
+            shell.querySelectorAll('.db-hybrid-seg-block').forEach(b => {
+                if (b.dataset.fullcode === code) {
+                    matchedBlocks.push(b);
+                }
+            });
+            if (matchedBlocks.length > 0) {
+                if (wrap) wrap.classList.add('unit-dimming');
+                matchedBlocks.forEach(b => b.classList.add('is-unit-focus'));
+                anchorBlock = matchedBlocks[0];
+            }
+        }
+
+        positionDbHybridTooltip(anchorBlock || chipEl, color, code, `${totalVal} QTY`, summary, '', '#64748b');
+    }
+
+    function hideDbHybridTooltip() {
+        clearDbHybridUnitHighlight();
+        const tip = document.getElementById('db-hybrid-speech-tip');
+        if (tip) tip.classList.remove('is-visible');
+    }
+
+    function renderDbHybridStatusChart(data) {
+        const stage = document.getElementById('db-hybrid-stage');
+        if (!stage) return;
+
+        const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+        const isPmd = (summaryCategory === 'pmd');
+        const isIt = (summaryCategory === 'it_coorporate');
+        const isTekno = (summaryCategory === 'warehouse_tekno');
+        const isHub = (summaryCategory === 'warehouse_hub');
+        const isQuarterly = (summarySOType === 'quarterly');
+
+        const isMatchingCatData = Boolean(
+            data &&
+            (!data._cat || data._cat === summaryCategory) &&
+            (!data._soType || data._soType === summarySOType)
+        );
+        const safeData = isMatchingCatData ? data : {};
+        const subDeptsData = safeData.sub_depts || {};
+        const sitesData = safeData.sites || {};
+
+        const hasDepts = !(isIt || isTekno);
+        const lvlSel = document.getElementById('db-hybrid-level-select');
+        if (lvlSel) {
+            lvlSel.style.display = hasDepts ? '' : 'none';
+            const subOpt = lvlSel.querySelector('option[value="subdept"]');
+            if (subOpt) {
+                subOpt.textContent = isPmd ? 'Segmen: Site' : 'Segmen: Sub Dept';
+            }
+            if (lvlSel.value !== dbHybridLevel) {
+                lvlSel.value = dbHybridLevel;
+            }
+        }
+
+        const effectiveLevel = (hasDepts && dbHybridLevel === 'dept') ? 'dept' : 'subdept';
+
+        const makeUnitFromStat = (code, dept, statObj, defaultTotalSites = 0, sitecode = '') => {
+            const s = statObj || {};
+            const solved = Number(s.solved || 0);
+            const unsolved = Number(s.unsolved || 0);
+            const newDb = Number(s.new_db || 0);
+            const isSiteUnit = Boolean(sitecode);
+            return {
+                code: String(code || '-'),
+                dept: String(dept || 'DEFAULT'),
+                sitecode: sitecode ? String(sitecode) : '',
+                solved,
+                unsolved,
+                new_db: newDb,
+                diff_solved: s.diff_solved,
+                prev_solved: s.prev_solved,
+                diff_unsolved: s.diff_unsolved,
+                prev_unsolved: s.prev_unsolved,
+                diff_new_db: s.diff_new_db,
+                prev_new_db: s.prev_new_db,
+                solved_sites: s.solved_sites !== undefined ? Number(s.solved_sites || 0) : (isSiteUnit && solved > 0 ? 1 : 0),
+                unsolved_sites: s.unsolved_sites !== undefined ? Number(s.unsolved_sites || 0) : (isSiteUnit && unsolved > 0 ? 1 : 0),
+                new_db_sites: s.new_db_sites !== undefined ? Number(s.new_db_sites || 0) : (isSiteUnit && newDb > 0 ? 1 : 0),
+                total_sites: s.total_sites !== undefined ? Number(s.total_sites || defaultTotalSites) : defaultTotalSites
+            };
+        };
+
+        let baseUnits = [];
+        let validDepts = [];
+        let validSubs = [];
+        let defaultScopeSites = 55;
+
+        if (isPmd) {
+            validDepts = ['DNO', 'DSO', 'PMD'];
+            validSubs = ['DNO', 'DSO'];
+            defaultScopeSites = 7;
+            if (effectiveLevel === 'dept') {
+                const dnoStat = subDeptsData.dno || safeData.dno || {};
+                const dsoStat = subDeptsData.dso || safeData.dso || {};
+                baseUnits = [
+                    makeUnitFromStat('DNO', 'DNO', dnoStat, 4),
+                    makeUnitFromStat('DSO', 'DSO', dsoStat, 3)
+                ];
+            } else {
+                let pmdSites = Object.values(sitesData).filter(s => s && s.sitecode);
+                if (pmdSites.length === 0) {
+                    pmdSites = [
+                        { sitecode: 'PMD_BWA_BANTEN',   name_site: 'OUTLET BWA BANTEN',   dept: 'DNO' },
+                        { sitecode: 'PMD_BWA_MERUYA',   name_site: 'OUTLET BWA MERUYA',   dept: 'DNO' },
+                        { sitecode: 'PMD_CDA',          name_site: 'OUTLET CDA',          dept: 'DNO' },
+                        { sitecode: 'PMD_NEA',          name_site: 'OUTLET NEA',          dept: 'DNO' },
+                        { sitecode: 'PMD_SEOA',         name_site: 'OUTLET SEOA',         dept: 'DSO' },
+                        { sitecode: 'PMD_BDA_KELINKIT', name_site: 'OUTLET BDA KELINKIT', dept: 'DSO' },
+                        { sitecode: 'PMD_SAST',         name_site: 'OUTLET SAST',         dept: 'DSO' }
+                    ];
+                }
+                baseUnits = pmdSites.map(s => {
+                    const cleanName = stripPmdOutletPrefix(s.name_site || s.sitecode);
+                    const pDept = (s.dept === 'DNO' || s.dept === 'DSO')
+                        ? s.dept
+                        : ((s.sub_dept === 'DNO' || s.sub_dept === 'DSO') ? s.sub_dept : 'PMD');
+                    return makeUnitFromStat(cleanName || s.sitecode, pDept, s, 1, s.sitecode);
+                });
+            }
+        } else if (isIt) {
+            defaultScopeSites = 2;
+            const itFallback = [
+                { sitecode: '50002001384', name_site: 'OUTLET OPTI TBS' },
+                { sitecode: '50002003133', name_site: 'OUTLET OPTI - IT CORP - ARCADIA LT 4' }
+            ];
+            let itSites = Object.values(sitesData).filter(s => s && s.sitecode);
+            if (itSites.length === 0) itSites = itFallback;
+            baseUnits = itSites.map(s => makeUnitFromStat(s.name_site || s.sitecode, 'DEFAULT', s, 1, s.sitecode));
+        } else if (isTekno) {
+            defaultScopeSites = isQuarterly ? 4 : 2;
+            const itSiteCodes = ['50002001384', '50002003133'];
+            let teknoSites = Object.values(sitesData).filter(s => s && s.sitecode && !itSiteCodes.includes(String(s.sitecode)));
+            if (teknoSites.length === 0) {
+                teknoSites = isQuarterly
+                    ? [
+                        { sitecode: '50002003305', name_site: 'BUFFER PERANGKAT RUSAK WAREHOUSE T TEKNO' },
+                        { sitecode: '50002003448', name_site: 'STORAGE END OF CYCLE LT.2 WAREHOUSE TEKNO' },
+                        { sitecode: '50002003922', name_site: 'STORAGE END OF CYCLE LT.1 WAREHOUSE TEKNO' },
+                        { sitecode: '50002003599', name_site: 'PERSIAPAN PENGUJIAN WAREHOUSE T TEKNO' }
+                    ]
+                    : [
+                        { sitecode: '50002003289', name_site: 'GUDANG WAREHOUSE TEKNO' },
+                        { sitecode: '50002003307', name_site: 'PENYIMPANAN PERANGKAT KHUSUS T TEKNO' }
+                    ];
+            }
+            baseUnits = teknoSites.map(s => makeUnitFromStat(s.name_site || s.sitecode, 'DEFAULT', s, 1, s.sitecode));
+        } else if (isHub) {
+            validDepts = ['WRO', 'CRO', 'ERO'];
+            validSubs = ['NSO', 'SSO', 'EKO', 'EJO'];
+            defaultScopeSites = 4;
+            if (effectiveLevel === 'dept') {
+                baseUnits = ['WRO', 'CRO', 'ERO'].map(d => makeUnitFromStat(d, d, safeData[d.toLowerCase()] || {}, d === 'WRO' ? 2 : 1));
+            } else {
+                const hubMap = [
+                    { code: 'NSO', dept: 'WRO' },
+                    { code: 'SSO', dept: 'WRO' },
+                    { code: 'EKO', dept: 'CRO' },
+                    { code: 'EJO', dept: 'ERO' }
+                ];
+                baseUnits = hubMap.map(m => makeUnitFromStat(m.code, m.dept, subDeptsData[m.code.toLowerCase()] || {}, 1));
+            }
+        } else {
+            validDepts = isQuarterly ? ['ERO', 'WRO'] : ['CRO', 'ERO', 'WRO'];
+            defaultScopeSites = isQuarterly ? 16 : 55;
+            const outletSubMap = [
+                { code: 'CSO',  dept: 'WRO' },
+                { code: 'NSO',  dept: 'WRO' },
+                { code: 'SSO',  dept: 'WRO' },
+                ...(isQuarterly ? [] : [
+                    { code: 'CJDO', dept: 'CRO' },
+                    { code: 'EKO',  dept: 'CRO' },
+                    { code: 'WJO',  dept: 'CRO' },
+                    { code: 'WKO',  dept: 'CRO' }
+                ]),
+                { code: 'BNO',  dept: 'ERO' },
+                { code: 'EJO',  dept: 'ERO' },
+                { code: 'MPO',  dept: 'ERO' },
+                { code: 'SMO',  dept: 'ERO' }
+            ];
+            validSubs = outletSubMap.map(m => m.code);
+            if (effectiveLevel === 'dept') {
+                baseUnits = validDepts.map(d => makeUnitFromStat(d, d, safeData[d.toLowerCase()] || {}, 0));
+            } else {
+                baseUnits = outletSubMap.map(m => makeUnitFromStat(m.code, m.dept, subDeptsData[m.code.toLowerCase()] || {}, 0));
+            }
+        }
+
+        // Sync with Status Penyelesaian DB header filters (ignoring stale values during instant category switch)
+        const rawDept = (document.getElementById('rdb-status-filter-dept')?.value || rdbStatusDept || 'all').toUpperCase();
+        const rawSub = (document.getElementById('rdb-status-filter-subdept')?.value || rdbStatusSubDept || 'all').toUpperCase();
+        const rawSite = (document.getElementById('rdb-status-filter-sitecode')?.value || rdbStatusSitecode || 'all').toUpperCase();
+
+        const effDept = (rawDept !== 'ALL' && validDepts.includes(rawDept)) ? rawDept : 'ALL';
+        const effSub = (rawSub !== 'ALL' && rawSub !== 'DEFAULT' && validSubs.includes(rawSub)) ? rawSub : 'ALL';
+        const effSite = (rawSite !== 'ALL' && sitesData[rawSite]) ? rawSite : 'ALL';
+
+        let activeUnits = baseUnits;
+        let isFiltered = false;
+
+        if (effSite !== 'ALL') {
+            isFiltered = true;
+            const siteObj = sitesData[effSite];
+            const siteLabel = isPmd
+                ? (stripPmdOutletPrefix(siteObj.name_site || effSite) || effSite)
+                : (siteObj.name_site || effSite);
+            const siteDept = isPmd
+                ? ((siteObj.dept === 'DNO' || siteObj.dept === 'DSO') ? siteObj.dept : ((siteObj.sub_dept === 'DNO' || siteObj.sub_dept === 'DSO') ? siteObj.sub_dept : 'PMD'))
+                : (siteObj.sub_dept || siteObj.dept || 'DEFAULT');
+            activeUnits = [makeUnitFromStat(siteLabel, siteDept, siteObj, 1, effSite)];
+        } else {
+            if (effDept !== 'ALL' && effDept !== 'PMD') {
+                isFiltered = true;
+                activeUnits = activeUnits.filter(u => u.dept === effDept || u.code === effDept);
+            }
+            if (effSub !== 'ALL') {
+                isFiltered = true;
+                if (effectiveLevel === 'dept' && !isPmd) {
+                    const subToDept = { CSO: 'WRO', NSO: 'WRO', SSO: 'WRO', CJDO: 'CRO', EKO: 'CRO', WJO: 'CRO', WKO: 'CRO', BNO: 'ERO', EJO: 'ERO', MPO: 'ERO', SMO: 'ERO' };
+                    const parentDept = subToDept[effSub] || '';
+                    activeUnits = activeUnits.filter(u => u.code === parentDept);
+                } else {
+                    activeUnits = activeUnits.filter(u => u.code === effSub || u.dept === effSub);
+                }
+            }
+        }
+
+        // Rank units by total DB status volume descending for consistent Nordic Navy–Sky color assignment across all 3 bars & legend
+        const unitsWithTotal = activeUnits.map(u => ({
+            ...u,
+            total: (u.solved || 0) + (u.unsolved || 0) + (u.new_db || 0)
+        }));
+        const unitsRanked = unitsWithTotal
+            .filter(u => u.total > 0)
+            .sort((a, b) => b.total - a.total);
+
+        const legendUnits = unitsRanked.length > 0 ? unitsRanked : unitsWithTotal;
+        const unitColorMap = {};
+        legendUnits.forEach((u, idx) => {
+            unitColorMap[u.code] = (legendUnits.length >= 6 && idx === legendUnits.length - 1)
+                ? SWEET_DB_MIST_TAIL
+                : SWEET_DB_PALETTE[idx % SWEET_DB_PALETTE.length];
+        });
+
+        // Determine aggregate status totals, site coverage, and period trends
+        let categoryRootItem = {};
+        if (isPmd) categoryRootItem = safeData.pmd || safeData.national || {};
+        else if (isIt || isTekno || isHub) categoryRootItem = safeData.national || {};
+        else categoryRootItem = safeData.outlet_national || safeData.national || {};
+
+        let summarySource = null;
+        if (!isFiltered) {
+            summarySource = categoryRootItem;
+        } else if (effSite !== 'ALL' && sitesData[effSite]) {
+            summarySource = {
+                ...sitesData[effSite],
+                solved_sites: Number(sitesData[effSite].solved || 0) > 0 ? 1 : 0,
+                unsolved_sites: Number(sitesData[effSite].unsolved || 0) > 0 ? 1 : 0,
+                new_db_sites: Number(sitesData[effSite].new_db || 0) > 0 ? 1 : 0,
+                total_sites: 1
+            };
+        } else if (effSub !== 'ALL' && subDeptsData[effSub.toLowerCase()]) {
+            summarySource = subDeptsData[effSub.toLowerCase()];
+        } else if (effDept !== 'ALL') {
+            summarySource = isPmd
+                ? (subDeptsData[effDept.toLowerCase()] || safeData[effDept.toLowerCase()] || null)
+                : (safeData[effDept.toLowerCase()] || null);
+        }
+
+        const sumUnitsField = (field) => activeUnits.reduce((acc, u) => acc + Number(u[field] || 0), 0);
+        const sumDiffField = (diffKey) => {
+            let hasAny = false;
+            let acc = 0;
+            activeUnits.forEach(u => {
+                if (u[diffKey] !== undefined && u[diffKey] !== null && !isNaN(Number(u[diffKey]))) {
+                    hasAny = true;
+                    acc += Number(u[diffKey]);
+                }
+            });
+            return hasAny ? acc : null;
+        };
+
+        const scopeSites = (summarySource && summarySource.total_sites !== undefined && Number(summarySource.total_sites) > 0)
+            ? Number(summarySource.total_sites)
+            : (sumUnitsField('total_sites') || (isFiltered ? activeUnits.length : defaultScopeSites));
+
+        const buildStatusTotal = (statusKey) => {
+            const meta = DB_HYBRID_STATUS_META[statusKey];
+            const val = (summarySource && summarySource[statusKey] !== undefined)
+                ? Number(summarySource[statusKey] || 0)
+                : sumUnitsField(statusKey);
+            const sitesWithVal = (summarySource && summarySource[meta.sitesKey] !== undefined)
+                ? Number(summarySource[meta.sitesKey] || 0)
+                : sumUnitsField(meta.sitesKey);
+            const diffVal = (summarySource && summarySource[meta.diffKey] !== undefined)
+                ? summarySource[meta.diffKey]
+                : sumDiffField(meta.diffKey);
+            const prevVal = (summarySource && summarySource[meta.prevKey] !== undefined)
+                ? summarySource[meta.prevKey]
+                : 0;
+            const trendHtml = renderStatusTrendBadge(diffVal, prevVal, false, statusKey);
+            const trendMeta = formatDbHybridTrendMeta(diffVal, statusKey);
+            return {
+                val,
+                sites: `${sitesWithVal}/${scopeSites} Sites`,
+                trendHtml,
+                trendText: trendMeta.text,
+                trendColor: trendMeta.color
+            };
+        };
+
+        const totals = {
+            solved: buildStatusTotal('solved'),
+            unsolved: buildStatusTotal('unsolved'),
+            new_db: buildStatusTotal('new_db')
+        };
+        const grandTotal = totals.solved.val + totals.unsolved.val + totals.new_db.val;
+        const solvedPct = grandTotal > 0 ? ((totals.solved.val / grandTotal) * 100).toFixed(1) : '0.0';
+
+        // Build Half-Donut SVG
+        const cx = 115, cy = 110, rOut = 92, rIn = 63;
+        const statusKeys = ['solved', 'unsolved', 'new_db'];
+        const activeStatusKeys = statusKeys.filter(k => totals[k].val > 0);
+        const arcGap = activeStatusKeys.length > 1 ? 0.035 : 0;
+        let curAngle = Math.PI;
+
+        const arcsSvgHtml = activeStatusKeys.map((k, idx) => {
+            const t = totals[k];
+            const meta = DB_HYBRID_STATUS_META[k];
+            const span = grandTotal > 0 ? (t.val / grandTotal) * Math.PI : 0;
+            const a1 = curAngle + (idx === 0 ? 0 : arcGap / 2);
+            const a2 = curAngle + span - (idx === activeStatusKeys.length - 1 ? 0 : arcGap / 2);
+            curAngle += span;
+            if (a2 <= a1) return '';
+            const dPath = dbHybridArcPath(cx, cy, rOut, rIn, a1, a2);
+            if (!dPath) return '';
+            const pctStr = `${((t.val / grandTotal) * 100).toFixed(1)}%`;
+            return `<path class="db-hybrid-donut-arc"
+                d="${dPath}"
+                fill="${meta.arc}"
+                data-color="${meta.arc}"
+                data-label="${escapeHtml(meta.full)}"
+                data-val="${fmt(t.val)} QTY"
+                data-pct="${pctStr}"
+                data-trend="${escapeHtml(t.trendText)}"
+                data-trend-color="${t.trendColor}"
+                onmouseenter="App.showDbHybridArcTooltip(this)"
+                onmouseleave="App.hideDbHybridTooltip()" />`;
+        }).join('');
+
+        const trackPath = dbHybridArcPath(cx, cy, rOut, rIn, Math.PI, Math.PI * 2);
+        const halfDonutSvg = `
+            <svg viewBox="0 0 230 122" class="db-hybrid-donut-svg">
+                <path d="${trackPath}" fill="#f1f5f9" />
+                ${arcsSvgHtml}
+                <text x="${cx}" y="${cy - 24}" text-anchor="middle" fill="#0f172a" style="font-size: 24px; font-weight: 800;">${solvedPct}%</text>
+                <text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="#64748b" style="font-size: 12px; font-weight: 600;">Solved Rate</text>
+            </svg>
+        `;
+
+        // Plain borderless, background-free, dot-free summary below Half-Donut
+        const plainSummaryHtml = statusKeys.map(k => {
+            const meta = DB_HYBRID_STATUS_META[k];
+            const t = totals[k];
+            return `
+                <div class="db-hybrid-plain-item">
+                    <div class="db-hybrid-plain-title">${escapeHtml(meta.short)}</div>
+                    <div class="db-hybrid-plain-val" style="color: ${meta.text};">${fmt(t.val)}</div>
+                    <div class="db-hybrid-plain-sites">${escapeHtml(t.sites)}</div>
+                </div>
+            `;
+        }).join('');
+
+        // 3 Horizontal Clean Segmented Bars (zero text inside segments)
+        const rowsHtml = statusKeys.map(k => {
+            const meta = DB_HYBRID_STATUS_META[k];
+            const tot = totals[k];
+
+            const rowUnits = activeUnits
+                .map(u => {
+                    const val = Number(u[k] || 0);
+                    const diffVal = u[meta.diffKey];
+                    const tMeta = formatDbHybridTrendMeta(diffVal, k);
+                    return {
+                        fullCode: u.code,
+                        dept: u.dept || 'DEFAULT',
+                        val,
+                        trendText: tMeta.text,
+                        trendColor: tMeta.color
+                    };
+                })
+                .filter(u => u.val > 0)
+                .sort((a, b) => b.val - a.val);
+
+            let trackInnerHtml = '';
+            if (rowUnits.length === 0) {
+                trackInnerHtml = `<div class="db-hybrid-seg-empty"></div>`;
+            } else {
+                trackInnerHtml = rowUnits.map((s, idx) => {
+                    const bg = unitColorMap[s.fullCode] || SWEET_DB_MIST_TAIL;
+                    const pct = tot.val > 0 ? (s.val / tot.val) * 100 : 0;
+                    const first = (idx === 0);
+                    const last = (idx === rowUnits.length - 1);
+                    const radius = (first && last)
+                        ? '8px'
+                        : (first ? '8px 2.5px 2.5px 8px' : (last ? '2.5px 8px 8px 2.5px' : '2.5px'));
+                    return `<div class="db-hybrid-seg-block"
+                        style="flex: ${Math.max(pct, 0.8)} 1 0%; background: ${bg}; border-radius: ${radius};"
+                        data-status="${escapeHtml(meta.short)}"
+                        data-fullcode="${escapeHtml(s.fullCode)}"
+                        data-dept="${escapeHtml(s.dept)}"
+                        data-color="${bg}"
+                        data-val="${fmt(s.val)}"
+                        data-pct="${pct.toFixed(1)}%"
+                        data-trend="${escapeHtml(s.trendText)}"
+                        data-trend-color="${s.trendColor}"
+                        onmouseenter="App.showDbHybridSegTooltip(this)"></div>`;
+                }).join('');
+            }
+
+            return `
+                <div class="db-hybrid-row-group" onmouseleave="App.hideDbHybridTooltip()">
+                    <div class="db-hybrid-row-head">
+                        <div class="db-hybrid-row-head-left">
+                            <span class="db-hybrid-row-title">${escapeHtml(meta.full)}</span>
+                            <span class="db-dept-trend">${tot.trendHtml}</span>
+                        </div>
+                        <div class="db-hybrid-row-head-right">
+                            <span class="db-hybrid-row-sites">${escapeHtml(tot.sites)}</span>
+                            <span class="db-hybrid-row-total" style="color: ${meta.text};">${fmt(tot.val)}</span>
+                        </div>
+                    </div>
+                    <div id="db-hybrid-track-${k}" class="db-hybrid-seg-row">
+                        ${trackInnerHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 1 Shared Interactive Dot Legend below the 3 bars
+        const sharedLegendHtml = legendUnits.length > 0
+            ? `
+                <div class="db-hybrid-dot-legend" onmouseleave="App.hideDbHybridTooltip()">
+                    ${legendUnits.map(u => {
+                        const bg = unitColorMap[u.code] || SWEET_DB_MIST_TAIL;
+                        const summary = `S:${fmt(u.solved)} · U:${fmt(u.unsolved)} · N:${fmt(u.new_db)}`;
+                        return `
+                            <div class="db-hybrid-dot-chip"
+                                 data-code="${escapeHtml(u.code)}"
+                                 data-color="${bg}"
+                                 data-total="${fmt(u.total)}"
+                                 data-summary="${escapeHtml(summary)}"
+                                 onmouseenter="App.focusDbHybridUnitFromLegend(this)">
+                                <span class="db-hybrid-dot-swatch" style="background: ${bg};"></span>
+                                <span class="db-hybrid-dot-name">${escapeHtml(u.code)}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `
+            : '';
+
+        stage.innerHTML = `
+            <div class="db-hybrid-grid">
+                <div class="db-hybrid-donut-col">
+                    ${halfDonutSvg}
+                    <div class="db-hybrid-plain-summary">
+                        ${plainSummaryHtml}
+                    </div>
+                </div>
+                <div id="db-hybrid-bars-wrap" class="db-hybrid-bars-col">
+                    ${rowsHtml}
+                    ${sharedLegendHtml}
+                </div>
+            </div>
+        `;
+
+        hideDbHybridTooltip();
+    }
+
     function updateDbAnalysis(data) {
-        currentDbAnalysisData = data || {};
+        currentDbAnalysisData = data ? { ...data, _cat: summaryCategory, _soType: summarySOType } : { _cat: summaryCategory, _soType: summarySOType };
         syncDbAnalysisVisibility();
 
         const formatQty = (n) => Number(n || 0).toLocaleString();
@@ -5227,7 +5947,7 @@ const App = (() => {
             const solvedDeptEl = document.getElementById(`db-solved-${deptKey}`);
             if (solvedDeptEl) solvedDeptEl.textContent = formatQty(item.solved);
             const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${deptKey}`);
-            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, 'solved');
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, false, 'solved');
             const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${deptKey}`);
             if (sitesSolvedEl) {
                 const sSites = item.solved_sites || 0;
@@ -5238,7 +5958,7 @@ const App = (() => {
             const unsolvedDeptEl = document.getElementById(`db-unsolved-${deptKey}`);
             if (unsolvedDeptEl) unsolvedDeptEl.textContent = formatQty(item.unsolved);
             const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${deptKey}`);
-            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, 'unsolved');
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, false, 'unsolved');
             const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${deptKey}`);
             if (sitesUnsolvedEl) {
                 const uSites = item.unsolved_sites || 0;
@@ -5249,7 +5969,7 @@ const App = (() => {
             const newDeptEl = document.getElementById(`db-new-${deptKey}`);
             if (newDeptEl) newDeptEl.textContent = formatQty(item.new_db);
             const trendNewEl = document.getElementById(`db-sub-trend-new-${deptKey}`);
-            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, 'new_db');
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, false, 'new_db');
             const sitesNewEl = document.getElementById(`db-sub-sites-new-${deptKey}`);
             if (sitesNewEl) {
                 const nSites = item.new_db_sites || 0;
@@ -5282,10 +6002,12 @@ const App = (() => {
                 metaEl.textContent = `${withQty}/${total} Sites`;
             }
 
+            const isSmallTrend = (key !== 'dno' && key !== 'dso');
+
             const solvedEl = document.getElementById(`db-solved-${key}`);
             if (solvedEl) solvedEl.textContent = formatQty(item.solved);
             const trendSolvedEl = document.getElementById(`db-sub-trend-solved-${key}`);
-            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, true, 'solved');
+            if (trendSolvedEl) trendSolvedEl.innerHTML = renderStatusTrendBadge(item.diff_solved, item.prev_solved, isSmallTrend, 'solved');
             const sitesSolvedEl = document.getElementById(`db-sub-sites-solved-${key}`);
             if (sitesSolvedEl) {
                 const sSites = item.solved_sites || 0;
@@ -5296,7 +6018,7 @@ const App = (() => {
             const unsolvedEl = document.getElementById(`db-unsolved-${key}`);
             if (unsolvedEl) unsolvedEl.textContent = formatQty(item.unsolved);
             const trendUnsolvedEl = document.getElementById(`db-sub-trend-unsolved-${key}`);
-            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, true, 'unsolved');
+            if (trendUnsolvedEl) trendUnsolvedEl.innerHTML = renderStatusTrendBadge(item.diff_unsolved, item.prev_unsolved, isSmallTrend, 'unsolved');
             const sitesUnsolvedEl = document.getElementById(`db-sub-sites-unsolved-${key}`);
             if (sitesUnsolvedEl) {
                 const uSites = item.unsolved_sites || 0;
@@ -5307,7 +6029,7 @@ const App = (() => {
             const newEl = document.getElementById(`db-new-${key}`);
             if (newEl) newEl.textContent = formatQty(item.new_db);
             const trendNewEl = document.getElementById(`db-sub-trend-new-${key}`);
-            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, true, 'new_db');
+            if (trendNewEl) trendNewEl.innerHTML = renderStatusTrendBadge(item.diff_new_db, item.prev_new_db, isSmallTrend, 'new_db');
             const sitesNewEl = document.getElementById(`db-sub-sites-new-${key}`);
             if (sitesNewEl) {
                 const nSites = item.new_db_sites || 0;
@@ -5333,36 +6055,36 @@ const App = (() => {
         const trendArcadia = document.getElementById('db-trend-it-arcadia');
         if (trendArcadia) trendArcadia.innerHTML = renderDbTrendBadge(arcadiaItem, false);
 
-        // IT Corporate status sub-items
+        // IT Corporate status cards
         const sTbsSolved = document.getElementById('db-solved-it-tbs');
         if (sTbsSolved) sTbsSolved.textContent = formatQty(tbsItem.solved);
         const stTbsSolved = document.getElementById('db-sub-trend-solved-it-tbs');
-        if (stTbsSolved) stTbsSolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_solved, tbsItem.prev_solved, true, 'solved');
+        if (stTbsSolved) stTbsSolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_solved, tbsItem.prev_solved, false, 'solved');
 
         const sArcSolved = document.getElementById('db-solved-it-arcadia');
         if (sArcSolved) sArcSolved.textContent = formatQty(arcadiaItem.solved);
         const stArcSolved = document.getElementById('db-sub-trend-solved-it-arcadia');
-        if (stArcSolved) stArcSolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_solved, arcadiaItem.prev_solved, true, 'solved');
+        if (stArcSolved) stArcSolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_solved, arcadiaItem.prev_solved, false, 'solved');
 
         const sTbsUnsolved = document.getElementById('db-unsolved-it-tbs');
         if (sTbsUnsolved) sTbsUnsolved.textContent = formatQty(tbsItem.unsolved);
         const stTbsUnsolved = document.getElementById('db-sub-trend-unsolved-it-tbs');
-        if (stTbsUnsolved) stTbsUnsolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_unsolved, tbsItem.prev_unsolved, true, 'unsolved');
+        if (stTbsUnsolved) stTbsUnsolved.innerHTML = renderStatusTrendBadge(tbsItem.diff_unsolved, tbsItem.prev_unsolved, false, 'unsolved');
 
         const sArcUnsolved = document.getElementById('db-unsolved-it-arcadia');
         if (sArcUnsolved) sArcUnsolved.textContent = formatQty(arcadiaItem.unsolved);
         const stArcUnsolved = document.getElementById('db-sub-trend-unsolved-it-arcadia');
-        if (stArcUnsolved) stArcUnsolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_unsolved, arcadiaItem.prev_unsolved, true, 'unsolved');
+        if (stArcUnsolved) stArcUnsolved.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_unsolved, arcadiaItem.prev_unsolved, false, 'unsolved');
 
         const sTbsNew = document.getElementById('db-new-it-tbs');
         if (sTbsNew) sTbsNew.textContent = formatQty(tbsItem.new_db);
         const stTbsNew = document.getElementById('db-sub-trend-new-it-tbs');
-        if (stTbsNew) stTbsNew.innerHTML = renderStatusTrendBadge(tbsItem.diff_new_db, tbsItem.prev_new_db, true, 'new_db');
+        if (stTbsNew) stTbsNew.innerHTML = renderStatusTrendBadge(tbsItem.diff_new_db, tbsItem.prev_new_db, false, 'new_db');
 
         const sArcNew = document.getElementById('db-new-it-arcadia');
         if (sArcNew) sArcNew.textContent = formatQty(arcadiaItem.new_db);
         const stArcNew = document.getElementById('db-sub-trend-new-it-arcadia');
-        if (stArcNew) stArcNew.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_new_db, arcadiaItem.prev_new_db, true, 'new_db');
+        if (stArcNew) stArcNew.innerHTML = renderStatusTrendBadge(arcadiaItem.diff_new_db, arcadiaItem.prev_new_db, false, 'new_db');
 
         // Warehouse Tekno: Populate dynamic cards and status breakdown
         const teknoContainer = document.getElementById('db-tekno-cards-container');
@@ -5389,35 +6111,12 @@ const App = (() => {
             teknoContainer.innerHTML = html || '<div style="color: #94a3b8; font-size: 12px; padding: 1rem; text-align: center;">Tidak ada data site Tekno</div>';
         }
 
-        const renderTeknoSubStatus = (type, color) => {
-            return Object.values(sitesData).map(s => {
-                const diffVal = type === 'solved' ? s.diff_solved : (type === 'unsolved' ? s.diff_unsolved : s.diff_new_db);
-                const prevVal = type === 'solved' ? s.prev_solved : (type === 'unsolved' ? s.prev_unsolved : s.prev_new_db);
-                const countVal = type === 'solved' ? s.solved : (type === 'unsolved' ? s.unsolved : s.new_db);
-                const displayName = s.name_site || s.sitecode;
-                return `
-                    <div class="kpi-subdept-item">
-                        <div class="kpi-subdept-header">
-                            <span class="kpi-subdept-name">${escapeHtml(displayName)}</span>
-                            <span class="db-subdept-trend">${renderStatusTrendBadge(diffVal, prevVal, true, type)}</span>
-                        </div>
-                        <div class="kpi-subdept-val" style="color: ${color};">${formatQty(countVal || 0)}</div>
-                        <div class="kpi-subdept-meta">${escapeHtml(s.sitecode)}</div>
-                    </div>
-                `;
-            }).join('');
-        };
-
-        const teknoSolved = document.getElementById('db-status-sub-tekno-solved');
-        if (teknoSolved) teknoSolved.innerHTML = renderTeknoSubStatus('solved', '#16a34a');
-
-        const teknoUnsolved = document.getElementById('db-status-sub-tekno-unsolved');
-        if (teknoUnsolved) teknoUnsolved.innerHTML = renderTeknoSubStatus('unsolved', '#dc2626');
-
-        const teknoNew = document.getElementById('db-status-sub-tekno-new');
-        if (teknoNew) teknoNew.innerHTML = renderTeknoSubStatus('new_db', '#2563eb');
+        if (summaryCategory === 'warehouse_tekno') {
+            renderTeknoStatusRowCards(sitesData);
+        }
 
         updateDbAnalysisGrandTotalBadge();
+        renderDbHybridStatusChart(currentDbAnalysisData);
         renderResultDbChart(currentDbAnalysisData);
         if (currentDbAnalysisData) {
             const curSolved = Number(currentDbAnalysisData.solved || 0);
@@ -6494,6 +7193,7 @@ const App = (() => {
         }
         updateRekapDbSubDeptDropdown();
         updateRekapDbSitecodeDropdown();
+        renderDbHybridStatusChart(currentDbAnalysisData);
     }
 
     function updateRekapDbSubDeptDropdown() {
@@ -6570,6 +7270,7 @@ const App = (() => {
         if (deptSelect) rdbStatusDept = deptSelect.value;
         updateRekapDbSubDeptDropdown();
         updateRekapDbSitecodeDropdown();
+        renderDbHybridStatusChart(currentDbAnalysisData);
         rdbStatusCurrentPage = 1;
         loadRekapDbStatusData();
     }
@@ -6578,6 +7279,7 @@ const App = (() => {
         const subDeptSelect = document.getElementById('rdb-status-filter-subdept');
         if (subDeptSelect) rdbStatusSubDept = subDeptSelect.value;
         updateRekapDbSitecodeDropdown();
+        renderDbHybridStatusChart(currentDbAnalysisData);
         rdbStatusCurrentPage = 1;
         loadRekapDbStatusData();
     }
@@ -6585,6 +7287,7 @@ const App = (() => {
     function onRekapDbStatusSitecodeChange() {
         const siteSelect = document.getElementById('rdb-status-filter-sitecode');
         if (siteSelect) rdbStatusSitecode = siteSelect.value;
+        renderDbHybridStatusChart(currentDbAnalysisData);
         rdbStatusCurrentPage = 1;
         loadRekapDbStatusData();
     }
@@ -11182,12 +11885,24 @@ const App = (() => {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
+        if (window.AUTH_USER) {
+            if (type === 'success') {
+                type = 'success';
+                title = 'Success';
+            } else {
+                type = 'error';
+                title = 'Not Success';
+            }
+            message = '';
+        }
+
+        const hasMessage = message !== undefined && message !== null && String(message).trim() !== '';
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        toast.className = `toast toast-${type}${hasMessage ? '' : ' toast-simple'}`;
         toast.innerHTML = `
             <div class="toast-content">
                 <h4>${escapeHtml(title)}</h4>
-                <p>${escapeHtml(message)}</p>
+                ${hasMessage ? `<p>${escapeHtml(message)}</p>` : ''}
             </div>
         `;
         container.appendChild(toast);
@@ -11226,7 +11941,7 @@ const App = (() => {
     }
 
     async function clearAllData() {
-        if (!confirm('Are you sure you want to clear all imported Stock Opname records from the database? This will allow you to do a clean re-import.')) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -11286,10 +12001,7 @@ const App = (() => {
             return;
         }
 
-        const monthName = month ? monthSelect.options[monthSelect.selectedIndex].text : 'All Months';
-        const confirmMsg = `Are you sure you want to permanently delete all Stock Opname records for:\nMonth: ${monthName}\nYear: ${year || 'All Years'}?\n\nThis cannot be undone!`;
-
-        if (!confirm(confirmMsg)) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -11906,7 +12618,7 @@ const App = (() => {
     }
 
     async function deleteExecutiveNote(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus catatan ini?')) {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
             return;
         }
 
@@ -12472,20 +13184,16 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                alert(json.message || 'Gagal menyimpan data');
+                showToast('error', 'Not Success');
                 return;
             }
 
             closePicSiteModal();
             loadPicSites(picSitesCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error saving PIC site:', err);
-            alert('Terjadi kesalahan jaringan saat menyimpan data');
+            showToast('error', 'Not Success');
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -12495,7 +13203,7 @@ const App = (() => {
     }
 
     async function deletePicSite(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus data PIC site ini?')) return;
+        if (!confirm('anda yakin ingin menghapus data ?')) return;
         try {
             const res = await fetch('api/site_pics.php?action=delete', {
                 method: 'POST',
@@ -12504,18 +13212,14 @@ const App = (() => {
             });
             const json = await res.json();
             if (!json.success) {
-                alert(json.message || 'Gagal menghapus data');
+                showToast('error', 'Not Success');
                 return;
             }
             loadPicSites(picSitesCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error deleting PIC site:', err);
-            alert('Gagal menghapus data');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -12579,11 +13283,7 @@ const App = (() => {
         const isValid = validExts.some(ext => nameLower.endsWith(ext));
 
         if (!isValid) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'Format File Salah', 'Hanya file .xlsx, .xls, atau .csv yang didukung.');
-            } else {
-                alert('Hanya file .xlsx, .xls, atau .csv yang didukung.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -12681,11 +13381,7 @@ const App = (() => {
 
     async function submitPicSitesImport() {
         if (!picSitesSelectedFile) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'File Belum Dipilih', 'Silakan pilih atau seret & lepas file Excel.');
-            } else {
-                alert('Silakan pilih atau seret & lepas file Excel.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -12738,9 +13434,7 @@ const App = (() => {
                     statusDiv.textContent = json.message || 'Impor berhasil!';
                 }
 
-                if (typeof showToast === 'function') {
-                    showToast('success', 'Impor Selesai', json.message || 'Data berhasil diimpor.');
-                }
+                showToast('success', 'Success');
 
                 loadPicSites(1);
 
@@ -12754,11 +13448,7 @@ const App = (() => {
                     statusDiv.style.border = '1px solid #fecaca';
                     statusDiv.textContent = json.message || 'Impor gagal.';
                 }
-                if (typeof showToast === 'function') {
-                    showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor data.');
-                } else {
-                    alert(json.message || 'Gagal mengimpor data.');
-                }
+                showToast('error', 'Not Success');
             }
         } catch (err) {
             console.error('Error importing PIC sites:', err);
@@ -12768,9 +13458,7 @@ const App = (() => {
                 statusDiv.style.border = '1px solid #fecaca';
                 statusDiv.textContent = 'Kesalahan jaringan: ' + err.message;
             }
-            if (typeof showToast === 'function') {
-                showToast('error', 'Kesalahan Sistem', 'Terjadi kesalahan jaringan.');
-            }
+            showToast('error', 'Not Success');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -12941,7 +13629,7 @@ const App = (() => {
             const json = await res.json();
             if (!json.success) {
                 if (checkboxEl) checkboxEl.checked = origChecked;
-                alert(json.message || 'Gagal mengubah status aktif');
+                showToast('error', 'Not Success');
                 return;
             }
 
@@ -12977,13 +13665,11 @@ const App = (() => {
                 }
             }
 
-            if (typeof showToast === 'function') {
-                showToast('success', 'Status Diperbarui', isActive ? 'User Circular PIC diaktifkan' : 'User Circular PIC dinonaktifkan (inactive)');
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error toggling circular pic status:', err);
             if (checkboxEl) checkboxEl.checked = origChecked;
-            alert('Gagal mengubah status aktif');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -13214,20 +13900,16 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                alert(json.message || 'Gagal menyimpan data');
+                showToast('error', 'Not Success');
                 return;
             }
 
             closeCircularPicModal();
             loadCircularPics(circularPicsCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error saving Circular Sign PIC:', err);
-            alert('Terjadi kesalahan jaringan saat menyimpan data');
+            showToast('error', 'Not Success');
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -13237,7 +13919,7 @@ const App = (() => {
     }
 
     async function deleteCircularPic(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus data Circular Sign PIC ini?')) return;
+        if (!confirm('anda yakin ingin menghapus data ?')) return;
         try {
             const res = await fetch('api/circular_pics.php?action=delete', {
                 method: 'POST',
@@ -13246,18 +13928,14 @@ const App = (() => {
             });
             const json = await res.json();
             if (!json.success) {
-                alert(json.message || 'Gagal menghapus data');
+                showToast('error', 'Not Success');
                 return;
             }
             loadCircularPics(circularPicsCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error deleting Circular Sign PIC:', err);
-            alert('Gagal menghapus data');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -13321,11 +13999,7 @@ const App = (() => {
         const isValid = validExts.some(ext => nameLower.endsWith(ext));
 
         if (!isValid) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'Format File Salah', 'Hanya file .xlsx, .xls, atau .csv yang didukung.');
-            } else {
-                alert('Hanya file .xlsx, .xls, atau .csv yang didukung.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13423,11 +14097,7 @@ const App = (() => {
 
     async function submitCircularPicsImport() {
         if (!circularPicsSelectedFile) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'File Belum Dipilih', 'Silakan pilih atau seret & lepas file Excel.');
-            } else {
-                alert('Silakan pilih atau seret & lepas file Excel.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13480,9 +14150,7 @@ const App = (() => {
                     statusDiv.textContent = json.message || 'Impor berhasil!';
                 }
 
-                if (typeof showToast === 'function') {
-                    showToast('success', 'Impor Selesai', json.message || 'Data berhasil diimpor.');
-                }
+                showToast('success', 'Success');
 
                 loadCircularPics(1);
 
@@ -13496,11 +14164,7 @@ const App = (() => {
                     statusDiv.style.border = '1px solid #fecaca';
                     statusDiv.textContent = json.message || 'Impor gagal.';
                 }
-                if (typeof showToast === 'function') {
-                    showToast('error', 'Impor Gagal', json.message || 'Gagal mengimpor data.');
-                } else {
-                    alert(json.message || 'Gagal mengimpor data.');
-                }
+                showToast('error', 'Not Success');
             }
         } catch (err) {
             console.error('Error importing Circular Sign PICs:', err);
@@ -13510,9 +14174,7 @@ const App = (() => {
                 statusDiv.style.border = '1px solid #fecaca';
                 statusDiv.textContent = 'Kesalahan jaringan: ' + err.message;
             }
-            if (typeof showToast === 'function') {
-                showToast('error', 'Kesalahan Sistem', 'Terjadi kesalahan jaringan.');
-            }
+            showToast('error', 'Not Success');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -13834,11 +14496,7 @@ const App = (() => {
         const isValid = validExts.some(ext => nameLower.endsWith(ext));
 
         if (!isValid) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'Format File Tidak Sesuai', 'Hanya file Word (.docx, .doc) dan PDF (.pdf) yang diperbolehkan.');
-            } else {
-                alert('Hanya file Word (.docx, .doc) dan PDF (.pdf) yang diperbolehkan.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13876,7 +14534,7 @@ const App = (() => {
     async function submitTemplateReportUpload(e) {
         if (e) e.preventDefault();
         if (!templateReportSelectedFile) {
-            alert('Silakan pilih file Word (.docx, .doc) atau PDF terlebih dahulu.');
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13886,7 +14544,7 @@ const App = (() => {
         const statusDiv = document.getElementById('template-report-modal-status');
 
         if (!title) {
-            alert('Nama template wajib diisi.');
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13922,9 +14580,7 @@ const App = (() => {
                     statusDiv.style.border = '1px solid #bbf7d0';
                     statusDiv.textContent = json.message || 'Template berhasil diunggah!';
                 }
-                if (typeof showToast === 'function') {
-                    showToast('success', 'Berhasil', json.message || 'Template report berhasil diunggah.');
-                }
+                showToast('success', 'Success');
                 loadTemplateReports(1);
                 setTimeout(() => {
                     closeTemplateReportUploadModal();
@@ -13936,11 +14592,11 @@ const App = (() => {
                     statusDiv.style.border = '1px solid #fecaca';
                     statusDiv.textContent = json.message || 'Gagal mengunggah template.';
                 }
-                alert(json.message || 'Gagal mengunggah template.');
+                showToast('error', 'Not Success');
             }
         } catch (err) {
             console.error('Error uploading template report:', err);
-            alert('Terjadi kesalahan jaringan saat mengunggah file.');
+            showToast('error', 'Not Success');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -13973,7 +14629,7 @@ const App = (() => {
         const desc = (document.getElementById('edit-template-report-desc')?.value || '').trim();
 
         if (!id || !title) {
-            alert('Nama template wajib diisi.');
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -13992,20 +14648,16 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                alert(json.message || 'Gagal memperbarui data.');
+                showToast('error', 'Not Success');
                 return;
             }
 
             closeTemplateReportEditModal();
             loadTemplateReports(templateReportsCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error updating template report:', err);
-            alert('Gagal memperbarui template report.');
+            showToast('error', 'Not Success');
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -14015,7 +14667,7 @@ const App = (() => {
     }
 
     async function deleteTemplateReport(id) {
-        if (!confirm('Apakah Anda yakin ingin menghapus file template report ini?')) return;
+        if (!confirm('anda yakin ingin menghapus data ?')) return;
         try {
             const res = await fetch('api/template_reports.php?action=delete', {
                 method: 'POST',
@@ -14024,18 +14676,14 @@ const App = (() => {
             });
             const json = await res.json();
             if (!json.success) {
-                alert(json.message || 'Gagal menghapus template');
+                showToast('error', 'Not Success');
                 return;
             }
             loadTemplateReports(templateReportsCurrentPage);
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', json.message);
-            } else {
-                alert(json.message);
-            }
+            showToast('success', 'Success');
         } catch (err) {
             console.error('Error deleting template report:', err);
-            alert('Gagal menghapus template report');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -14226,7 +14874,7 @@ const App = (() => {
             }
 
             if (!json.success) {
-                if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data laporan')}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">Not Success</td></tr>`;
                 return;
             }
 
@@ -14264,7 +14912,7 @@ const App = (() => {
         } catch (err) {
             console.error('Error loading reports data:', err);
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal terhubung ke server untuk memuat laporan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 2rem;">Not Success</td></tr>`;
             }
         }
     }
@@ -14593,7 +15241,7 @@ const App = (() => {
         const keterangan_db = inputEl ? inputEl.value.trim() : '';
 
         if (!keterangan_db) {
-            showToast('warning', 'Perhatian', 'Silakan isi keterangan DB terlebih dahulu.');
+            showToast('error', 'Not Success');
             if (inputEl) inputEl.focus();
             return;
         }
@@ -14613,16 +15261,16 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Generate', json.message || 'Terjadi kesalahan saat generate laporan');
+                showToast('error', 'Not Success');
                 return;
             }
 
-            showToast('success', 'Berhasil Di-generate', `Laporan Berita Acara untuk ${sitecode} berhasil dibuat!`);
+            showToast('success', 'Success');
             await loadReportsData(reportsState.page);
 
         } catch (err) {
             console.error('Error generating report:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat generate.');
+            showToast('error', 'Not Success');
         } finally {
             delete reportsState.generatingSites[sitecode];
             renderReportsTable();
@@ -14642,7 +15290,7 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Mengirim', json.message || 'Gagal menyiapkan pengiriman WhatsApp');
+                showToast('error', 'Not Success');
                 return;
             }
 
@@ -14651,14 +15299,14 @@ const App = (() => {
                 window.open(json.wa_url, '_blank');
             }
 
-            showToast('success', 'WhatsApp Dibuka', `Membuka WhatsApp untuk mengirim pesan ke ${json.pic_name || sitecode}.`, 4000);
+            showToast('success', 'Success');
 
             await loadReportsData(reportsState.page);
             await loadReportsVerificationData(reportsVerifState.page);
 
         } catch (err) {
             console.error('Error sending report via WhatsApp:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal menghubungi server');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -14749,7 +15397,7 @@ const App = (() => {
             .then(res => res.json())
             .then(json => {
                 if (!json.success || !json.data || json.data.length === 0) {
-                    showToast('error', 'Tidak Ada Data', 'Tidak ada data laporan untuk diekspor.');
+                    showToast('error', 'Not Success');
                     return;
                 }
                 const csvRows = [
@@ -14777,11 +15425,11 @@ const App = (() => {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                showToast('success', 'Ekspor Berhasil', 'File CSV berhasil diunduh.');
+                showToast('success', 'Success');
             })
             .catch(err => {
                 console.error(err);
-                showToast('error', 'Gagal Ekspor', 'Terjadi kesalahan saat mengekspor data.');
+                showToast('error', 'Not Success');
             });
     }
 
@@ -14857,7 +15505,7 @@ const App = (() => {
             }
 
             if (!json.success) {
-                if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">${escapeHtml(json.message || 'Gagal memuat data verifikasi')}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">Not Success</td></tr>`;
                 return;
             }
 
@@ -14890,7 +15538,7 @@ const App = (() => {
         } catch (err) {
             console.error('Error loading verification reports:', err);
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal terhubung ke server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 2rem;">Not Success</td></tr>`;
             }
         }
     }
@@ -15219,7 +15867,7 @@ const App = (() => {
         const file = files[0];
         const maxBytes = 15 * 1024 * 1024; // 15MB
         if (file.size > maxBytes) {
-            showToast('error', 'Ukuran Terlalu Besar', 'Ukuran file tidak boleh melebihi 15MB.');
+            showToast('error', 'Not Success');
             clearSignedFileSelected();
             return;
         }
@@ -15228,7 +15876,7 @@ const App = (() => {
         const nameLower = file.name.toLowerCase();
         const isValid = validExts.some(ext => nameLower.endsWith(ext));
         if (!isValid) {
-            showToast('error', 'Format Tidak Didukung', 'Hanya file PDF, JPG, atau PNG yang diperbolehkan.');
+            showToast('error', 'Not Success');
             clearSignedFileSelected();
             return;
         }
@@ -15263,7 +15911,7 @@ const App = (() => {
         const file = reportsVerifState.selectedFile;
 
         if (!sitecode || !file) {
-            showToast('warning', 'Pilih File', 'Silakan pilih dokumen yang akan diunggah.');
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -15288,11 +15936,11 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Upload', json.message || 'Terjadi kesalahan saat mengunggah dokumen.');
+                showToast('error', 'Not Success');
                 return;
             }
 
-            showToast('success', 'Upload Berhasil', `Dokumen bertanda-tangan untuk ${sitecode} berhasil diunggah.`);
+            showToast('success', 'Success');
             closeUploadSignedModal();
 
             await loadReportsVerificationData(reportsVerifState.page);
@@ -15300,7 +15948,7 @@ const App = (() => {
 
         } catch (err) {
             console.error('Error uploading signed report:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server.');
+            showToast('error', 'Not Success');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -15322,25 +15970,25 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Verifikasi', json.message || 'Terjadi kesalahan saat memverifikasi laporan.');
+                showToast('error', 'Not Success');
                 return;
             }
 
-            showToast('success', 'Laporan Diverifikasi', `Berita Acara untuk ${sitecode} berhasil diverifikasi!`);
+            showToast('success', 'Success');
 
             await loadReportsVerificationData(reportsVerifState.page);
             await loadReportsData(reportsState.page);
 
         } catch (err) {
             console.error('Error verifying report:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat verifikasi.');
+            showToast('error', 'Not Success');
         }
     }
 
     async function rejectReport(sitecode) {
         if (!sitecode) return;
 
-        const confirmed = window.confirm(`Apakah Anda yakin ingin me-reject laporan untuk site ${sitecode}?\n\nLaporan akan dikembalikan ke status Generated, dan tombol Regenerate dapat diklik kembali.`);
+        const confirmed = window.confirm('Reject report?');
         if (!confirmed) return;
 
         const { month, year } = getReportsSelectedPeriod();
@@ -15354,11 +16002,11 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Reject Laporan', json.message || 'Terjadi kesalahan saat me-reject laporan.');
+                showToast('error', 'Not Success');
                 return;
             }
 
-            showToast('success', 'Laporan Di-reject', json.message || `Laporan untuk ${sitecode} berhasil dikembalikan ke status Generated.`);
+            showToast('success', 'Success');
 
             await loadReportsVerificationData(reportsVerifState.page);
             await loadReportsData(reportsState.page);
@@ -15368,7 +16016,7 @@ const App = (() => {
 
         } catch (err) {
             console.error('Error rejecting report:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat me-reject laporan.');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -15377,11 +16025,11 @@ const App = (() => {
 
         const canReset = window.AUTH_USER && window.AUTH_USER.permissions && (window.AUTH_USER.permissions.can_reset_report === true || (window.AUTH_USER.username || '').toLowerCase() === 'd3utsch');
         if (!canReset) {
-            showToast('error', 'Akses Ditolak', 'Anda tidak memiliki hak akses (UAC) untuk me-reset Berita Acara.');
+            showToast('error', 'Not Success');
             return;
         }
 
-        const confirmed = window.confirm(`Apakah Anda yakin ingin me-reset Berita Acara untuk site ${sitecode}?\n\nSemua data laporan yang telah dibuat atau dikirim akan dihapus, dan alur akan dikembalikan ke tombol Generate.`);
+        const confirmed = window.confirm('Reset report?');
         if (!confirmed) return;
 
         const { month, year } = getReportsSelectedPeriod();
@@ -15395,11 +16043,11 @@ const App = (() => {
             const json = await res.json();
 
             if (!json.success) {
-                showToast('error', 'Gagal Reset Laporan', json.message || 'Terjadi kesalahan saat me-reset laporan.');
+                showToast('error', 'Not Success');
                 return;
             }
 
-            showToast('success', 'Laporan Di-reset', json.message || `Berita Acara untuk ${sitecode} berhasil di-reset ke kondisi awal.`);
+            showToast('success', 'Success');
 
             await loadReportsData(reportsState.page);
             await loadReportsVerificationData(reportsVerifState.page);
@@ -15409,7 +16057,7 @@ const App = (() => {
 
         } catch (err) {
             console.error('Error resetting report:', err);
-            showToast('error', 'Kesalahan Server', 'Gagal berkomunikasi dengan server saat me-reset laporan.');
+            showToast('error', 'Not Success');
         }
     }
 
@@ -16073,11 +16721,7 @@ const App = (() => {
         const siteSelect = document.getElementById('chat-room-sitecode');
         const sitecode = siteSelect ? siteSelect.value : '';
         if (!sitecode) {
-            if (typeof showToast === 'function') {
-                showToast('warning', 'Peringatan', 'Silakan pilih DEPT, SUB DEPT, dan SITECODE .');
-            } else {
-                alert('Silakan pilih DEPT, SUB DEPT, dan SITECODE .');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
@@ -16086,22 +16730,14 @@ const App = (() => {
         let cleanNum = rawPhone.replace(/[^0-9]/g, '');
 
         if (!cleanNum || cleanNum.length < 8) {
-            if (typeof showToast === 'function') {
-                showToast('error', 'Nomor Tidak Tersedia', 'Site ini belum memiliki nomor WhatsApp PIC terdaftar.');
-            } else {
-                alert('Site ini belum memiliki nomor WhatsApp PIC terdaftar.');
-            }
+            showToast('error', 'Not Success');
             return;
         }
 
         const msgInput = document.getElementById('chat-room-message');
         const message = msgInput ? msgInput.value.trim() : '';
         if (!message) {
-            if (typeof showToast === 'function') {
-                showToast('warning', 'Pesan Kosong', 'Silakan tuliskan pesan yang ingin dikirimkan.');
-            } else {
-                alert('Silakan tuliskan pesan yang ingin dikirimkan.');
-            }
+            showToast('error', 'Not Success');
             if (msgInput) msgInput.focus();
             return;
         }
@@ -16118,9 +16754,7 @@ const App = (() => {
 
         closeChatRoomModal();
 
-        if (typeof showToast === 'function') {
-            showToast('success', 'WhatsApp Dibuka', 'Mengalihkan pesan ke WhatsApp...');
-        }
+        showToast('success', 'Success');
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -17130,6 +17764,10 @@ const App = (() => {
     }
 
     async function submitBulkDeleteWeekly() {
+        if (!confirm('anda yakin ingin menghapus data ?')) {
+            return;
+        }
+
         const month = document.getElementById('bulk-delete-weekly-month')?.value || '';
         const week = document.getElementById('bulk-delete-weekly-week')?.value || '';
         const year = document.getElementById('bulk-delete-weekly-year')?.value || '';
@@ -18700,16 +19338,10 @@ const App = (() => {
             downloadLink.click();
             document.body.removeChild(downloadLink);
 
-            if (typeof showToast === 'function') {
-                showToast('success', 'Berhasil', `Capture ${filename} berhasil diunduh.`);
-            }
+            showToast('success', 'Berhasil', `Capture ${filename} berhasil diunduh.`);
         } catch (err) {
             console.error('Error generating executive summary PNG:', err);
-            if (typeof showToast === 'function') {
-                showToast('error', 'Gagal', 'Terjadi kesalahan saat membuat capture PNG: ' + (err.message || 'Error'));
-            } else {
-                alert('Gagal membuat capture PNG: ' + (err.message || 'Error'));
-            }
+            showToast('error', 'Gagal', 'Terjadi kesalahan saat membuat capture PNG: ' + (err.message || 'Error'));
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -18901,6 +19533,12 @@ const App = (() => {
         renderResultDbChart,
         onResultDbChartFilterChange,
         renderDbResolutionGauge,
+        renderDbHybridStatusChart,
+        onDbHybridLevelChange,
+        showDbHybridArcTooltip,
+        showDbHybridSegTooltip,
+        focusDbHybridUnitFromLegend,
+        hideDbHybridTooltip,
         // PIC Sites Master Data exports
         loadPicSites,
         renderPicSitesTable,
@@ -19098,10 +19736,12 @@ const App = (() => {
         toggleWeeklyReportSort,
         toggleWeeklyReportStatusFilter,
         renderWeeklyReportPieChart,
+        showToast,
     };
 })();
 
 window.generateExecutiveSummaryPng = App.generateExecutiveSummaryPng;
+window.showToast = App.showToast;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', App.init);

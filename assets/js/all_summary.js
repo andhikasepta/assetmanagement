@@ -2628,12 +2628,24 @@ const AllSummaryApp = (function () {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
+        if (window.AUTH_USER) {
+            if (type === 'success') {
+                type = 'success';
+                title = 'Success';
+            } else {
+                type = 'error';
+                title = 'Not Success';
+            }
+            message = '';
+        }
+
+        const hasMessage = message !== undefined && message !== null && String(message).trim() !== '';
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        toast.className = `toast toast-${type}${hasMessage ? '' : ' toast-simple'}`;
         toast.innerHTML = `
             <div class="toast-content">
                 <h4>${escapeHtml(title)}</h4>
-                <p>${escapeHtml(message)}</p>
+                ${hasMessage ? `<p>${escapeHtml(message)}</p>` : ''}
             </div>
         `;
         container.appendChild(toast);
